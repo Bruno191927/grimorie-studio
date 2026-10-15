@@ -5,6 +5,7 @@ import 'package:grimoire_studio/features/editor/presentation/providers/editor_pr
 import 'package:grimoire_studio/features/editor/models/game_category.dart';
 import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
+import 'package:grimoire_studio/core/widgets/grimoire_emoji_picker.dart';
 
 class CardGalleryScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenEditor;
@@ -2729,26 +2730,100 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
 
                   // Emoji / Icon Picker (Revamped from Image 1 feedback)
                   Text(ref.tr('category_icon'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      // Selected icon preview
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Color(selectedColor).withValues(alpha: 0.2),
+                      // Clickable preview box that opens full picker
+                      Tooltip(
+                        message: 'Haz clic para abrir el selector de emojis',
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Color(selectedColor), width: 1.5),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          iconController.text.isEmpty ? '🃏' : iconController.text,
-                          style: const TextStyle(fontSize: 22),
+                          onTap: () async {
+                            final picked = await GrimoireEmojiPicker.show(context, currentEmoji: iconController.text);
+                            if (picked != null && picked.isNotEmpty) {
+                              setDialogState(() => iconController.text = picked);
+                            }
+                          },
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Color(selectedColor).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Color(selectedColor), width: 1.8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              iconController.text.isEmpty ? '🃏' : iconController.text,
+                              style: const TextStyle(fontSize: 26),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      // Preset emojis
+                      const SizedBox(width: 12),
+
+                      // Button to open the full categorized emoji selector
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: GrimoireTheme.accentPurple,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.sentiment_satisfied_alt, size: 18),
+                        label: const Text(
+                          'Abrir Selector de Emojis...',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () async {
+                          final picked = await GrimoireEmojiPicker.show(context, currentEmoji: iconController.text);
+                          if (picked != null && picked.isNotEmpty) {
+                            setDialogState(() => iconController.text = picked);
+                          }
+                        },
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Direct custom text/symbol input
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ref.tr('custom_emoji_hint'),
+                              style: const TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
+                            ),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              height: 32,
+                              child: TextField(
+                                controller: iconController,
+                                style: const TextStyle(fontSize: 13, color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: 'ej. 🦄 o 🔮',
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onChanged: (val) => setDialogState(() {}),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Quick suggestions row
+                  Row(
+                    children: [
+                      const Text(
+                        'Sugerencias:',
+                        style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -2761,43 +2836,23 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                   onTap: () => setDialogState(() => iconController.text = emoji),
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
                                     decoration: BoxDecoration(
-                                      color: isCurrent ? GrimoireTheme.accentPurple.withValues(alpha: 0.3) : const Color(0xFF131522),
+                                      color: isCurrent
+                                          ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
+                                          : const Color(0xFF131522),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color: isCurrent ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
                                         width: isCurrent ? 1.5 : 1.0,
                                       ),
                                     ),
-                                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                                    child: Text(emoji, style: const TextStyle(fontSize: 16)),
                                   ),
                                 ),
                               );
                             }).toList(),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(ref.tr('custom_emoji_hint'), style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted)),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 55,
-                        height: 28,
-                        child: TextField(
-                          controller: iconController,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          onChanged: (val) => setDialogState(() {}),
                         ),
                       ),
                     ],

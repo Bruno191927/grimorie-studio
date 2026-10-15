@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/features/editor/models/game_category.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/screens/editor_screen.dart';
+import 'package:grimoire_studio/core/widgets/grimoire_emoji_picker.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -111,6 +112,39 @@ void main() {
 
       // Verify active card dropdown is present
       expect(find.text('Carta Activa:'), findsOneWidget);
+    });
+
+    testWidgets('GrimoireEmojiPicker searches, categorizes, and selects emojis', (WidgetTester tester) async {
+      String? selectedEmoji;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GrimoireEmojiPicker(
+              initialEmoji: '🦄',
+              onEmojiSelected: (emoji) => selectedEmoji = emoji,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify header and categories are displayed
+      expect(find.text('Selector de Íconos y Emojis'), findsOneWidget);
+      expect(find.text('Fantasía & TCG'), findsOneWidget);
+      expect(find.text('Criaturas & Animales'), findsOneWidget);
+
+      // Search for dragon
+      await tester.enterText(find.byType(TextField).first, 'dragón');
+      await tester.pumpAndSettle();
+
+      expect(find.text('🐉'), findsOneWidget);
+
+      // Tap on dragon emoji
+      await tester.tap(find.text('🐉'));
+      await tester.pumpAndSettle();
+
+      expect(selectedEmoji, equals('🐉'));
     });
   });
 }
