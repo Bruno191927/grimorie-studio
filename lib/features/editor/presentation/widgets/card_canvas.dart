@@ -256,7 +256,7 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
               child: Image.file(
                 artFile,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Center(
+                errorBuilder: (context, error, stackTrace) => Center(
                   child: Text(
                     activeRow['icon']?.toString() ?? '✨',
                     style: const TextStyle(fontSize: 48),
@@ -288,11 +288,21 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
         );
 
       case LayerType.image:
+        File? imgFile;
         if (layer.imagePath != null && File(layer.imagePath!).existsSync()) {
+          imgFile = File(layer.imagePath!);
+        } else {
+          final game = (activeRow['game'] ?? '').toString();
+          final key = layer.bindingKey.isNotEmpty ? layer.bindingKey : 'art_url';
+          final bindingVal = activeRow[key]?.toString();
+          imgFile = GameFolderService.resolveCardImageFile(game, bindingVal);
+        }
+
+        if (imgFile != null && imgFile.existsSync()) {
           return ClipRRect(
             borderRadius: BorderRadius.circular(layer.borderRadius),
             child: Image.file(
-              File(layer.imagePath!),
+              imgFile,
               fit: BoxFit.cover,
             ),
           );
@@ -301,9 +311,12 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
           decoration: BoxDecoration(
             color: const Color(0xFF1E2337),
             borderRadius: BorderRadius.circular(layer.borderRadius),
+            border: layer.borderWidth > 0
+                ? Border.all(color: borderColor, width: layer.borderWidth)
+                : null,
           ),
           child: const Center(
-            child: Icon(Icons.image_outlined, color: GrimoireTheme.textMuted),
+            child: Icon(Icons.image_outlined, color: GrimoireTheme.textMuted, size: 36),
           ),
         );
     }

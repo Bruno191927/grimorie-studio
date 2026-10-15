@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../models/layer_item.dart';
+import '../../services/game_folder_service.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
@@ -57,6 +59,8 @@ class InspectorPanel extends ConsumerWidget {
             ref.tr('select_layer_hint'),
             style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted, height: 1.5),
           ),
+          const SizedBox(height: 16),
+          _buildLocalImageAssetsSection(context, ref, state, null),
         ],
       ),
     );
@@ -218,6 +222,10 @@ class InspectorPanel extends ConsumerWidget {
           },
         ),
 
+        // Local Image Upload & Asset Management
+        const SizedBox(height: 16),
+        _buildLocalImageAssetsSection(context, ref, ref.watch(editorProvider), layer),
+
         // AI Art Generation Trigger (as required by AGENT.MD Section 3.B)
         const SizedBox(height: 20),
         _buildSectionHeader(ref.tr('generative_ai_art')),
@@ -239,6 +247,329 @@ class InspectorPanel extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildLocalImageAssetsSection(BuildContext context, WidgetRef ref, EditorState state, LayerItem? layer) {
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    final cardName = (activeRow['card_name'] ?? 'Carta').toString();
+    final artUrl = activeRow['art_url']?.toString() ?? '';
+    final artFile = GameFolderService.resolveCardImageFile(gameName, artUrl);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF121524),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.photo_library_outlined, size: 16, color: GrimoireTheme.accentPurple),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${ref.tr('image_assets_section')} • $cardName',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'games/$gameName/assets/',
+                      style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, fontFamily: 'monospace'),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Current image status & preview
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B0D17),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: GrimoireTheme.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2337),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: artFile != null && artFile.existsSync()
+                      ? Image.file(artFile, fit: BoxFit.cover)
+                      : Center(
+                          child: Text(activeRow['icon']?.toString() ?? '🖼️', style: const TextStyle(fontSize: 24)),
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        artUrl.isNotEmpty ? artUrl : ref.tr('no_local_asset'),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: artFile != null ? const Color(0xFFA7F3D0) : GrimoireTheme.textMuted,
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        artFile != null ? '✓ Guardada en assets/' : 'Sin archivo local',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          color: artFile != null ? GrimoireTheme.accentEmerald : GrimoireTheme.accentAmber,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Button 1: Subir Imagen desde PC
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GrimoireTheme.accentEmerald,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.upload_file, size: 16),
+              label: Text(
+                ref.tr('upload_local_image'),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () async {
+                final files = await FilePicker.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+                );
+                if (files.isNotEmpty && files.first.path != null) {
+                  final sourcePath = files.first.path!;
+                  final savedRelPath = await ref.read(editorProvider.notifier).uploadImageForActiveCard(sourcePath);
+                  if (context.mounted && savedRelPath != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: GrimoireTheme.accentEmerald,
+                        content: Text('Imagen guardada con éxito en games/$gameName/$savedRelPath'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Button 2 & 3: Explorar assets / Abrir en Explorer
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.5)),
+                    backgroundColor: const Color(0xFF16182E),
+                    foregroundColor: const Color(0xFFE0E7FF),
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.photo_library_outlined, size: 13, color: GrimoireTheme.accentIndigo),
+                  label: Text(
+                    ref.tr('browse_game_assets'),
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () => _showAssetsGalleryDialog(context, ref, gameName),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton(
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF16182E),
+                  side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                tooltip: ref.tr('open_assets_folder'),
+                icon: const Icon(Icons.folder_open, size: 16, color: GrimoireTheme.accentEmerald),
+                onPressed: () => GameFolderService.openGameFolderInExplorer(gameName),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAssetsGalleryDialog(BuildContext context, WidgetRef ref, String gameName) {
+    final assetImages = GameFolderService.listGameAssetImages(gameName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GrimoireTheme.surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: GrimoireTheme.borderSubtle),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.photo_library_outlined, color: GrimoireTheme.accentPurple, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Assets de "$gameName"',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Text(
+                    'games/$gameName/assets/ (${assetImages.length} imágenes)',
+                    style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted, fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          height: 380,
+          child: assetImages.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.image_not_supported_outlined, size: 40, color: GrimoireTheme.textMuted),
+                      SizedBox(height: 12),
+                      Text(
+                        'No hay imágenes guardadas en la carpeta assets/.',
+                        style: TextStyle(color: GrimoireTheme.textSecondary, fontSize: 13),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Usa el botón "Subir Imagen desde PC" para importar imágenes.',
+                        style: TextStyle(color: GrimoireTheme.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                )
+              : GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: assetImages.length,
+                  itemBuilder: (context, idx) {
+                    final imgFile = assetImages[idx];
+                    final fileName = imgFile.uri.pathSegments.last;
+                    final relativePath = 'assets/$fileName';
+
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        ref.read(editorProvider.notifier).assignAssetToActiveCard(relativePath);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: GrimoireTheme.accentEmerald,
+                            content: Text('Imagen "$fileName" vinculada a la carta.'),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F111D),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: GrimoireTheme.borderSubtle),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Image.file(
+                                imgFile,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const Center(
+                                  child: Icon(Icons.broken_image, color: GrimoireTheme.textMuted),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              color: const Color(0xFF141726),
+                              child: Text(
+                                fileName,
+                                style: const TextStyle(fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GrimoireTheme.accentPurple,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.folder_open, size: 16),
+            label: Text(ref.tr('open_assets_folder')),
+            onPressed: () => GameFolderService.openGameFolderInExplorer(gameName),
+          ),
+        ],
+      ),
     );
   }
 

@@ -6,7 +6,7 @@ import 'package:csv/csv.dart';
 class GameFolderService {
   /// Base directory where games and their assets are organized:
   /// games/
-  ///   ├── <GameName>/
+  ///   ├── `<GameName>`/
   ///   │     ├── data.csv
   ///   │     └── assets/
   ///   │           ├── image1.png
@@ -145,13 +145,40 @@ class GameFolderService {
     return result;
   }
 
-  /// Saves an image buffer directly into game/assets/<fileName>
+  /// Saves an image buffer directly into `game/assets/<fileName>`
   static Future<File> saveCardImage(String gameName, String fileName, Uint8List imageBytes) async {
     await ensureGameFolderExists(gameName);
     final assetsDir = getGameAssetsDir(gameName);
     final targetFile = File('${assetsDir.path}/$fileName');
     await targetFile.writeAsBytes(imageBytes);
     return targetFile;
+  }
+
+  /// Copies an image file from the user's PC into `games/<gameName>/assets/<fileName>`
+  static Future<File> importImageToGameAssets(String gameName, File sourceFile, {String? customFileName}) async {
+    await ensureGameFolderExists(gameName);
+    final assetsDir = getGameAssetsDir(gameName);
+    final fileName = customFileName ?? sourceFile.uri.pathSegments.last;
+    final sanitizedFileName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final targetFile = File('${assetsDir.path}/$sanitizedFileName');
+    return await sourceFile.copy(targetFile.path);
+  }
+
+  /// Lists all valid image files currently stored in `games/<gameName>/assets/`
+  static List<File> listGameAssetImages(String gameName) {
+    try {
+      final assetsDir = getGameAssetsDir(gameName);
+      if (!assetsDir.existsSync()) return [];
+      final files = assetsDir.listSync().whereType<File>();
+      final validImages = files.where((f) {
+        final ext = f.path.toLowerCase();
+        return ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.webp');
+      }).toList();
+      validImages.sort((a, b) => a.uri.pathSegments.last.toLowerCase().compareTo(b.uri.pathSegments.last.toLowerCase()));
+      return validImages;
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Resolves an art_url string to a physical File on disk if it exists

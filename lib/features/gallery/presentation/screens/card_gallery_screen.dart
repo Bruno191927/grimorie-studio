@@ -21,6 +21,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
   bool _groupByGame = true;
   final Map<String, String?> _gameCategoryFilter = {};
   final Set<String> _selectedFileTypes = {'type_300dpi'};
+  final Map<String, bool> _showDefaultModelsForGame = {};
 
   @override
   Widget build(BuildContext context) {
@@ -886,54 +887,90 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final editorState = ref.watch(editorProvider);
     final categories = editorState.gameCategories[gameName] ?? [];
     final currentCatFilter = _gameCategoryFilter[gameName];
+    final showDefaultModels = _showDefaultModelsForGame[gameName] ?? true;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F111D),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: GrimoireTheme.borderSubtle.withValues(alpha: 0.8)),
+        color: const Color(0xFF0F111E),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: GrimoireTheme.borderSubtle.withValues(alpha: 0.9), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with title and action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Header row with title, active filter tag, and action buttons (Responsive Wrap)
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 10,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.style_outlined, size: 14, color: GrimoireTheme.accentPurple),
-                  const SizedBox(width: 6),
-                  Text(
-                    ref.tr('category_archetypes'),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                    ),
+                    child: const Icon(Icons.category_outlined, size: 18, color: GrimoireTheme.accentPurple),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '(${categories.length} ${ref.tr('cards_in_game')})',
-                    style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            ref.tr('categories_and_defaults'),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: GrimoireTheme.surfaceElevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: GrimoireTheme.borderSubtle),
+                            ),
+                            child: Text(
+                              '${categories.length} ${ref.tr('cards_in_game')}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFC7D2FE)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        ref.tr('categories_defaults_desc'),
+                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                      ),
+                    ],
                   ),
                   if (currentCatFilter != null && currentCatFilter != 'All') ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.6)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'Filtrando: $currentCatFilter',
-                            style: const TextStyle(fontSize: 10, color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           InkWell(
                             onTap: () => setState(() => _gameCategoryFilter[gameName] = null),
-                            child: const Icon(Icons.close, size: 12, color: Color(0xFFE9D5FF)),
+                            child: const Icon(Icons.close, size: 14, color: Color(0xFFE9D5FF)),
                           ),
                         ],
                       ),
@@ -941,21 +978,32 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   ],
                 ],
               ),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
-                  // Button: Gestionar Modelos
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  // Button: Toggle Default Card Models Blueprint Section
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
+                      backgroundColor: showDefaultModels ? GrimoireTheme.accentPurple.withValues(alpha: 0.18) : const Color(0xFF131522),
+                      foregroundColor: const Color(0xFFE9D5FF),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      foregroundColor: const Color(0xFFC7D2FE),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.settings_outlined, size: 13, color: GrimoireTheme.accentIndigo),
-                    label: Text(ref.tr('manage_categories'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                    onPressed: () => _showManageCategoriesDialog(gameName),
+                    icon: Icon(
+                      showDefaultModels ? Icons.visibility_off_outlined : Icons.auto_awesome,
+                      size: 14,
+                      color: GrimoireTheme.accentPurple,
+                    ),
+                    label: Text(
+                      showDefaultModels ? ref.tr('hide_default_models') : ref.tr('view_default_models'),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => setState(() => _showDefaultModelsForGame[gameName] = !showDefaultModels),
                   ),
-                  const SizedBox(width: 6),
 
                   // Button: Carpeta del Juego (data.csv & assets/)
                   OutlinedButton.icon(
@@ -963,29 +1011,27 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       side: BorderSide(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.5)),
                       backgroundColor: GrimoireTheme.accentEmerald.withValues(alpha: 0.12),
                       foregroundColor: const Color(0xFFA7F3D0),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.folder_open_outlined, size: 13, color: GrimoireTheme.accentEmerald),
+                    icon: const Icon(Icons.folder_open_outlined, size: 14, color: GrimoireTheme.accentEmerald),
                     label: Text(ref.tr('game_folder'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     onPressed: () => _showGameFolderDialog(gameName, allGameCards),
                   ),
-                  const SizedBox(width: 6),
 
                   // Button: + Nueva Categoría
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
-                      backgroundColor: GrimoireTheme.accentPurple.withValues(alpha: 0.12),
-                      foregroundColor: const Color(0xFFE9D5FF),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GrimoireTheme.accentPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.add, size: 13, color: GrimoireTheme.accentPurple),
+                    icon: const Icon(Icons.add, size: 14),
                     label: Text(ref.tr('new_category_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     onPressed: () => _showCategoryModelDialog(gameName),
                   ),
@@ -993,9 +1039,9 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // Scrollable Category Archetype Chips
+          // Scrollable Category Archetype Chips (Enlarged & Visual)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1009,7 +1055,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   isSelected: currentCatFilter == null || currentCatFilter == 'All',
                   onTap: () => setState(() => _gameCategoryFilter[gameName] = null),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
 
                 // Predefined archetype chips
                 for (final cat in categories) ...[
@@ -1031,11 +1077,59 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     onEditModel: () => _showCategoryModelDialog(gameName, existingCategory: cat),
                     onDelete: () => _confirmDeleteCategory(gameName, cat.name),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                 ],
               ],
             ),
           ),
+
+          // Dedicated Section: Default Card Models Blueprint Carousel
+          if (showDefaultModels) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090B14),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.25)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.dashboard_customize_outlined, size: 16, color: GrimoireTheme.accentPurple),
+                      const SizedBox(width: 8),
+                      Text(
+                        ref.tr('default_card_models'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${categories.length} plantillas configuradas)',
+                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final cat in categories) ...[
+                          _buildCategoryBlueprintCard(gameName, cat, allGameCards),
+                          const SizedBox(width: 12),
+                        ],
+                        _buildAddCategoryBlueprintCard(gameName),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1051,42 +1145,51 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.25) : GrimoireTheme.surfaceElevated,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected ? color : GrimoireTheme.borderSubtle,
             width: isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(icon, style: const TextStyle(fontSize: 13)),
-            const SizedBox(width: 6),
+            Text(icon, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 8),
             Text(
               title,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? color.withValues(alpha: 0.4) : const Color(0xFF131520),
+                color: isSelected ? color.withValues(alpha: 0.45) : const Color(0xFF131520),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: isSelected ? Colors.white : GrimoireTheme.textMuted,
                 ),
@@ -1112,11 +1215,20 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? catColor.withValues(alpha: 0.22) : GrimoireTheme.surfaceElevated,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: isSelected ? catColor : GrimoireTheme.borderSubtle,
           width: isSelected ? 1.5 : 1.0,
         ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: catColor.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1124,33 +1236,33 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           // Main clickable filter area
           InkWell(
             onTap: onTap,
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
             child: Padding(
-              padding: const EdgeInsets.only(left: 10, right: 6, top: 5, bottom: 5),
+              padding: const EdgeInsets.only(left: 14, right: 8, top: 7, bottom: 7),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(category.icon, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(width: 6),
+                  Text(category.icon, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
                   Text(
                     category.name,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                       color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isSelected ? catColor.withValues(alpha: 0.35) : const Color(0xFF131520),
+                      color: isSelected ? catColor.withValues(alpha: 0.45) : const Color(0xFF131520),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '$count',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: isSelected ? Colors.white : GrimoireTheme.textMuted,
                       ),
@@ -1161,15 +1273,27 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ),
           ),
 
-          // Quick Action: + Create Card from this archetype
+          // Prominent Quick Action Button: + Generar
           Tooltip(
-            message: 'Crear carta con este modelo',
-            child: InkWell(
-              onTap: onGenerateCard,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: Icon(Icons.add, size: 14, color: isSelected ? Colors.white : GrimoireTheme.accentPurple),
+            message: 'Generar carta con el modelo "${category.name}"',
+            child: Container(
+              margin: const EdgeInsets.only(right: 4),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: catColor.withValues(alpha: 0.35),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  side: BorderSide(color: catColor.withValues(alpha: 0.7)),
+                ),
+                icon: const Icon(Icons.flash_on, size: 12, color: Colors.white),
+                label: Text(
+                  ref.tr('quick_generate'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                onPressed: onGenerateCard,
               ),
             ),
           ),
@@ -1178,7 +1302,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            icon: Icon(Icons.more_vert, size: 13, color: GrimoireTheme.textMuted.withValues(alpha: 0.8)),
+            icon: Icon(Icons.more_vert, size: 15, color: GrimoireTheme.textMuted.withValues(alpha: 0.9)),
             color: GrimoireTheme.surfaceElevated,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -1227,11 +1351,197 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
         ],
       ),
     );
   }
+
+  // Visual Blueprint Card for a Category Default Model
+  Widget _buildCategoryBlueprintCard(String gameName, GameCategory cat, List<Map<String, dynamic>> allGameCards) {
+    final catColor = Color(cat.defaultColor);
+    final cardCount = allGameCards.where((c) => (c['category'] ?? '').toString().toLowerCase() == cat.name.toLowerCase()).length;
+
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111422),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: catColor.withValues(alpha: 0.5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: catColor.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with Icon & Name
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: catColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: catColor),
+                ),
+                alignment: Alignment.center,
+                child: Text(cat.icon, style: const TextStyle(fontSize: 18)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cat.name,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    Text(
+                      '$cardCount ${ref.tr('cards_in_game')}',
+                      style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: GrimoireTheme.borderSubtle),
+          const SizedBox(height: 8),
+
+          // Default Card Specs
+          Row(
+            children: [
+              const Icon(Icons.style_outlined, size: 12, color: GrimoireTheme.accentPurple),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Tipo: ${cat.defaultType}',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC7D2FE)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Text('⚡ ', style: TextStyle(fontSize: 10)),
+              Text('Coste: ${cat.defaultCost}', style: const TextStyle(fontSize: 10, color: Colors.white)),
+              const Spacer(),
+              const Text('⚔️ ', style: TextStyle(fontSize: 10)),
+              Text('${cat.defaultAttack}/${cat.defaultDefense}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: _getRarityColor(cat.defaultRarity), shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Text(cat.defaultRarity, style: TextStyle(fontSize: 10, color: _getRarityColor(cat.defaultRarity), fontWeight: FontWeight.w600)),
+            ],
+          ),
+          if (cat.defaultRules.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '"${cat.defaultRules}"',
+              style: const TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: GrimoireTheme.textMuted),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 10),
+
+          // Action Buttons: Use Blueprint to generate card & Edit Blueprint
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GrimoireTheme.accentPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.flash_on, size: 12),
+                  label: const Text('+ Usar Modelo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () => _generateCardFromModel(gameName, cat),
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: const Icon(Icons.tune, size: 15, color: GrimoireTheme.accentIndigo),
+                tooltip: 'Editar Modelo',
+                onPressed: () => _showCategoryModelDialog(gameName, existingCategory: cat),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: const Icon(Icons.delete_outline, size: 15, color: GrimoireTheme.accentPink),
+                tooltip: 'Eliminar Categoría',
+                onPressed: () => _confirmDeleteCategory(gameName, cat.name),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Button Blueprint card to add a new category model
+  Widget _buildAddCategoryBlueprintCard(String gameName) {
+    return InkWell(
+      onTap: () => _showCategoryModelDialog(gameName),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 140,
+        height: 175,
+        decoration: BoxDecoration(
+          color: const Color(0xFF10121E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4), style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_circle_outline, size: 24, color: GrimoireTheme.accentPurple),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '+ Nueva\nPlantilla',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE9D5FF)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   void _generateCardFromModel(String gameName, GameCategory category) {
     ref.read(editorProvider.notifier).createCardFromCategory(gameName, category);
@@ -2097,7 +2407,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     )
                   : ListView.separated(
                       itemCount: categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
                       itemBuilder: (context, idx) {
                         final cat = categories[idx];
                         final cardCount = allGameCards.where((c) => (c['category'] ?? '').toString().toLowerCase() == cat.name.toLowerCase()).length;
@@ -2746,15 +3056,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       label: Text(ref.tr('save_csv_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       onPressed: () async {
                         await ref.read(editorProvider.notifier).syncGameDataCsv(gameName);
-                        if (context.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: GrimoireTheme.accentEmerald,
-                              content: Text('${ref.tr('csv_saved_toast')} "$gameName" (${gameCards.length} cartas).'),
-                            ),
-                          );
-                        }
+                        if (!mounted) return;
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: GrimoireTheme.accentEmerald,
+                            content: Text('${ref.tr('csv_saved_toast')} "$gameName" (${gameCards.length} cartas).'),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -2772,17 +3081,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       label: Text(ref.tr('load_csv_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       onPressed: () async {
                         final ok = await ref.read(editorProvider.notifier).reloadGameFromCsv(gameName);
-                        if (context.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: ok ? GrimoireTheme.accentEmerald : GrimoireTheme.accentPink,
-                              content: Text(ok
-                                  ? '${ref.tr('csv_loaded_toast')} "$gameName".'
-                                  : 'No se encontró data.csv para "$gameName". Primero guárdalo.'),
-                            ),
-                          );
-                        }
+                        if (!mounted) return;
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: ok ? GrimoireTheme.accentEmerald : GrimoireTheme.accentPink,
+                            content: Text(ok
+                                ? '${ref.tr('csv_loaded_toast')} "$gameName".'
+                                : 'No se encontró data.csv para "$gameName". Primero guárdalo.'),
+                          ),
+                        );
                       },
                     ),
                   ),

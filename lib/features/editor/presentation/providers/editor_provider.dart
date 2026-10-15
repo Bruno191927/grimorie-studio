@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
@@ -1382,6 +1383,43 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   Future<bool> openGameFolder(String gameName) async {
     return await GameFolderService.openGameFolderInExplorer(gameName);
+  }
+
+  Future<String?> uploadImageForActiveCard(String sourceFilePath) async {
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    final sourceFile = File(sourceFilePath);
+    if (!sourceFile.existsSync()) return null;
+
+    final targetFile = await GameFolderService.importImageToGameAssets(gameName, sourceFile);
+    final relativeUrl = 'assets/${targetFile.uri.pathSegments.last}';
+
+    updateActiveRowData('art_url', relativeUrl);
+
+    if (state.selectedLayer != null && state.selectedLayer!.type == LayerType.image) {
+      updateLayer(state.selectedLayer!.copyWith(
+        imagePath: targetFile.path,
+        bindingKey: 'art_url',
+      ));
+    }
+
+    await syncGameDataCsv(gameName);
+    return relativeUrl;
+  }
+
+  Future<void> assignAssetToActiveCard(String assetRelativePath) async {
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    updateActiveRowData('art_url', assetRelativePath);
+
+    final resolvedFile = GameFolderService.resolveCardImageFile(gameName, assetRelativePath);
+    if (state.selectedLayer != null && state.selectedLayer!.type == LayerType.image && resolvedFile != null) {
+      updateLayer(state.selectedLayer!.copyWith(
+        imagePath: resolvedFile.path,
+        bindingKey: 'art_url',
+      ));
+    }
+    await syncGameDataCsv(gameName);
   }
 }
 
