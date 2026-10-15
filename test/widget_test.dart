@@ -35,13 +35,13 @@ void main() {
 
     // Verify Board Game groups are present in Spanish
     expect(find.text('Todos los Juegos'), findsOneWidget);
-    expect(find.text('Cyber Arena TCG'), findsWidgets);
-    expect(find.text('Reino Arcano (Fantasy)'), findsWidgets);
+    expect(find.text('Magic'), findsWidgets);
+    expect(find.text('Unstable Unicorns'), findsWidgets);
 
-    // Test Interactive Checkbox: tap dynamic game category 'Hechizos Arcanos'
-    final categoryCheckbox = find.text('Hechizos Arcanos');
-    expect(categoryCheckbox, findsWidgets);
-    await tester.tap(categoryCheckbox.first);
+    // Test Interactive Archetype Pill: tap category 'Criaturas' in Magic
+    final categoryPill = find.text('Criaturas');
+    expect(categoryPill, findsWidgets);
+    await tester.tap(categoryPill.first);
     await tester.pumpAndSettle();
 
     // Switch to English via provider
@@ -67,11 +67,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify card Flame Dress exists initially
-    expect(find.text('"Flame Dress"'), findsOneWidget);
+    // Verify card Lightning Bolt exists initially
+    expect(find.text('"Lightning Bolt"'), findsOneWidget);
 
-    // Find the three dots button on card Flame Dress and tap it
-    final moreVertButton = find.byKey(const ValueKey('card_menu_Flame Dress'));
+    // Find the three dots button on card Lightning Bolt and tap it
+    final moreVertButton = find.byKey(const ValueKey('card_menu_Lightning Bolt'));
     await tester.tap(moreVertButton);
     await tester.pumpAndSettle();
 
@@ -91,8 +91,8 @@ void main() {
     await tester.tap(confirmDeleteBtn);
     await tester.pumpAndSettle();
 
-    // Verify Flame Dress is deleted from gallery
-    expect(find.text('"Flame Dress"'), findsNothing);
+    // Verify Lightning Bolt is deleted from gallery
+    expect(find.text('"Lightning Bolt"'), findsNothing);
   });
 
   testWidgets('Delete game button confirms and removes board game and its cards', (WidgetTester tester) async {
@@ -107,30 +107,30 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify Reino Arcano (Fantasy) header and cards exist initially
-    expect(find.text('Reino Arcano (Fantasy)'), findsWidgets);
-    expect(find.text('"Celestial Kitsune"'), findsOneWidget);
+    // Verify Magic header and cards exist initially
+    expect(find.text('Magic'), findsWidgets);
+    expect(find.text('"Black Lotus"'), findsOneWidget);
 
-    // Find the Eliminar Juego button for Reino Arcano
+    // Find the Eliminar Juego button for Magic
     final deleteGameButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
     expect(deleteGameButtons, findsWidgets);
 
-    // Tap the second delete game button (corresponding to Reino Arcano)
-    await tester.tap(deleteGameButtons.at(1));
+    // Tap the delete game button for Magic
+    await tester.tap(deleteGameButtons.first);
     await tester.pumpAndSettle();
 
     // Verify Confirmation Dialog appears
     expect(find.text('¿Eliminar Juego de Mesa?'), findsOneWidget);
-    expect(find.textContaining('Reino Arcano (Fantasy)'), findsWidgets);
+    expect(find.textContaining('Magic'), findsWidgets);
 
     // Tap confirm delete in dialog
     final confirmDeleteBtn = find.widgetWithText(ElevatedButton, 'Eliminar Juego');
     await tester.tap(confirmDeleteBtn);
     await tester.pumpAndSettle();
 
-    // Verify Reino Arcano (Fantasy) and Celestial Kitsune are removed
-    expect(find.text('"Celestial Kitsune"'), findsNothing);
-    expect(find.text('Juego de mesa eliminado con éxito: "Reino Arcano (Fantasy)"'), findsOneWidget);
+    // Verify Magic and Black Lotus are removed
+    expect(find.text('"Black Lotus"'), findsNothing);
+    expect(find.text('Juego de mesa eliminado con éxito: "Magic"'), findsOneWidget);
   });
 }
 

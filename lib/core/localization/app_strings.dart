@@ -184,6 +184,16 @@ class AppStrings {
       'default_rarity': 'Rareza',
       'save_model': 'Guardar Modelo',
       'archetype_saved': 'Modelo de categoría guardado',
+      'game_folder': 'Carpeta del Juego',
+      'open_in_explorer': 'Abrir en Explorador',
+      'save_csv_btn': 'Guardar data.csv',
+      'load_csv_btn': 'Recargar data.csv',
+      'csv_saved_toast': 'data.csv y assets/ guardados para',
+      'csv_loaded_toast': 'Cartas recargadas desde data.csv para',
+      'game_structure_dialog_title': 'Estructura de Archivos del Juego',
+      'game_structure_dialog_desc': 'Organización del juego en carpetas independientes para data.csv y activos de arte generado:',
+      'assets_count': 'Imágenes en assets/',
+      'data_csv_status': 'Archivo data.csv',
     },
     AppLanguage.en: {
       // Header Nav
@@ -364,6 +374,16 @@ class AppStrings {
       'default_rarity': 'Rarity',
       'save_model': 'Save Archetype',
       'archetype_saved': 'Category archetype saved',
+      'game_folder': 'Game Folder',
+      'open_in_explorer': 'Open in Explorer',
+      'save_csv_btn': 'Save data.csv',
+      'load_csv_btn': 'Reload data.csv',
+      'csv_saved_toast': 'data.csv and assets/ saved for',
+      'csv_loaded_toast': 'Cards reloaded from data.csv for',
+      'game_structure_dialog_title': 'Game File Structure',
+      'game_structure_dialog_desc': 'Dedicated game folder organization for data.csv and generated art assets:',
+      'assets_count': 'Images in assets/',
+      'data_csv_status': 'data.csv file',
     },
   };
 

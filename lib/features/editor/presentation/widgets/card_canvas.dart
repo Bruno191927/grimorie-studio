@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/layer_item.dart';
+import '../../services/game_folder_service.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/utils/template_parser.dart';
 import '../../../../core/utils/expression_evaluator.dart';
@@ -240,10 +241,37 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
         );
 
       case LayerType.shape:
-        // Check dynamic art color from row
         Color effectiveColor = shapeColor;
         if (activeRow.containsKey('art_color') && layer.bindingKey == 'art_url') {
           effectiveColor = Color(activeRow['art_color'] as int);
+        }
+
+        Widget? content;
+        if (layer.bindingKey == 'art_url') {
+          final game = (activeRow['game'] ?? '').toString();
+          final artFile = GameFolderService.resolveCardImageFile(game, activeRow['art_url']?.toString());
+          if (artFile != null) {
+            content = ClipRRect(
+              borderRadius: BorderRadius.circular(layer.borderRadius),
+              child: Image.file(
+                artFile,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(
+                    activeRow['icon']?.toString() ?? '✨',
+                    style: const TextStyle(fontSize: 48),
+                  ),
+                ),
+              ),
+            );
+          } else {
+            content = Center(
+              child: Text(
+                activeRow['icon']?.toString() ?? '✨',
+                style: const TextStyle(fontSize: 48),
+              ),
+            );
+          }
         }
 
         return Container(
@@ -256,14 +284,7 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
                 ? Border.all(color: borderColor, width: layer.borderWidth)
                 : null,
           ),
-          child: layer.bindingKey == 'art_url'
-              ? Center(
-                  child: Text(
-                    activeRow['icon']?.toString() ?? '✨',
-                    style: const TextStyle(fontSize: 48),
-                  ),
-                )
-              : null,
+          child: content,
         );
 
       case LayerType.image:

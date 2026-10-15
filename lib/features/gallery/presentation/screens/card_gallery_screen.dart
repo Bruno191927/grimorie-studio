@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/core/theme/grimoire_theme.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/models/game_category.dart';
+import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class CardGalleryScreen extends ConsumerStatefulWidget {
@@ -15,7 +16,6 @@ class CardGalleryScreen extends ConsumerStatefulWidget {
 }
 
 class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
-  double _maxMana = 10;
   String _searchQuery = '';
   String _selectedGame = 'All';
   bool _groupByGame = true;
@@ -35,30 +35,25 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         allGamesSet.add(g);
       }
     }
-    if (!editorState.deletedGames.contains('Cyber Arena TCG') && !allGamesSet.contains('Cyber Arena TCG')) {
-      allGamesSet.add('Cyber Arena TCG');
-    }
-    if (!editorState.deletedGames.contains('Reino Arcano (Fantasy)') && !allGamesSet.contains('Reino Arcano (Fantasy)')) {
-      allGamesSet.add('Reino Arcano (Fantasy)');
+    if (!editorState.deletedGames.contains('Magic') && !allGamesSet.contains('Magic')) {
+      allGamesSet.add('Magic');
     }
     if (!editorState.deletedGames.contains('Unstable Unicorns') && !allGamesSet.contains('Unstable Unicorns')) {
       allGamesSet.add('Unstable Unicorns');
     }
     final allGames = allGamesSet.toList();
 
-    // Filter rows based on search, mana, board game, and game-scoped category
+    // Filter rows based on search, board game, and game-scoped category
     final filteredRows = allRows.where((row) {
       final name = (row['card_name'] ?? '').toString().toLowerCase();
       final type = (row['type'] ?? '').toString().toLowerCase();
       final game = (row['game'] ?? '').toString();
-      final cost = double.tryParse((row['cost'] ?? '0').toString()) ?? 0;
       final cat = (row['category'] ?? '').toString();
 
       final matchesQuery = _searchQuery.isEmpty ||
           name.contains(_searchQuery.toLowerCase()) ||
           type.contains(_searchQuery.toLowerCase()) ||
           game.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesMana = cost <= _maxMana;
       final matchesGame = _selectedGame == 'All' ||
           game.toLowerCase() == _selectedGame.toLowerCase();
       
@@ -67,7 +62,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           activeCatForGame == 'All' ||
           cat.toLowerCase() == activeCatForGame.toLowerCase();
 
-      return matchesQuery && matchesMana && matchesGame && matchesCategory;
+      return matchesQuery && matchesGame && matchesCategory;
     }).toList();
 
     return Scaffold(
@@ -316,7 +311,6 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                           setState(() {
                                             _selectedGame = 'All';
                                             _gameCategoryFilter.clear();
-                                            _maxMana = 10;
                                             _searchQuery = '';
                                           });
                                         },
@@ -774,7 +768,6 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 ),
                 onPressed: () {
                   setState(() {
-                    _maxMana = 10;
                     _searchQuery = '';
                     _selectedGame = 'All';
                     _gameCategoryFilter.clear();
@@ -821,17 +814,6 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             onToggle: (val) => _toggleFileType('type_vector', val),
           ),
 
-          const SizedBox(height: 16),
-          // Mana Cost Slider
-          _buildFilterSectionTitle('${ref.tr('filter_mana_cost')} (≤ ${_maxMana.toInt()})'),
-          Slider(
-            value: _maxMana,
-            min: 1,
-            max: 10,
-            divisions: 9,
-            activeColor: GrimoireTheme.accentPurple,
-            onChanged: (val) => setState(() => _maxMana = val),
-          ),
         ],
       ),
     );
@@ -972,6 +954,23 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     icon: const Icon(Icons.settings_outlined, size: 13, color: GrimoireTheme.accentIndigo),
                     label: Text(ref.tr('manage_categories'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                     onPressed: () => _showManageCategoriesDialog(gameName),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Button: Carpeta del Juego (data.csv & assets/)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.5)),
+                      backgroundColor: GrimoireTheme.accentEmerald.withValues(alpha: 0.12),
+                      foregroundColor: const Color(0xFFA7F3D0),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    icon: const Icon(Icons.folder_open_outlined, size: 13, color: GrimoireTheme.accentEmerald),
+                    label: Text(ref.tr('game_folder'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () => _showGameFolderDialog(gameName, allGameCards),
                   ),
                   const SizedBox(width: 6),
 
@@ -1270,6 +1269,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final game = row['game']?.toString() ?? 'General';
     final cost = row['cost']?.toString() ?? '0';
     final category = row['category']?.toString() ?? '';
+    final artFile = GameFolderService.resolveCardImageFile(game, row['art_url']?.toString());
 
     return InkWell(
       onTap: () {
@@ -1402,9 +1402,20 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Center(
-                      child: Text(icon, style: const TextStyle(fontSize: 50)),
-                    ),
+                    if (artFile != null)
+                      Positioned.fill(
+                        child: Image.file(
+                          artFile,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(icon, style: const TextStyle(fontSize: 50)),
+                          ),
+                        ),
+                      )
+                    else
+                      Center(
+                        child: Text(icon, style: const TextStyle(fontSize: 50)),
+                      ),
                     Positioned(
                       bottom: 8,
                       child: Container(
@@ -2563,16 +2574,220 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     _showCategoryModelDialog(defaultGame);
   }
 
+  void _showGameFolderDialog(String gameName, List<Map<String, dynamic>> allGameCards) {
+    final gameCards = allGameCards
+        .where((c) => (c['game'] ?? '').toString().toLowerCase() == gameName.toLowerCase())
+        .toList();
+    final gameDir = GameFolderService.getGameDir(gameName);
+    final assetsCount = GameFolderService.getAssetsCount(gameName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GrimoireTheme.surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: GrimoireTheme.borderSubtle),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.accentEmerald.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.4)),
+              ),
+              child: const Icon(Icons.folder_special_outlined, color: GrimoireTheme.accentEmerald, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '${ref.tr('game_structure_dialog_title')}: "$gameName"',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ref.tr('game_structure_dialog_desc'),
+                style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+
+              // Folder Structure Diagram Card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F121E),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: GrimoireTheme.borderSubtle),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.folder, size: 16, color: GrimoireTheme.accentEmerald),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            gameDir.path,
+                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: GrimoireTheme.borderSubtle, height: 16),
+                    Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        const Icon(Icons.description_outlined, size: 14, color: GrimoireTheme.accentIndigo),
+                        const SizedBox(width: 8),
+                        const Text('data.csv', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.white)),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: GrimoireTheme.accentIndigo.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${gameCards.length} cartas',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC7D2FE)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        const Icon(Icons.photo_library_outlined, size: 14, color: GrimoireTheme.accentPink),
+                        const SizedBox(width: 8),
+                        const Text('assets/', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.white)),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: GrimoireTheme.accentPink.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$assetsCount imágenes',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFBCFE8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Action Buttons Row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.6)),
+                        backgroundColor: GrimoireTheme.accentEmerald.withValues(alpha: 0.12),
+                        foregroundColor: const Color(0xFFA7F3D0),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.save_outlined, size: 15),
+                      label: Text(ref.tr('save_csv_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        await ref.read(editorProvider.notifier).syncGameDataCsv(gameName);
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: GrimoireTheme.accentEmerald,
+                              content: Text('${ref.tr('csv_saved_toast')} "$gameName" (${gameCards.length} cartas).'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.6)),
+                        backgroundColor: GrimoireTheme.accentIndigo.withValues(alpha: 0.12),
+                        foregroundColor: const Color(0xFFC7D2FE),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.sync, size: 15),
+                      label: Text(ref.tr('load_csv_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final ok = await ref.read(editorProvider.notifier).reloadGameFromCsv(gameName);
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: ok ? GrimoireTheme.accentEmerald : GrimoireTheme.accentPink,
+                              content: Text(ok
+                                  ? '${ref.tr('csv_loaded_toast')} "$gameName".'
+                                  : 'No se encontró data.csv para "$gameName". Primero guárdalo.'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Button: Abrir en Explorador de Windows
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GrimoireTheme.accentPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.folder_open, size: 16),
+                  label: Text(ref.tr('open_in_explorer'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    ref.read(editorProvider.notifier).openGameFolder(gameName);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _getGameIcon(String game) {
     final g = game.toLowerCase();
-    if (g.contains('cyber') || g.contains('arena') || g.contains('mech')) {
-      return Icons.smart_toy_outlined;
-    } else if (g.contains('unicorn') || g.contains('unstable') || g.contains('inestable')) {
+    if (g.contains('unicorn') || g.contains('unstable') || g.contains('inestable')) {
+      return Icons.pets;
+    } else if (g.contains('magic') || g.contains('mtg') || g.contains('arcano')) {
       return Icons.auto_awesome;
-    } else if (g.contains('arcano') || g.contains('fantasy') || g.contains('magic') || g.contains('reino')) {
-      return Icons.castle_outlined;
-    } else if (g.contains('star') || g.contains('odyssey') || g.contains('sci-fi') || g.contains('space')) {
-      return Icons.rocket_launch_outlined;
     }
     return Icons.casino_outlined;
   }
