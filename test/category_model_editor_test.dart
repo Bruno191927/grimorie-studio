@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/features/editor/models/game_category.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/screens/editor_screen.dart';
+import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'package:grimoire_studio/core/widgets/grimoire_emoji_picker.dart';
 
 void main() {
@@ -77,6 +79,7 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(editorProvider.notifier);
+      notifier.restoreSampleGames();
       expect(container.read(editorProvider).project.rows.isNotEmpty, isTrue);
 
       // Change category of active card to 'Instantáneos' (active card is Magic)
@@ -98,8 +101,13 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(editorProvider.notifier).restoreSampleGames();
+
       await tester.pumpWidget(
-        ProviderScope(
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             home: EditorScreen(repaintBoundaryKey: GlobalKey()),
           ),
@@ -201,14 +209,43 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(editorProvider.notifier).restoreSampleGames();
+
+      // Ensure Magic assets folder exists with a test asset synchronously
+      GameFolderService.ensureGameFolderExistsSync('Magic');
+      final magicAssets = GameFolderService.getGameAssetsDir('Magic');
+      const validPng1x1 = [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+        0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+      ];
+      final testAsset = File('${magicAssets.path}/black_lotus.png');
+      testAsset.writeAsBytesSync(validPng1x1);
+      addTearDown(() {
+        try {
+          if (testAsset.existsSync()) testAsset.deleteSync();
+        } catch (_) {}
+        try {
+          final magicDir = GameFolderService.getGameDir('Magic');
+          if (magicDir.existsSync()) magicDir.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
       await tester.pumpWidget(
-        ProviderScope(
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             home: EditorScreen(repaintBoundaryKey: GlobalKey()),
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // 1. Verify Assets panel is present between canvas and inspector
       expect(find.text('Assets del Juego'), findsWidgets);
@@ -220,7 +257,8 @@ void main() {
 
       // 3. Tap on black_lotus.png to assign it to the active card
       await tester.tap(find.text('black_lotus.png'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Active badge should be visible on the card
       expect(find.text('ACTIVA'), findsWidgets);
@@ -229,7 +267,8 @@ void main() {
       final collapseBtn = find.byTooltip('Plegar panel de assets');
       expect(collapseBtn, findsWidgets);
       await tester.tap(collapseBtn.first);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Panel should now be collapsed showing the vertical label ASSETS
       expect(find.textContaining('ASSETS'), findsWidgets);
@@ -238,7 +277,8 @@ void main() {
       final expandBtn = find.byTooltip('Desplegar panel de assets');
       expect(expandBtn, findsWidgets);
       await tester.tap(expandBtn.first);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Title should be visible again
       expect(find.text('Assets del Juego'), findsWidgets);

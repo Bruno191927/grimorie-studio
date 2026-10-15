@@ -13,6 +13,7 @@ void main() {
     addTearDown(container.dispose);
 
     final notifier = container.read(editorProvider.notifier);
+    notifier.restoreSampleGames();
     final unicornCategories = notifier.getCategoriesForGame('Unstable Unicorns');
 
     // 1. Verify Unstable Unicorns has all 5 requested categories
@@ -74,6 +75,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // Initial state is empty; restore sample games to test
+    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+      await tester.pumpAndSettle();
+    }
 
     // 1. Verify Unstable Unicorns Game Pill is present in Gallery sub-header
     final unicornGamePill = find.text('Unstable Unicorns');

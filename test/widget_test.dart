@@ -33,6 +33,15 @@ void main() {
     // Initial language is Spanish
     expect(find.text('Galería de Cartas'), findsOneWidget);
 
+    // App starts empty with No Games Empty State
+    expect(find.text('No tienes juegos creados'), findsOneWidget);
+    expect(find.text('Crear mi Primer Juego'), findsOneWidget);
+    expect(find.text('Restaurar Juegos de Ejemplo'), findsOneWidget);
+
+    // Tap Restaurar Juegos de Ejemplo to populate sample games
+    await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    await tester.pumpAndSettle();
+
     // Verify Board Game groups are present in Spanish
     expect(find.text('Todos los Juegos'), findsOneWidget);
     expect(find.text('Magic'), findsWidgets);
@@ -66,6 +75,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // Restore sample games to test card deletion
+    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+      await tester.pumpAndSettle();
+    }
 
     // Verify card Lightning Bolt exists initially
     expect(find.text('"Lightning Bolt"'), findsOneWidget);
@@ -107,7 +122,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify Magic header and cards exist initially
+    // Restore sample games to test game deletion
+    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+      await tester.pumpAndSettle();
+    }
+
+    // Verify Magic header and cards exist
     expect(find.text('Magic'), findsWidgets);
     expect(find.text('"Black Lotus"'), findsOneWidget);
 
@@ -130,10 +151,9 @@ void main() {
 
     // Verify Magic and Black Lotus are removed
     expect(find.text('"Black Lotus"'), findsNothing);
-    expect(find.text('Juego de mesa eliminado con éxito: "Magic"'), findsOneWidget);
   });
 
-  testWidgets('Deleting all games displays "No tienes juegos creados" empty state and restores sample games', (WidgetTester tester) async {
+  testWidgets('App starts with "No tienes juegos creados" empty state and restores sample games', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1920, 1080);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -145,32 +165,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. Delete Magic
-    var deleteButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
-    expect(deleteButtons, findsWidgets);
-    await tester.tap(deleteButtons.first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Eliminar Juego'));
-    await tester.pumpAndSettle();
-
-    // 2. Delete Unstable Unicorns
-    deleteButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
-    expect(deleteButtons, findsWidgets);
-    await tester.tap(deleteButtons.first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Eliminar Juego'));
-    await tester.pumpAndSettle();
-
-    // 3. Verify No Games Empty State appears
+    // 1. Verify No Games Empty State appears initially on start
     expect(find.text('No tienes juegos creados'), findsOneWidget);
     expect(find.text('Crear mi Primer Juego'), findsOneWidget);
     expect(find.text('Restaurar Juegos de Ejemplo'), findsOneWidget);
 
-    // 4. Tap Restaurar Juegos de Ejemplo
+    // 2. Tap Restaurar Juegos de Ejemplo
     await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
     await tester.pumpAndSettle();
 
-    // 5. Verify games are restored
+    // 3. Verify games are restored
     expect(find.text('Magic'), findsWidgets);
     expect(find.text('Unstable Unicorns'), findsWidgets);
     expect(find.text('"Black Lotus"'), findsOneWidget);

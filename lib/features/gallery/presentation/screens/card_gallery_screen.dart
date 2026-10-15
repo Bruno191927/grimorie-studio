@@ -37,11 +37,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         allGamesSet.add(g);
       }
     }
-    if (!editorState.deletedGames.contains('Magic') && !allGamesSet.contains('Magic')) {
-      allGamesSet.add('Magic');
-    }
-    if (!editorState.deletedGames.contains('Unstable Unicorns') && !allGamesSet.contains('Unstable Unicorns')) {
-      allGamesSet.add('Unstable Unicorns');
+    for (final g in editorState.gameCategories.keys) {
+      final trimmed = g.trim();
+      if (trimmed.isNotEmpty && !editorState.deletedGames.contains(trimmed)) {
+        allGamesSet.add(trimmed);
+      }
     }
     final allGames = allGamesSet.toList();
     if (allGames.isEmpty && _selectedGame != 'All') {

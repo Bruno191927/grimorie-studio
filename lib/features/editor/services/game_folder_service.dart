@@ -69,12 +69,17 @@ class GameFolderService {
     return File('${getGameDir(gameName).path}${sep}data.csv');
   }
 
+  /// Ensures synchronously that the game directory and its assets/ folder exist
+  static void ensureGameFolderExistsSync(String gameName) {
+    final assetsDir = getGameAssetsDir(gameName);
+    if (!assetsDir.existsSync()) {
+      assetsDir.createSync(recursive: true);
+    }
+  }
+
   /// Ensures that the game directory and its assets/ folder exist
   static Future<void> ensureGameFolderExists(String gameName) async {
-    final assetsDir = getGameAssetsDir(gameName);
-    if (!await assetsDir.exists()) {
-      await assetsDir.create(recursive: true);
-    }
+    ensureGameFolderExistsSync(gameName);
   }
 
   /// Exports cards for a game into game/data.csv formatted in standard RFC-4180

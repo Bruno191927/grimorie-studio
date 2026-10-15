@@ -92,6 +92,11 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
   @override
   Widget build(BuildContext context) {
     final allRows = ref.watch(editorProvider).project.rows;
+    final deck = _getGameCards();
+    if (_hand.isEmpty && _battlefield.isEmpty && deck.isNotEmpty) {
+      _hand.addAll(deck.take(5));
+    }
+
     final availableGames = <String>{'All'};
     for (final r in allRows) {
       final g = (r['game'] ?? '').toString().trim();

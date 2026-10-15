@@ -1007,21 +1007,29 @@ class EditorNotifier extends StateNotifier<EditorState> {
       name: 'Grimoire Chronicles: Tabletop Core Set',
       templates: [defaultTemplate, unicornTemplate],
       activeTemplateIndex: 0,
-      rows: sampleRows,
+      rows: const [],
       activeRowIndex: 0,
     );
 
     _cachedInitialSampleRows = sampleRows.map((r) => Map<String, dynamic>.from(r)).toList();
+    _cachedSampleGameCategories = initialGameCategories.map(
+      (k, v) => MapEntry(k, List<GameCategory>.from(v)),
+    );
 
     return EditorState(
       project: initialProject,
-      gameCategories: initialGameCategories,
+      gameCategories: const {},
     );
   }
 
   static List<Map<String, dynamic>>? _cachedInitialSampleRows;
+  static Map<String, List<GameCategory>>? _cachedSampleGameCategories;
+
   static List<Map<String, dynamic>> getInitialSampleRows() =>
       _cachedInitialSampleRows?.map((r) => Map<String, dynamic>.from(r)).toList() ?? [];
+
+  static Map<String, List<GameCategory>> getInitialSampleCategories() =>
+      _cachedSampleGameCategories?.map((k, v) => MapEntry(k, List<GameCategory>.from(v))) ?? {};
 
   void selectLayer(String? id) {
     state = state.copyWith(selectedLayerId: id, clearSelectedLayer: id == null);
@@ -1405,11 +1413,13 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void restoreSampleGames() {
     final defaultRows = getInitialSampleRows();
+    final defaultCategories = getInitialSampleCategories();
     state = state.copyWith(
       project: state.project.copyWith(
         rows: defaultRows,
         activeRowIndex: 0,
       ),
+      gameCategories: defaultCategories,
       deletedGames: {},
     );
   }
