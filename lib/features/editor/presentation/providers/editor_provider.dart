@@ -1007,11 +1007,17 @@ class EditorNotifier extends StateNotifier<EditorState> {
       activeRowIndex: 0,
     );
 
+    _cachedInitialSampleRows = sampleRows.map((r) => Map<String, dynamic>.from(r)).toList();
+
     return EditorState(
       project: initialProject,
       gameCategories: initialGameCategories,
     );
   }
+
+  static List<Map<String, dynamic>>? _cachedInitialSampleRows;
+  static List<Map<String, dynamic>> getInitialSampleRows() =>
+      _cachedInitialSampleRows?.map((r) => Map<String, dynamic>.from(r)).toList() ?? [];
 
   void selectLayer(String? id) {
     state = state.copyWith(selectedLayerId: id, clearSelectedLayer: id == null);
@@ -1390,6 +1396,17 @@ class EditorNotifier extends StateNotifier<EditorState> {
         activeRowIndex: newIndex,
       ),
       deletedGames: updatedDeletedGames,
+    );
+  }
+
+  void restoreSampleGames() {
+    final defaultRows = getInitialSampleRows();
+    state = state.copyWith(
+      project: state.project.copyWith(
+        rows: defaultRows,
+        activeRowIndex: 0,
+      ),
+      deletedGames: {},
     );
   }
 

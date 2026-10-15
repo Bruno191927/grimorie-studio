@@ -222,6 +222,14 @@ class AppStrings {
       'upload_image_hint': 'Sube un archivo .png, .jpg o .webp. Se copiará a la carpeta assets/ del juego y se vinculará a esta carta.',
       'current_asset_file': 'Archivo Asset Actual',
       'no_local_asset': 'Sin imagen física en assets/. Se usará ícono/color de respaldo.',
+      'no_games_title': 'No tienes juegos creados',
+      'no_games_desc': 'Crea tu primer juego de mesa (por ejemplo Magic, Unstable Unicorns, etc.) con sus categorías y modelos para comenzar a diseñar tus cartas.',
+      'create_first_game_btn': 'Crear mi Primer Juego',
+      'restore_sample_games_btn': 'Restaurar Juegos de Ejemplo',
+      'sample_games_restored': 'Juegos de ejemplo restaurados con éxito.',
+      'game_has_no_cards_title': 'Este juego aún no tiene cartas',
+      'game_has_no_cards_desc': 'Usa las plantillas de categoría de arriba o añade una carta nueva para comenzar.',
+      'add_first_card_to_game': 'Añadir Primera Carta',
     },
     AppLanguage.en: {
       // Header Nav
@@ -440,6 +448,14 @@ class AppStrings {
       'upload_image_hint': 'Upload a .png, .jpg, or .webp file. It will be copied to the game assets/ folder and linked to this card.',
       'current_asset_file': 'Current Asset File',
       'no_local_asset': 'No physical image in assets/. Fallback icon/color will be used.',
+      'no_games_title': 'No card games created',
+      'no_games_desc': 'Create your first tabletop game (e.g. Magic, Unstable Unicorns, etc.) with its categories and blueprints to start designing cards.',
+      'create_first_game_btn': 'Create My First Game',
+      'restore_sample_games_btn': 'Restore Sample Games',
+      'sample_games_restored': 'Sample games (Magic & Unstable Unicorns) successfully restored.',
+      'game_has_no_cards_title': 'This game has no cards yet',
+      'game_has_no_cards_desc': 'Use the category blueprints above or add a new card to get started.',
+      'add_first_card_to_game': 'Add First Card',
     },
   };
 

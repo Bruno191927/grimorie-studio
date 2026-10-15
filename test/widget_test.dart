@@ -132,5 +132,48 @@ void main() {
     expect(find.text('"Black Lotus"'), findsNothing);
     expect(find.text('Juego de mesa eliminado con éxito: "Magic"'), findsOneWidget);
   });
+
+  testWidgets('Deleting all games displays "No tienes juegos creados" empty state and restores sample games', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: GrimoireApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Delete Magic
+    var deleteButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
+    expect(deleteButtons, findsWidgets);
+    await tester.tap(deleteButtons.first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Eliminar Juego'));
+    await tester.pumpAndSettle();
+
+    // 2. Delete Unstable Unicorns
+    deleteButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
+    expect(deleteButtons, findsWidgets);
+    await tester.tap(deleteButtons.first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Eliminar Juego'));
+    await tester.pumpAndSettle();
+
+    // 3. Verify No Games Empty State appears
+    expect(find.text('No tienes juegos creados'), findsOneWidget);
+    expect(find.text('Crear mi Primer Juego'), findsOneWidget);
+    expect(find.text('Restaurar Juegos de Ejemplo'), findsOneWidget);
+
+    // 4. Tap Restaurar Juegos de Ejemplo
+    await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    await tester.pumpAndSettle();
+
+    // 5. Verify games are restored
+    expect(find.text('Magic'), findsWidgets);
+    expect(find.text('Unstable Unicorns'), findsWidgets);
+    expect(find.text('"Black Lotus"'), findsOneWidget);
+  });
 }
 

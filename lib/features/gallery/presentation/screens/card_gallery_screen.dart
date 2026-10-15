@@ -44,6 +44,9 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
       allGamesSet.add('Unstable Unicorns');
     }
     final allGames = allGamesSet.toList();
+    if (allGames.isEmpty && _selectedGame != 'All') {
+      _selectedGame = 'All';
+    }
 
     // Filter rows based on search, board game, and game-scoped category
     final filteredRows = allRows.where((row) {
@@ -297,31 +300,8 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
 
                         // Card Area: Grouped or Continuous Grid
                         Expanded(
-                          child: filteredRows.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.search_off, size: 48, color: GrimoireTheme.textMuted),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        ref.tr('no_cards_found'),
-                                        style: const TextStyle(color: GrimoireTheme.textMuted, fontSize: 13),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _selectedGame = 'All';
-                                            _gameCategoryFilter.clear();
-                                            _searchQuery = '';
-                                          });
-                                        },
-                                        child: Text(ref.tr('filter_reset')),
-                                      ),
-                                    ],
-                                  ),
-                                )
+                          child: allGames.isEmpty || filteredRows.isEmpty
+                              ? _buildEmptyStateContent(filteredRows, allRows, allGames)
                               : _groupByGame
                                   ? _buildGroupedByGameView(filteredRows, allRows)
                                   : _buildFlatGridView(filteredRows, allRows),
@@ -656,12 +636,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         ],
         Expanded(
           child: filteredRows.isEmpty
-              ? Center(
-                  child: Text(
-                    ref.tr('no_cards_found'),
-                    style: const TextStyle(color: GrimoireTheme.textMuted, fontSize: 13),
-                  ),
-                )
+              ? _buildNoFilteredCardsEmptyState()
               : GridView.builder(
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 260,
@@ -678,6 +653,260 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 ),
         ),
       ],
+    );
+  }
+
+  // --- Empty State Controller ---
+  Widget _buildEmptyStateContent(
+    List<Map<String, dynamic>> filteredRows,
+    List<Map<String, dynamic>> allRows,
+    List<String> allGames,
+  ) {
+    if (allGames.isEmpty) {
+      return _buildNoGamesEmptyState();
+    }
+    if (_selectedGame != 'All') {
+      final selectedGameCards = allRows
+          .where((r) => (r['game'] ?? '').toString().toLowerCase() == _selectedGame.toLowerCase())
+          .toList();
+      if (selectedGameCards.isEmpty) {
+        return _buildEmptyGameView(_selectedGame);
+      }
+    }
+    return _buildNoFilteredCardsEmptyState();
+  }
+
+  // --- Empty State: No Games in Studio ---
+  Widget _buildNoGamesEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: GrimoireTheme.surfacePanel.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: GrimoireTheme.accentPurple.withValues(alpha: 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Glowing Icon Badge
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      GrimoireTheme.accentPurple.withValues(alpha: 0.3),
+                      GrimoireTheme.accentIndigo.withValues(alpha: 0.15),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.3),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.sports_esports_outlined,
+                  size: 36,
+                  color: GrimoireTheme.accentPurple,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              Text(
+                ref.tr('no_games_title'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Description
+              Text(
+                ref.tr('no_games_desc'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: GrimoireTheme.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  // Button: Crear mi Primer Juego
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GrimoireTheme.accentPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      minimumSize: const Size(0, 42),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 4,
+                      shadowColor: GrimoireTheme.accentPurple.withValues(alpha: 0.5),
+                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: Text(
+                      ref.tr('create_first_game_btn'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: _showNewGameDialog,
+                  ),
+
+                  // Button: Restaurar Juegos de Ejemplo (Magic & Unstable Unicorns)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.5)),
+                      backgroundColor: GrimoireTheme.accentIndigo.withValues(alpha: 0.1),
+                      foregroundColor: const Color(0xFFC7D2FE),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      minimumSize: const Size(0, 42),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.restore, size: 17, color: GrimoireTheme.accentIndigo),
+                    label: Text(
+                      ref.tr('restore_sample_games_btn'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: () {
+                      ref.read(editorProvider.notifier).restoreSampleGames();
+                      setState(() {
+                        _selectedGame = 'All';
+                        _gameCategoryFilter.clear();
+                        _searchQuery = '';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: GrimoireTheme.accentEmerald,
+                          content: Text(ref.tr('sample_games_restored')),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Empty State: Selected Game has No Cards ---
+  Widget _buildEmptyGameView(String gameName) {
+    return ListView(
+      children: [
+        _buildGameCategoriesBar(gameName, []),
+        const SizedBox(height: 32),
+        Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 440),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: GrimoireTheme.surfacePanel.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: GrimoireTheme.borderSubtle),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_getGameIcon(gameName), size: 44, color: GrimoireTheme.accentPurple),
+                const SizedBox(height: 14),
+                Text(
+                  ref.tr('game_has_no_cards_title'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  ref.tr('game_has_no_cards_desc'),
+                  style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GrimoireTheme.accentPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    minimumSize: const Size(0, 38),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: Text(
+                    '${ref.tr('add_first_card_to_game')} a "$gameName"',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    ref.read(editorProvider.notifier).addCardToGame(gameName);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: GrimoireTheme.accentEmerald,
+                        content: Text('Primera carta añadida al juego "$gameName".'),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- Empty State: Filter Matched No Cards ---
+  Widget _buildNoFilteredCardsEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.search_off, size: 48, color: GrimoireTheme.textMuted),
+          const SizedBox(height: 12),
+          Text(
+            ref.tr('no_cards_found'),
+            style: const TextStyle(color: GrimoireTheme.textMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _selectedGame = 'All';
+                _gameCategoryFilter.clear();
+                _searchQuery = '';
+              });
+            },
+            child: Text(ref.tr('filter_reset')),
+          ),
+        ],
+      ),
     );
   }
 
