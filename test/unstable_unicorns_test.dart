@@ -3,9 +3,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/main.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/features/editor/models/game_category.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('GameCategory unit test: Unstable Unicorns base categories and card creation', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final notifier = container.read(editorProvider.notifier);
+    final unicornCategories = notifier.getCategoriesForGame('Unstable Unicorns');
+
+    // 1. Verify Unstable Unicorns has all 5 requested categories
+    expect(unicornCategories.length, equals(5));
+    final catNames = unicornCategories.map((c) => c.name).toList();
+    expect(catNames, contains('Unicornios'));
+    expect(catNames, contains('Cartas de Mejora'));
+    expect(catNames, contains('Cartas de Degradación'));
+    expect(catNames, contains('Cartas de Magia'));
+    expect(catNames, contains('Cartas de ¡Neigh! (Relincho)'));
+
+    // 2. Generate a new card from the "Unicornios" category
+    final unicornCat = unicornCategories.firstWhere((c) => c.name == 'Unicornios');
+    notifier.createCardFromCategory('Unstable Unicorns', unicornCat, cardName: 'Unicornio Estelar');
+
+    final rows = container.read(editorProvider).project.rows;
+    final createdCard = rows.firstWhere((r) => r['card_name'] == 'Unicornio Estelar');
+    expect(createdCard['game'], equals('Unstable Unicorns'));
+    expect(createdCard['category'], equals('Unicornios'));
+    expect(createdCard['icon'], equals('🦄'));
+    expect(createdCard['type'], equals('Unicornio Mágico'));
+
+    // 3. Add a new custom category to Unstable Unicorns
+    final newCat = GameCategory(
+      id: 'cat_dragons',
+      name: 'Unicornios Dragón',
+      icon: '🐉',
+      defaultType: 'Unicornio Dragón Legendario',
+      defaultColor: 0xFFEF4444,
+      defaultRules: 'Inmune a cartas de Degradación.',
+    );
+    notifier.addCategoryToGame('Unstable Unicorns', newCat);
+
+    final updatedCats = notifier.getCategoriesForGame('Unstable Unicorns');
+    expect(updatedCats.length, equals(6));
+    expect(updatedCats.any((c) => c.name == 'Unicornios Dragón'), isTrue);
+
+    // 4. Generate card from new custom category
+    notifier.createCardFromCategory('Unstable Unicorns', newCat, cardName: 'Dragón Brillante');
+    final rowsAfter = container.read(editorProvider).project.rows;
+    final dragonCard = rowsAfter.firstWhere((r) => r['card_name'] == 'Dragón Brillante');
+    expect(dragonCard['icon'], equals('🐉'));
+    expect(dragonCard['category'], equals('Unicornios Dragón'));
+    expect(dragonCard['rules'], equals('Inmune a cartas de Degradación.'));
+
+    // 5. Delete category from game
+    notifier.deleteCategoryFromGame('Unstable Unicorns', 'Unicornios Dragón');
+    expect(notifier.getCategoriesForGame('Unstable Unicorns').length, equals(5));
+  });
 
   testWidgets('Unstable Unicorns game exists with cards, custom template, and playtest integration', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1920, 1080);
@@ -33,6 +89,13 @@ void main() {
     expect(find.text('"¡Relincho! (Neigh!)"'), findsOneWidget);
     expect(find.text('"Bomba de Purpurina"'), findsOneWidget);
     expect(find.text('"Melena Arcoíris Protectora"'), findsOneWidget);
+
+    // Verify categories for Unstable Unicorns are shown in sidebar
+    expect(find.text('Unicornios'), findsWidgets);
+    expect(find.text('Cartas de Mejora'), findsWidgets);
+    expect(find.text('Cartas de Degradación'), findsWidgets);
+    expect(find.text('Cartas de Magia'), findsWidgets);
+    expect(find.text('Cartas de ¡Neigh! (Relincho)'), findsWidgets);
 
     // 3. Tap on "Unicornio Seductor" to open Canvas Editor
     await tester.tap(find.text('"Unicornio Seductor"'));

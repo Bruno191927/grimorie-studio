@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/card_project.dart';
 import '../../models/card_template.dart';
 import '../../models/layer_item.dart';
+import '../../models/game_category.dart';
 
 class EditorState {
   final CardProject project;
@@ -14,6 +15,7 @@ class EditorState {
   final bool isGeneratingAi;
   final CardSide currentSide;
   final Set<String> deletedGames;
+  final Map<String, List<GameCategory>> gameCategories;
 
   const EditorState({
     required this.project,
@@ -24,6 +26,7 @@ class EditorState {
     this.isGeneratingAi = false,
     this.currentSide = CardSide.front,
     this.deletedGames = const {},
+    this.gameCategories = const {},
   });
 
   LayerItem? get selectedLayer {
@@ -43,6 +46,7 @@ class EditorState {
     bool? isGeneratingAi,
     CardSide? currentSide,
     Set<String>? deletedGames,
+    Map<String, List<GameCategory>>? gameCategories,
   }) {
     return EditorState(
       project: project ?? this.project,
@@ -53,6 +57,7 @@ class EditorState {
       isGeneratingAi: isGeneratingAi ?? this.isGeneratingAi,
       currentSide: currentSide ?? this.currentSide,
       deletedGames: deletedGames ?? this.deletedGames,
+      gameCategories: gameCategories ?? this.gameCategories,
     );
   }
 }
@@ -461,6 +466,130 @@ class EditorNotifier extends StateNotifier<EditorState> {
       ],
     );
 
+    // Board Game Specific Categories Configuration
+    final initialGameCategories = <String, List<GameCategory>>{
+      'Unstable Unicorns': [
+        const GameCategory(
+          id: 'uu-unicorns',
+          name: 'Unicornios',
+          icon: '🦄',
+          defaultType: 'Unicornio Mágico',
+          defaultColor: 0xFFEC4899,
+          defaultRules: 'Al entrar a tu establo, activa su efecto mágico.',
+        ),
+        const GameCategory(
+          id: 'uu-upgrades',
+          name: 'Cartas de Mejora',
+          icon: '🌟',
+          defaultType: 'Mejora',
+          defaultColor: 0xFF06B6D4,
+          defaultRules: 'Mejora para tu establo. Otorga bonificaciones permanentes.',
+        ),
+        const GameCategory(
+          id: 'uu-downgrades',
+          name: 'Cartas de Degradación',
+          icon: '🏚️',
+          defaultType: 'Degradación',
+          defaultColor: 0xFFFACC15,
+          defaultRules: 'Juega en el establo de un rival para perjudicarlo.',
+        ),
+        const GameCategory(
+          id: 'uu-magic',
+          name: 'Cartas de Magia',
+          icon: '💣',
+          defaultType: 'Magia',
+          defaultColor: 0xFFE879F9,
+          defaultRules: 'Efecto de hechizo inmediato que va al descarte tras resolverse.',
+        ),
+        const GameCategory(
+          id: 'uu-neigh',
+          name: 'Cartas de ¡Neigh! (Relincho)',
+          icon: '🚫',
+          defaultType: 'Instantánea',
+          defaultColor: 0xFFEF4444,
+          defaultRules: '¡Respuesta Inmediata! Cancela la carta que cualquier rival intente jugar.',
+        ),
+      ],
+      'Cyber Arena TCG': [
+        const GameCategory(
+          id: 'ca-mechs',
+          name: 'Mechas y Criaturas Cyber',
+          icon: '🤖',
+          defaultType: 'Creature',
+          defaultColor: 0xFFF59E0B,
+          defaultRules: 'Unidad de combate cibernética de alta potencia.',
+        ),
+        const GameCategory(
+          id: 'ca-hacks',
+          name: 'Hacks y Software',
+          icon: '⚡',
+          defaultType: 'Spell',
+          defaultColor: 0xFF10B981,
+          defaultRules: 'Infiltración o sobrecarga de sistemas.',
+        ),
+        const GameCategory(
+          id: 'ca-lands',
+          name: 'Territorios Virtuales',
+          icon: '🏙️',
+          defaultType: 'Land',
+          defaultColor: 0xFF0284C7,
+          defaultRules: 'Genera ancho de banda y puntos de matriz.',
+        ),
+      ],
+      'Reino Arcano (Fantasy)': [
+        const GameCategory(
+          id: 'ra-creatures',
+          name: 'Criaturas Místicas',
+          icon: '🦌',
+          defaultType: 'Creature',
+          defaultColor: 0xFF0D9488,
+          defaultRules: 'Criatura feérica leal a los antiguos bosques.',
+        ),
+        const GameCategory(
+          id: 'ra-spells',
+          name: 'Hechizos Arcanos',
+          icon: '🌱',
+          defaultType: 'Spell',
+          defaultColor: 0xFF16A34A,
+          defaultRules: 'Encantamiento primordial de la naturaleza.',
+        ),
+        const GameCategory(
+          id: 'ra-relics',
+          name: 'Reliquias & Artefactos',
+          icon: '⏳',
+          defaultType: 'Artifact',
+          defaultColor: 0xFF9333EA,
+          defaultRules: 'Canalizador místico imbuido con runas arcanas.',
+        ),
+      ],
+      'Star Odyssey (Sci-Fi)': [
+        const GameCategory(
+          id: 'so-ships',
+          name: 'Naves Estelares',
+          icon: '🚀',
+          defaultType: 'Vehicle',
+          defaultColor: 0xFF3B82F6,
+          defaultRules: 'Crucero interestelar con escudos de plasma.',
+        ),
+        const GameCategory(
+          id: 'so-tech',
+          name: 'Tecnología Alienígena',
+          icon: '🛸',
+          defaultType: 'Artifact',
+          defaultColor: 0xFF8B5CF6,
+          defaultRules: 'Dispositivo hiperlumínico de civilización perdida.',
+        ),
+        const GameCategory(
+          id: 'so-planets',
+          name: 'Planetas Colonizados',
+          icon: '🪐',
+          defaultType: 'Land',
+          defaultColor: 0xFF6366F1,
+          defaultRules: 'Colonia minera con producción de helio-3.',
+        ),
+      ],
+    };
+
     // Sample data rows inspired by the reference image
     final sampleRows = [
       {
@@ -478,7 +607,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'When summoned, deals 3 damage to any target. If cost > 5, ignite enemy battlefield.',
         'prompt': 'Cute 3D robot character wearing futuristic glass helmet, miniature stylized tabletop figurine',
         'game': 'Cyber Arena TCG',
-        'category': 'cat_art_creature',
+        'category': 'Mechas y Criaturas Cyber',
       },
       {
         'card_name': 'Hamlet Contemplates',
@@ -495,7 +624,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Defender. At end of turn, draw 1 card if no damage was taken.',
         'prompt': 'Small cylindrical cyber panda robot contemplating on a minimalist platform, round aesthetic',
         'game': 'Cyber Arena TCG',
-        'category': 'cat_art_creature',
+        'category': 'Mechas y Criaturas Cyber',
       },
       {
         'card_name': 'Loving Vase 01',
@@ -512,7 +641,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Trample. Whenever this creature attacks, gain 3 life.',
         'prompt': 'Stylized warm brown standing bear toy figure, glossy vinyl toy, tabletop mini',
         'game': 'Cyber Arena TCG',
-        'category': 'cat_art_creature',
+        'category': 'Mechas y Criaturas Cyber',
       },
       {
         'card_name': 'Triumphant Awakening',
@@ -529,7 +658,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Target allied creature gets +2/+2 and vigilance until end of turn.',
         'prompt': 'Cute anthropomorphic plant sprout creature with leafy ears sticking out tongue',
         'game': 'Reino Arcano (Fantasy)',
-        'category': 'cat_spell_magic',
+        'category': 'Hechizos Arcanos',
       },
       {
         'card_name': 'Forest Nymph Stalker',
@@ -546,7 +675,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Forestwalk. Cannot be countered by spell abilities.',
         'prompt': 'Slender mystical deer nymph with celestial horns and golden spots, enchanted forest',
         'game': 'Reino Arcano (Fantasy)',
-        'category': 'cat_art_creature',
+        'category': 'Criaturas Místicas',
       },
       {
         'card_name': 'Celestial Kitsune',
@@ -563,7 +692,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Flash. When Celestial Kitsune enters, return target permanent to its owner hand.',
         'prompt': 'Blue magical fox spirit with glowing cyan eyes, mystical familiar for fantasy tabletop',
         'game': 'Reino Arcano (Fantasy)',
-        'category': 'cat_art_creature',
+        'category': 'Criaturas Místicas',
       },
       {
         'card_name': 'Chrono-Warp Relic',
@@ -580,7 +709,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Tap: Reverse time by 1 turn or warp past any encounter trap.',
         'prompt': 'Ancient celestial hourglass with floating glowing purple sand and golden filigree',
         'game': 'Star Odyssey (Sci-Fi)',
-        'category': 'cat_relic_artifact',
+        'category': 'Reliquias & Artefactos',
       },
       {
         'card_name': 'Neon Cyber City',
@@ -597,7 +726,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Generates 1 Cyber Matrix Point. All allied mechs gain +1/+0 shield.',
         'prompt': 'Futuristic neon cyberpunk floating city core with holographic data pillars',
         'game': 'Cyber Arena TCG',
-        'category': 'cat_virtual_lands',
+        'category': 'Territorios Virtuales',
       },
 
       // --- UNSTABLE UNICORNS (Edición Caos) ---
@@ -616,7 +745,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Si esta carta fuese a ser destruida o sacrificada, devuélvela a tu Guardería en lugar de enviarla al descarte.',
         'prompt': 'Cute pastel baby unicorn with soft rainbow mane drinking from baby bottle, kawaii vinyl toy',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Unicornio Bebé Galáctico',
@@ -633,7 +762,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Comienza la partida en la Guardería. Los rivales no pueden robar esta carta mientras sea un bebé.',
         'prompt': 'Cosmic starry galaxy baby unicorn floating among purple nebulae, cute chibi',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Unicornio Básico con Capa',
@@ -650,7 +779,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'No tiene habilidades mágicas complejas, pero defiende tu establo con honor y valentía heroica.',
         'prompt': 'Heroic cute unicorn wearing a mini knight helmet and red heroic cape, pastel chibi style',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Unicornio Gamer Cósmico',
@@ -667,7 +796,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Un unicornio adicto a los videojuegos retro. Si tu establo tiene al menos 3 unicornios, gana +1 de defensa.',
         'prompt': 'Pastel purple unicorn wearing gaming headset and holding a retro portable console',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Unicornio Seductor',
@@ -684,7 +813,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Al entrar a tu establo, roba 1 carta de Unicornio del establo de cualquier rival y trasládala al tuyo.',
         'prompt': 'Elegant magical unicorn with sparkling magenta heart sunglasses and charming aura',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Motosierra Unicornio',
@@ -701,7 +830,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Al entrar a tu establo, destruye inmediatamente 1 carta de Mejora o Degradación en cualquier establo.',
         'prompt': 'Fierce humorous unicorn wielding a tiny cute chainsaw, glitter sparks flying',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Rinocornio Demoledor',
@@ -718,7 +847,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Al inicio de tu turno, puedes renunciar a tu robo de carta para destruir 1 Unicornio en el establo de un rival.',
         'prompt': 'Armored rhinocorn with a massive glowing crystal horn charging forward, vibrant comic art',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Unicornio Zombi',
@@ -735,7 +864,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Al inicio de tu turno, puedes descartar 1 carta de tu mano para revivir cualquier Unicornio de tu descarte a tu establo.',
         'prompt': 'Adorable zombie unicorn with soft green pastel fur and glowing purple stitches, kawaii undead',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': 'Ginormous Unicorn',
@@ -752,7 +881,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Cuenta como 2 Unicornios para la victoria. Mientras permanezca en tu establo, ningún jugador puede jugar cartas Instantáneas.',
         'prompt': 'Colossal dinosaur-sized unicorn stomping through a miniature cartoon farm, rainbow footprints',
         'game': 'Unstable Unicorns',
-        'category': 'cat_art_creature',
+        'category': 'Unicornios',
       },
       {
         'card_name': '¡Relincho! (Neigh!)',
@@ -769,7 +898,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': '¡Respuesta Inmediata! Cancela la carta que cualquier rival intente jugar y envíala directamente a la pila de descarte.',
         'prompt': 'Sassy unicorn yelling with mouth wide open, red comic stop barrier, dramatic shockwaves',
         'game': 'Unstable Unicorns',
-        'category': 'cat_spell_magic',
+        'category': 'Cartas de ¡Neigh! (Relincho)',
       },
       {
         'card_name': 'Súper Relincho Místico',
@@ -786,7 +915,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Cancela cualquier jugada rival al instante. Esta carta es inmutable y no puede ser cancelada por ningún otro ¡Relincho!.',
         'prompt': 'Golden-horned supreme unicorn stamping hoof creating golden shockwave of denial, epic comic style',
         'game': 'Unstable Unicorns',
-        'category': 'cat_spell_magic',
+        'category': 'Cartas de ¡Neigh! (Relincho)',
       },
       {
         'card_name': 'Bomba de Purpurina',
@@ -803,7 +932,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Sacrifica 1 carta de tu establo. A cambio, destruye cualquier carta en el establo de un rival a tu elección.',
         'prompt': 'Sparkling glitter bomb exploding into multi-color star sparkles, vibrant pop-art',
         'game': 'Unstable Unicorns',
-        'category': 'cat_spell_magic',
+        'category': 'Cartas de Magia',
       },
       {
         'card_name': 'Súper Patada Equina',
@@ -820,7 +949,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Devuelve cualquier carta de un establo rival a la mano de su dueño. Roba 1 carta adicional de tu mazo.',
         'prompt': 'Cartoon unicorn delivering an energetic back kick with rainbow motion lines and stars',
         'game': 'Unstable Unicorns',
-        'category': 'cat_spell_magic',
+        'category': 'Cartas de Magia',
       },
       {
         'card_name': 'Melena Arcoíris Protectora',
@@ -837,7 +966,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Mejora de Establo: Tus Unicornios están bendecidos y son completamente inmunes a ser destruidos por efectos mágicos rivales.',
         'prompt': 'Prismatic glowing rainbow mane floating like a mystical aura halo, fantasy magical artifact',
         'game': 'Unstable Unicorns',
-        'category': 'cat_relic_artifact',
+        'category': 'Cartas de Mejora',
       },
       {
         'card_name': 'Establo Inquebrantable',
@@ -854,7 +983,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Mejora de Establo: Los rivales tienen prohibido jugar cartas de Degradación o Maldición en tu establo.',
         'prompt': 'Majestic pastel crystal fortress castle with magical rainbow forcefield and unicorn banners',
         'game': 'Unstable Unicorns',
-        'category': 'cat_virtual_lands',
+        'category': 'Cartas de Mejora',
       },
       {
         'card_name': 'Luz Cegadora Desorientadora',
@@ -871,7 +1000,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Degradación: Juega en el establo de un rival. Todos los Unicornios de ese jugador quedan incapacitados y pierden sus poderes mágicos.',
         'prompt': 'Blinding radiant miniature sun hovering over a chaotic cartoon stable, dizzy unicorns with spiral eyes',
         'game': 'Unstable Unicorns',
-        'category': 'cat_virtual_lands',
+        'category': 'Cartas de Degradación',
       },
       {
         'card_name': 'Establo Diminuto',
@@ -888,7 +1017,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'rules_text': 'Degradación: Juega en el establo de un rival. El límite máximo de Unicornios de ese jugador se reduce drásticamente a 3.',
         'prompt': 'Tiny cramped wooden barn with a giant cartoon padlock, comical sad unicorn squeezed inside',
         'game': 'Unstable Unicorns',
-        'category': 'cat_virtual_lands',
+        'category': 'Cartas de Degradación',
       },
     ];
 
@@ -901,7 +1030,10 @@ class EditorNotifier extends StateNotifier<EditorState> {
       activeRowIndex: 0,
     );
 
-    return EditorState(project: initialProject);
+    return EditorState(
+      project: initialProject,
+      gameCategories: initialGameCategories,
+    );
   }
 
   void selectLayer(String? id) {
@@ -1031,27 +1163,122 @@ class EditorNotifier extends StateNotifier<EditorState> {
     }
   }
 
-  void addCardToGame(String gameName, {String? cardName, String? type, String? icon, String? category}) {
+  List<GameCategory> getCategoriesForGame(String gameName) {
+    if (state.gameCategories.containsKey(gameName)) {
+      return state.gameCategories[gameName]!;
+    }
+    // Auto-discover unique categories from existing card rows
+    final existingCategories = state.project.rows
+        .where((r) => (r['game'] ?? '').toString().toLowerCase() == gameName.toLowerCase())
+        .map((r) => (r['category'] ?? '').toString())
+        .where((c) => c.isNotEmpty)
+        .toSet();
+
+    return existingCategories.map((c) => GameCategory(
+      id: 'cat-${c.hashCode}',
+      name: c,
+      icon: '🃏',
+      defaultType: 'Criatura',
+    )).toList();
+  }
+
+  void addCategoryToGame(String gameName, GameCategory category) {
+    final currentList = List<GameCategory>.from(state.gameCategories[gameName] ?? []);
+    final existingIdx = currentList.indexWhere((c) => c.name.toLowerCase() == category.name.toLowerCase());
+    if (existingIdx != -1) {
+      currentList[existingIdx] = category;
+    } else {
+      currentList.add(category);
+    }
+    final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories);
+    updatedCategories[gameName] = currentList;
+    state = state.copyWith(gameCategories: updatedCategories);
+  }
+
+  void deleteCategoryFromGame(String gameName, String categoryName) {
+    final currentList = List<GameCategory>.from(state.gameCategories[gameName] ?? []);
+    currentList.removeWhere((c) => c.name.toLowerCase() == categoryName.toLowerCase());
+    final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories);
+    updatedCategories[gameName] = currentList;
+    state = state.copyWith(gameCategories: updatedCategories);
+  }
+
+  void createCardFromCategory(String gameName, GameCategory category, {String? cardName}) {
     if (state.deletedGames.contains(gameName)) {
       final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
       state = state.copyWith(deletedGames: updatedDeleted);
     }
 
     final newCard = {
-      'card_name': cardName ?? 'Nueva Carta ($gameName)',
+      'card_name': cardName ?? 'Nueva ${category.name}',
       'cost': '3',
-      'type': type ?? 'Creature',
+      'type': category.defaultType,
       'rarity': 'Common',
-      'attack': '2',
-      'defense': '2',
+      'attack': category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0',
+      'defense': category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0',
       'creator': 'Tyler Covington',
       'bid': '4.89 ETH',
       'chain': 'BSC',
-      'icon': icon ?? '🃏',
-      'art_color': 0xFF7C3AED,
-      'rules_text': 'Habilidad especial para el juego $gameName.',
+      'icon': category.icon,
+      'art_color': category.defaultColor,
+      'rules_text': category.defaultRules.isNotEmpty
+          ? category.defaultRules
+          : 'Habilidad de ${category.name} para $gameName.',
+      'rules': category.defaultRules.isNotEmpty
+          ? category.defaultRules
+          : 'Habilidad de ${category.name} para $gameName.',
       'game': gameName,
-      'category': category ?? 'cat_art_creature',
+      'category': category.name,
+    };
+    addRow(newCard);
+  }
+
+  void addCardToGame(
+    String gameName, {
+    String? cardName,
+    String? type,
+    String? icon,
+    String? category,
+    int? artColor,
+    String? rulesText,
+  }) {
+    if (state.deletedGames.contains(gameName)) {
+      final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
+      state = state.copyWith(deletedGames: updatedDeleted);
+    }
+
+    final categories = getCategoriesForGame(gameName);
+    final chosenCategory = category != null
+        ? categories.firstWhere(
+            (c) => c.name.toLowerCase() == category.toLowerCase(),
+            orElse: () => GameCategory(id: 'cat', name: category),
+          )
+        : (categories.isNotEmpty ? categories.first : null);
+
+    final finalCatName = chosenCategory?.name ?? category ?? 'General';
+    final finalIcon = icon ?? chosenCategory?.icon ?? '🃏';
+    final finalType = type ?? chosenCategory?.defaultType ?? 'Creature';
+    final finalColor = artColor ?? chosenCategory?.defaultColor ?? 0xFF7C3AED;
+    final finalRules = rulesText ?? (chosenCategory?.defaultRules.isNotEmpty == true
+        ? chosenCategory!.defaultRules
+        : 'Habilidad especial para el juego $gameName.');
+
+    final newCard = {
+      'card_name': cardName ?? 'Nueva Carta ($gameName)',
+      'cost': '3',
+      'type': finalType,
+      'rarity': 'Common',
+      'attack': finalType.toLowerCase().contains('creature') || finalType.toLowerCase().contains('unicorn') ? '2' : '0',
+      'defense': finalType.toLowerCase().contains('creature') || finalType.toLowerCase().contains('unicorn') ? '2' : '0',
+      'creator': 'Tyler Covington',
+      'bid': '4.89 ETH',
+      'chain': 'BSC',
+      'icon': finalIcon,
+      'art_color': finalColor,
+      'rules_text': finalRules,
+      'rules': finalRules,
+      'game': gameName,
+      'category': finalCatName,
     };
     addRow(newCard);
   }

@@ -38,10 +38,10 @@ void main() {
     expect(find.text('Cyber Arena TCG'), findsWidgets);
     expect(find.text('Reino Arcano (Fantasy)'), findsWidgets);
 
-    // Test Interactive Checkbox: tap 'Hechizos y Magia'
-    final spellCheckbox = find.text('Hechizos y Magia');
-    expect(spellCheckbox, findsOneWidget);
-    await tester.tap(spellCheckbox);
+    // Test Interactive Checkbox: tap dynamic game category 'Hechizos Arcanos'
+    final categoryCheckbox = find.text('Hechizos Arcanos');
+    expect(categoryCheckbox, findsWidgets);
+    await tester.tap(categoryCheckbox.first);
     await tester.pumpAndSettle();
 
     // Switch to English via provider

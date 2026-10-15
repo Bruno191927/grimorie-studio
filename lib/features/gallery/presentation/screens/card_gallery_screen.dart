@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/core/theme/grimoire_theme.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/features/editor/models/game_category.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class CardGalleryScreen extends ConsumerStatefulWidget {
@@ -396,24 +397,101 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     // Game Section Actions
                     Row(
                       children: [
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: GrimoireTheme.accentPurple,
+                        PopupMenuButton<String>(
+                          tooltip: 'Añadir carta por categoría',
+                          color: GrimoireTheme.surfaceElevated,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                          ),
+                          child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.add, size: 14, color: GrimoireTheme.accentPurple),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '+ ${ref.tr('add_row')}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.accentPurple),
+                                ),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.accentPurple),
+                              ],
+                            ),
                           ),
-                          icon: const Icon(Icons.add, size: 16),
-                          label: Text(
-                            '+ ${ref.tr('add_row')}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                          onPressed: () {
-                            ref.read(editorProvider.notifier).addCardToGame(entry.key);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: GrimoireTheme.accentEmerald,
-                                content: Text('Nueva carta añadida a "${entry.key}".'),
+                          onSelected: (val) {
+                            if (val == '__new_category__') {
+                              _showNewCategoryDialog(entry.key);
+                            } else if (val == '__basic__') {
+                              ref.read(editorProvider.notifier).addCardToGame(entry.key);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: GrimoireTheme.accentEmerald,
+                                  content: Text('Nueva carta estándar añadida a "${entry.key}".'),
+                                ),
+                              );
+                            } else {
+                              final cats = ref.read(editorProvider.notifier).getCategoriesForGame(entry.key);
+                              final cat = cats.firstWhere((c) => c.name == val, orElse: () => cats.first);
+                              ref.read(editorProvider.notifier).createCardFromCategory(entry.key, cat);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: GrimoireTheme.accentEmerald,
+                                  content: Text('Nueva carta "${cat.name}" creada para "${entry.key}".'),
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (ctx) {
+                            final cats = ref.read(editorProvider.notifier).getCategoriesForGame(entry.key);
+                            return [
+                              PopupMenuItem<String>(
+                                value: '__basic__',
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.note_add_outlined, size: 15, color: GrimoireTheme.textMuted),
+                                    SizedBox(width: 8),
+                                    Text('Carta Estándar', style: TextStyle(fontSize: 12)),
+                                  ],
+                                ),
                               ),
-                            );
+                              if (cats.isNotEmpty) const PopupMenuDivider(height: 8),
+                              ...cats.map((cat) => PopupMenuItem<String>(
+                                value: cat.name,
+                                child: Row(
+                                  children: [
+                                    Text(cat.icon, style: const TextStyle(fontSize: 15)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        cat.name,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                              const PopupMenuDivider(height: 8),
+                              PopupMenuItem<String>(
+                                value: '__new_category__',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.add_circle_outline, size: 15, color: GrimoireTheme.accentPurple),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      ref.tr('new_category_btn'),
+                                      style: const TextStyle(fontSize: 12, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ];
                           },
                         ),
                         const SizedBox(width: 8),
@@ -571,8 +649,28 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     );
   }
 
-  // --- Left Filter Sidebar with FULLY Interactive Checkboxes ---
   Widget _buildFilterSidebar() {
+    final editorState = ref.watch(editorProvider);
+    final allRows = editorState.project.rows;
+
+    List<GameCategory> activeCategories;
+    if (_selectedGame != 'All') {
+      activeCategories = editorState.gameCategories[_selectedGame] ?? [];
+    } else {
+      final seenNames = <String>{};
+      activeCategories = [];
+      for (final entry in editorState.gameCategories.entries) {
+        if (!editorState.deletedGames.contains(entry.key)) {
+          for (final cat in entry.value) {
+            if (!seenNames.contains(cat.name)) {
+              seenNames.add(cat.name);
+              activeCategories.add(cat);
+            }
+          }
+        }
+      }
+    }
+
     return Container(
       width: 240,
       decoration: const BoxDecoration(
@@ -628,38 +726,67 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Categories Checklist (Fully Interactive)
-          _buildFilterSectionTitle(ref.tr('filter_categories')),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_art_creature'),
-            isSelected: _selectedCategories.contains('cat_art_creature'),
-            onToggle: (val) => _toggleCategory('cat_art_creature', val),
+          // Categories Checklist (Board-Game Scoped & Dynamic)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: _buildFilterSectionTitle(
+                  _selectedGame == 'All'
+                      ? ref.tr('filter_categories')
+                      : '${ref.tr('filter_categories')} (${_selectedGame.length > 12 ? '${_selectedGame.substring(0, 10)}...' : _selectedGame})',
+                ),
+              ),
+              Tooltip(
+                message: ref.tr('new_category_btn'),
+                child: InkWell(
+                  onTap: () {
+                    final targetGame = _selectedGame == 'All' ? 'Unstable Unicorns' : _selectedGame;
+                    _showNewCategoryDialog(targetGame);
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 14, color: GrimoireTheme.accentPurple),
+                        SizedBox(width: 2),
+                        Text(
+                          'Nueva',
+                          style: TextStyle(fontSize: 10, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_spell_magic'),
-            isSelected: _selectedCategories.contains('cat_spell_magic'),
-            onToggle: (val) => _toggleCategory('cat_spell_magic', val),
-          ),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_relic_artifact'),
-            isSelected: _selectedCategories.contains('cat_relic_artifact'),
-            onToggle: (val) => _toggleCategory('cat_relic_artifact', val),
-          ),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_virtual_lands'),
-            isSelected: _selectedCategories.contains('cat_virtual_lands'),
-            onToggle: (val) => _toggleCategory('cat_virtual_lands', val),
-          ),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_trading_cards'),
-            isSelected: _selectedCategories.contains('cat_trading_cards'),
-            onToggle: (val) => _toggleCategory('cat_trading_cards', val),
-          ),
-          _buildInteractiveCheckbox(
-            label: ref.tr('cat_utility_rules'),
-            isSelected: _selectedCategories.contains('cat_utility_rules'),
-            onToggle: (val) => _toggleCategory('cat_utility_rules', val),
-          ),
+          if (activeCategories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                ref.tr('no_categories_defined'),
+                style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted, fontStyle: FontStyle.italic),
+              ),
+            )
+          else ...[
+            for (final cat in activeCategories)
+              _buildCategoryCheckbox(
+                category: cat,
+                count: allRows.where((r) =>
+                  (_selectedGame == 'All' || (r['game'] ?? '').toString().toLowerCase() == _selectedGame.toLowerCase()) &&
+                  (r['category'] ?? '').toString() == cat.name
+                ).length,
+                isSelected: _selectedCategories.contains(cat.name),
+                onToggle: (val) => _toggleCategory(cat.name, val),
+                onDelete: () => _confirmDeleteCategory(
+                  _selectedGame == 'All' ? _findGameForCategory(cat.name, editorState) : _selectedGame,
+                  cat.name,
+                ),
+              ),
+          ],
 
           const SizedBox(height: 16),
           // File Types Checklist (Fully Interactive)
@@ -768,6 +895,86 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     );
   }
 
+  // Board-game scoped Category Checkbox with emoji, color accent and count pill
+  Widget _buildCategoryCheckbox({
+    required GameCategory category,
+    required int count,
+    required bool isSelected,
+    required ValueChanged<bool?> onToggle,
+    VoidCallback? onDelete,
+  }) {
+    final catColor = Color(category.defaultColor);
+    return InkWell(
+      onTap: () => onToggle(!isSelected),
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: Checkbox(
+                value: isSelected,
+                activeColor: catColor,
+                checkColor: Colors.white,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: onToggle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(category.icon, style: const TextStyle(fontSize: 13)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                category.name,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? catColor.withValues(alpha: 0.25)
+                    : GrimoireTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? catColor.withValues(alpha: 0.5)
+                      : GrimoireTheme.borderSubtle,
+                ),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected ? Colors.white : GrimoireTheme.textMuted,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (onDelete != null) ...[
+              const SizedBox(width: 2),
+              InkWell(
+                onTap: onDelete,
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(Icons.close, size: 12, color: GrimoireTheme.textMuted.withValues(alpha: 0.7)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- Card Tile ---
   Widget _buildGalleryCardTile(Map<String, dynamic> row, int index) {
     final name = row['card_name']?.toString() ?? 'Card';
@@ -778,6 +985,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final artColor = Color(row['art_color'] is int ? row['art_color'] as int : 0xFFF59E0B);
     final game = row['game']?.toString() ?? 'General';
     final cost = row['cost']?.toString() ?? '0';
+    final category = row['category']?.toString() ?? '';
 
     return InkWell(
       onTap: () {
@@ -972,28 +1180,51 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ),
             const SizedBox(height: 4),
 
-            // Board Game Tag Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: GrimoireTheme.surfaceElevated,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: GrimoireTheme.borderSubtle),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(_getGameIcon(game), size: 10, color: GrimoireTheme.accentIndigo),
+            // Board Game Tag Pill & Category Pill
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: GrimoireTheme.surfaceElevated,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: GrimoireTheme.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_getGameIcon(game), size: 10, color: GrimoireTheme.accentIndigo),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            game,
+                            style: const TextStyle(fontSize: 9, color: Color(0xFFC7D2FE), fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (category.isNotEmpty) ...[
                   const SizedBox(width: 4),
-                  Expanded(
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 85),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
+                    ),
                     child: Text(
-                      game,
-                      style: const TextStyle(fontSize: 9, color: Color(0xFFC7D2FE), fontWeight: FontWeight.w600),
+                      category,
+                      style: const TextStyle(fontSize: 8.5, color: Color(0xFFE9D5FF), fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
             const SizedBox(height: 6),
 
@@ -1378,6 +1609,371 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  String _findGameForCategory(String catName, EditorState state) {
+    for (final entry in state.gameCategories.entries) {
+      if (entry.value.any((c) => c.name == catName)) {
+        return entry.key;
+      }
+    }
+    return _selectedGame == 'All' ? 'Unstable Unicorns' : _selectedGame;
+  }
+
+  // --- Dialog: Delete Category Confirmation ---
+  void _confirmDeleteCategory(String gameName, String categoryName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GrimoireTheme.surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: GrimoireTheme.borderSubtle),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.accentPink.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: GrimoireTheme.accentPink.withValues(alpha: 0.4)),
+              ),
+              child: const Icon(Icons.delete_outline, color: GrimoireTheme.accentPink, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                ref.tr('confirm_delete_category_title'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              ref.tr('confirm_delete_category_desc'),
+              style: const TextStyle(fontSize: 13, color: GrimoireTheme.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10121E),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: GrimoireTheme.borderSubtle),
+              ),
+              child: Text(
+                '$categoryName ($gameName)',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GrimoireTheme.accentPink,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(ref.tr('delete_category'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(editorProvider.notifier).deleteCategoryFromGame(gameName, categoryName);
+              setState(() {
+                _selectedCategories.remove(categoryName);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: GrimoireTheme.accentPink,
+                  content: Text('Categoría "$categoryName" eliminada de "$gameName".'),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Dialog: Create New Category for a Board Game ---
+  void _showNewCategoryDialog(String defaultGame) {
+    final editorState = ref.read(editorProvider);
+    final allGames = editorState.gameCategories.keys
+        .where((g) => !editorState.deletedGames.contains(g))
+        .toList();
+    if (!allGames.contains(defaultGame) && !editorState.deletedGames.contains(defaultGame)) {
+      allGames.add(defaultGame);
+    }
+    String chosenGame = defaultGame;
+    if (chosenGame == 'All' || editorState.deletedGames.contains(chosenGame)) {
+      chosenGame = allGames.isNotEmpty ? allGames.first : 'Unstable Unicorns';
+    }
+
+    final nameController = TextEditingController();
+    final iconController = TextEditingController(text: '🦄');
+    final typeController = TextEditingController();
+    final rulesController = TextEditingController();
+
+    int selectedColor = 0xFF8B5CF6;
+    final colorOptions = [
+      0xFF8B5CF6, // Purple
+      0xFFEC4899, // Pink
+      0xFF3B82F6, // Blue
+      0xFF10B981, // Emerald
+      0xFFF59E0B, // Amber
+      0xFFEF4444, // Red
+      0xFF06B6D4, // Cyan
+    ];
+
+    final emojiPresets = ['🦄', '🌟', '✨', '💣', '🚫', '⚔️', '🛡️', '🤖', '🔮', '⚡', '👑', '📜'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: GrimoireTheme.surfacePanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: GrimoireTheme.borderSubtle),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                ),
+                child: const Icon(Icons.category_outlined, color: GrimoireTheme.accentPurple, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ref.tr('new_category_title'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    Text(
+                      'Juego: $chosenGame',
+                      style: const TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ref.tr('new_category_desc'),
+                    style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.3),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Game selector if there are multiple games
+                  if (allGames.length > 1) ...[
+                    const Text('Juego de Mesa:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10121E),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: GrimoireTheme.borderSubtle),
+                      ),
+                      child: DropdownButton<String>(
+                        value: chosenGame,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        dropdownColor: GrimoireTheme.surfaceElevated,
+                        items: allGames.map((g) => DropdownMenuItem(
+                          value: g,
+                          child: Text(g, style: const TextStyle(fontSize: 12, color: Colors.white)),
+                        )).toList(),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => chosenGame = val);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Category Name
+                  Text(ref.tr('category_name'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'ej. Unicornios Mágicos, Cartas de Trampa',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (val) {
+                      if (typeController.text.isEmpty || typeController.text == nameController.text) {
+                        typeController.text = val;
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Emoji / Icon
+                  Text(ref.tr('category_icon'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 60,
+                        child: TextField(
+                          controller: iconController,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 20),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: emojiPresets.map((emoji) => InkWell(
+                              onTap: () => setDialogState(() => iconController.text = emoji),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                              ),
+                            )).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Default Card Type
+                  Text(ref.tr('category_default_type'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: typeController,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'ej. Unicornio Mágico, Hechizo, Trampa',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Theme Color
+                  Text(ref.tr('category_color'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: colorOptions.map((c) {
+                      final isSelected = selectedColor == c;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: InkWell(
+                          onTap: () => setDialogState(() => selectedColor = c),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: Color(c),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Colors.white : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Default Rules Template
+                  Text(ref.tr('category_rules_template'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: rulesController,
+                    maxLines: 2,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'ej. Cuando esta carta entre en tu Establo, puedes...',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GrimoireTheme.accentPurple,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                final catName = nameController.text.trim();
+                if (catName.isNotEmpty) {
+                  final newCategory = GameCategory(
+                    id: 'cat_${DateTime.now().millisecondsSinceEpoch}',
+                    name: catName,
+                    icon: iconController.text.trim().isEmpty ? '🦄' : iconController.text.trim(),
+                    defaultType: typeController.text.trim().isEmpty ? catName : typeController.text.trim(),
+                    defaultColor: selectedColor,
+                    defaultRules: rulesController.text.trim(),
+                  );
+                  ref.read(editorProvider.notifier).addCategoryToGame(chosenGame, newCategory);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: GrimoireTheme.accentEmerald,
+                      content: Text('Categoría "$catName" creada para el juego "$chosenGame".'),
+                    ),
+                  );
+                }
+              },
+              child: Text(ref.tr('create')),
+            ),
+          ],
+        ),
       ),
     );
   }
