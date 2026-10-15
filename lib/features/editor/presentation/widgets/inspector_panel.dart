@@ -7,6 +7,7 @@ import '../../services/game_folder_service.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
+import '../../../../core/widgets/grimoire_color_picker.dart';
 import 'package:grimoire_studio/features/ai_generator/presentation/widgets/ai_prompt_dialog.dart';
 
 class InspectorPanel extends ConsumerWidget {
@@ -430,6 +431,17 @@ class InspectorPanel extends ConsumerWidget {
                 },
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          _buildColorPickerSection(
+            context,
+            ref,
+            title: ref.tr('text_color'),
+            currentColor: layer.fontColor,
+            onChanged: (newColor) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(fontColor: newColor));
+            },
+            allowTransparent: false,
           ),
         ],
 
@@ -1074,22 +1086,49 @@ class InspectorPanel extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: currentColor,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+              InkWell(
+                onTap: () => _openColorPickerDialog(context, title, currentColor, onChanged, allowTransparent),
+                borderRadius: BorderRadius.circular(6),
+                child: Tooltip(
+                  message: 'Abrir Selector de Color Libre (Cualquier Color)',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141728),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: GrimoireTheme.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: currentColor,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+                          ),
+                          child: isTransparent
+                              ? const Icon(Icons.block, size: 12, color: Colors.redAccent)
+                              : null,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          hexString,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFC7D2FE),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.colorize, size: 12, color: GrimoireTheme.accentPurple),
+                      ],
+                    ),
+                  ),
                 ),
-                child: isTransparent
-                    ? const Icon(Icons.block, size: 12, color: Colors.redAccent)
-                    : null,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                hexString,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC7D2FE), fontFamily: 'monospace'),
               ),
             ],
           ),
@@ -1099,52 +1138,95 @@ class InspectorPanel extends ConsumerWidget {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: palette.map((col) {
-              final isSelected = col.toARGB32() == currentColor.toARGB32();
-              final isTrans = col.a == 0;
+            children: [
+              ...palette.map((col) {
+                final isSelected = col.toARGB32() == currentColor.toARGB32();
+                final isTrans = col.a == 0;
 
-              return InkWell(
-                onTap: () => onChanged(col),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: col,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isSelected
-                          ? GrimoireTheme.accentPurple
-                          : Colors.white.withValues(alpha: 0.2),
-                      width: isSelected ? 2.5 : 1.0,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: GrimoireTheme.accentPurple.withValues(alpha: 0.5),
-                              blurRadius: 6,
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: isTrans
-                      ? const Icon(Icons.block, size: 14, color: Colors.redAccent)
-                      : isSelected
-                          ? Icon(
-                              Icons.check,
-                              size: 14,
-                              color: ThemeData.estimateBrightnessForColor(col) == Brightness.dark
-                                  ? Colors.white
-                                  : Colors.black,
-                            )
+                return InkWell(
+                  onTap: () => onChanged(col),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: col,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isSelected
+                            ? GrimoireTheme.accentPurple
+                            : Colors.white.withValues(alpha: 0.2),
+                        width: isSelected ? 2.5 : 1.0,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: GrimoireTheme.accentPurple.withValues(alpha: 0.5),
+                                blurRadius: 6,
+                              )
+                            ]
                           : null,
+                    ),
+                    child: isTrans
+                        ? const Icon(Icons.block, size: 14, color: Colors.redAccent)
+                        : isSelected
+                            ? Icon(
+                                Icons.check,
+                                size: 14,
+                                color: ThemeData.estimateBrightnessForColor(col) == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black,
+                              )
+                            : null,
+                  ),
+                );
+              }),
+              // Free Color Picker Rainbow Button
+              Tooltip(
+                message: 'Abrir Selector de Color Libre (Cualquier Color)',
+                child: InkWell(
+                  onTap: () => _openColorPickerDialog(context, title, currentColor, onChanged, allowTransparent),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      gradient: const SweepGradient(
+                        colors: [
+                          Color(0xFFFF0000),
+                          Color(0xFFFFFF00),
+                          Color(0xFF00FF00),
+                          Color(0xFF00FFFF),
+                          Color(0xFF0000FF),
+                          Color(0xFFFF00FF),
+                          Color(0xFFFF0000),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: GrimoireTheme.accentPurple,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: GrimoireTheme.accentPurple.withValues(alpha: 0.4),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.palette_outlined,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-              );
-            }).toList(),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
 
-          // Hex input row + opacity slider
+          // Hex input row + Color Picker trigger + opacity slider
           Row(
             children: [
               Expanded(
@@ -1157,6 +1239,15 @@ class InspectorPanel extends ConsumerWidget {
                     labelText: ref.tr('custom_hex'),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    suffixIcon: Tooltip(
+                      message: 'Abrir Selector de Color Libre',
+                      child: IconButton(
+                        icon: const Icon(Icons.palette_outlined, size: 16, color: GrimoireTheme.accentPurple),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                        onPressed: () => _openColorPickerDialog(context, title, currentColor, onChanged, allowTransparent),
+                      ),
+                    ),
                   ),
                   onFieldSubmitted: (val) {
                     final parsed = _tryParseHexColor(val);
@@ -1203,6 +1294,25 @@ class InspectorPanel extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _openColorPickerDialog(
+    BuildContext context,
+    String title,
+    Color currentColor,
+    ValueChanged<Color> onChanged,
+    bool allowTransparent,
+  ) async {
+    final picked = await GrimoireColorPickerDialog.show(
+      context,
+      initialColor: currentColor,
+      title: title,
+      allowTransparent: allowTransparent,
+      onLiveChanged: (c) => onChanged(c),
+    );
+    if (picked != null) {
+      onChanged(picked);
+    }
   }
 
   // --- Border Width Selector with Presets ---
