@@ -712,7 +712,19 @@ class InspectorPanel extends ConsumerWidget {
                 ),
                 tooltip: ref.tr('open_assets_folder'),
                 icon: const Icon(Icons.folder_open, size: 16, color: GrimoireTheme.accentEmerald),
-                onPressed: () => GameFolderService.openGameFolderInExplorer(gameName),
+                onPressed: () async {
+                  final opened = await GameFolderService.openGameAssetsFolderInExplorer(gameName);
+                  if (context.mounted && opened) {
+                    final p = GameFolderService.getGameAssetsDir(gameName).absolute.path.replaceAll('/', '\\');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Carpeta abierta: $p'),
+                        duration: const Duration(seconds: 3),
+                        backgroundColor: const Color(0xFF16182E),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -855,7 +867,19 @@ class InspectorPanel extends ConsumerWidget {
             ),
             icon: const Icon(Icons.folder_open, size: 16),
             label: Text(ref.tr('open_assets_folder')),
-            onPressed: () => GameFolderService.openGameFolderInExplorer(gameName),
+            onPressed: () async {
+              final opened = await GameFolderService.openGameAssetsFolderInExplorer(gameName);
+              if (ctx.mounted && opened) {
+                final p = GameFolderService.getGameAssetsDir(gameName).absolute.path.replaceAll('/', '\\');
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text('Carpeta abierta: $p'),
+                    duration: const Duration(seconds: 3),
+                    backgroundColor: const Color(0xFF16182E),
+                  ),
+                );
+              }
+            },
           ),
         ],
       ),

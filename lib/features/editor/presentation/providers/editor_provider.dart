@@ -1536,6 +1536,10 @@ class EditorNotifier extends StateNotifier<EditorState> {
     return await GameFolderService.openGameFolderInExplorer(gameName);
   }
 
+  Future<bool> openGameAssetsFolder(String gameName) async {
+    return await GameFolderService.openGameAssetsFolderInExplorer(gameName);
+  }
+
   Future<String?> uploadImageForActiveCard(String sourceFilePath) async {
     final activeRow = state.project.activeRow;
     final gameName = (activeRow['game'] ?? 'Magic').toString();

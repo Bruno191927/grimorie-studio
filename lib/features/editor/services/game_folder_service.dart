@@ -12,6 +12,33 @@ class GameFolderService {
   ///   │           ├── image1.png
   ///   │           └── image2.png
   static Directory getGamesRootDir() {
+    // 1. Direct current working directory (IDE, CLI test, terminal run)
+    final cwdGames = Directory('games');
+    if (cwdGames.existsSync()) {
+      return cwdGames;
+    }
+
+    // 2. Relative to executable (portable deployment or runner build)
+    try {
+      final exeDir = File(Platform.resolvedExecutable).parent;
+      final exeGames = Directory('${exeDir.path}/games');
+      if (exeGames.existsSync()) {
+        return exeGames;
+      }
+
+      // 3. In development build, walk up parents from build/windows/x64/runner/Debug to project root
+      Directory? current = exeDir;
+      for (int i = 0; i < 6 && current != null; i++) {
+        final candidate = Directory('${current.path}/games');
+        if (candidate.existsSync()) {
+          return candidate;
+        }
+        final parent = current.parent;
+        if (parent.path == current.path) break;
+        current = parent;
+      }
+    } catch (_) {}
+
     return Directory('games');
   }
 
@@ -26,17 +53,20 @@ class GameFolderService {
   /// Returns the folder directory for a specific game
   static Directory getGameDir(String gameName) {
     final folder = sanitizeFolderName(gameName);
-    return Directory('${getGamesRootDir().path}/$folder');
+    final sep = Platform.isWindows ? '\\' : '/';
+    return Directory('${getGamesRootDir().path}$sep$folder');
   }
 
   /// Returns the assets/ directory inside a specific game folder
   static Directory getGameAssetsDir(String gameName) {
-    return Directory('${getGameDir(gameName).path}/assets');
+    final sep = Platform.isWindows ? '\\' : '/';
+    return Directory('${getGameDir(gameName).path}${sep}assets');
   }
 
   /// Returns the data.csv file for a specific game
   static File getGameDataCsvFile(String gameName) {
-    return File('${getGameDir(gameName).path}/data.csv');
+    final sep = Platform.isWindows ? '\\' : '/';
+    return File('${getGameDir(gameName).path}${sep}data.csv');
   }
 
   /// Ensures that the game directory and its assets/ folder exist
@@ -221,25 +251,51 @@ class GameFolderService {
     }
   }
 
+  /// Opens the game's assets/ directory directly in the native OS file explorer (Windows Explorer, Finder, etc.)
+  static Future<bool> openGameAssetsFolderInExplorer(String gameName) async {
+    await ensureGameFolderExists(gameName);
+    final dir = getGameAssetsDir(gameName);
+    return await openDirectoryInExplorer(dir);
+  }
+
   /// Opens the game's directory in the native OS file explorer (Windows Explorer, Finder, etc.)
   static Future<bool> openGameFolderInExplorer(String gameName) async {
     await ensureGameFolderExists(gameName);
     final dir = getGameDir(gameName);
-    final path = dir.absolute.path;
+    return await openDirectoryInExplorer(dir);
+  }
+
+  /// Opens the root games/ directory in the native OS file explorer
+  static Future<bool> openGamesRootDirInExplorer() async {
+    final root = getGamesRootDir();
+    return await openDirectoryInExplorer(root);
+  }
+
+  /// Helper to reliably open any Directory in the OS native file explorer
+  static Future<bool> openDirectoryInExplorer(Directory dir) async {
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final rawPath = dir.absolute.path;
 
     try {
       if (Platform.isWindows) {
-        await Process.run('explorer.exe', [path]);
+        final windowsPath = rawPath.replaceAll('/', '\\');
+        // 'cmd.exe /c start "" "<path>"' invokes Windows ShellExecute cleanly without switch-parsing bugs
+        final res = await Process.run('cmd.exe', ['/c', 'start', '', windowsPath]);
+        if (res.exitCode == 0) return true;
+        // Fallback to direct explorer.exe
+        await Process.run('explorer.exe', [windowsPath]);
         return true;
       } else if (Platform.isMacOS) {
-        await Process.run('open', [path]);
+        await Process.run('open', [rawPath]);
         return true;
       } else if (Platform.isLinux) {
-        await Process.run('xdg-open', [path]);
+        await Process.run('xdg-open', [rawPath]);
         return true;
       }
     } catch (e) {
-      debugPrint('Error opening folder in explorer: $e');
+      debugPrint('Error opening directory in explorer: $e');
     }
     return false;
   }

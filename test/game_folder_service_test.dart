@@ -119,5 +119,17 @@ void main() {
       final count = GameFolderService.getAssetsCount(testGame);
       expect(count, equals(2));
     });
+
+    test('getGameAssetsDir provides proper path and openGameAssetsFolderInExplorer ensures folder exists', () async {
+      final assetsDir = GameFolderService.getGameAssetsDir(testGame);
+      expect(assetsDir.path, contains('assets'));
+
+      // Calling openGameAssetsFolderInExplorer should ensure folder exists
+      await GameFolderService.ensureGameFolderExists(testGame);
+      expect(assetsDir.existsSync(), isTrue);
+
+      final rootDir = GameFolderService.getGamesRootDir();
+      expect(rootDir.existsSync(), isTrue);
+    });
   });
 }
