@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/grimoire_theme.dart';
+import '../../../../core/localization/locale_provider.dart';
 import '../../../editor/presentation/providers/editor_provider.dart';
 import '../../services/ai_service.dart';
 
@@ -114,18 +115,18 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                   child: const Icon(Icons.auto_awesome, color: GrimoireTheme.accentPurple, size: 20),
                 ),
                 const SizedBox(width: 10),
-                const Text(
-                  'AI Artwork Generator',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                Text(
+                  ref.tr('ai_artwork_generator'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
             // Provider Selector
-            const Text(
-              'Select AI Generation Engine:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
+            Text(
+              ref.tr('select_ai_engine'),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<AiProviderType>(
@@ -146,17 +147,17 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
             const SizedBox(height: 14),
 
             // Prompt text field
-            const Text(
-              'Art Prompt Description:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
+            Text(
+              ref.tr('art_prompt_desc'),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _promptController,
               maxLines: 3,
               style: const TextStyle(fontSize: 12, color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'Enter detailed prompt or {{variables}}...',
+              decoration: InputDecoration(
+                hintText: ref.tr('enter_prompt_hint'),
               ),
             ),
             const SizedBox(height: 12),
@@ -176,7 +177,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
               children: [
                 TextButton(
                   onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: GrimoireTheme.textMuted)),
+                  child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
@@ -192,7 +193,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.bolt, size: 16),
-                  label: Text(_isLoading ? 'Generating...' : 'Generate & Bind'),
+                  label: Text(_isLoading ? ref.tr('generating') : ref.tr('generate_and_bind')),
                   onPressed: _isLoading ? null : _handleGenerate,
                 ),
               ],

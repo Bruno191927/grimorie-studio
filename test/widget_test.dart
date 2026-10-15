@@ -34,6 +34,17 @@ void main() {
     // Initial language is Spanish
     expect(find.text('Galería de Cartas'), findsOneWidget);
 
+    // Verify Board Game groups are present in Spanish
+    expect(find.text('Todos los Juegos'), findsOneWidget);
+    expect(find.text('Cyber Arena TCG'), findsWidgets);
+    expect(find.text('Reino Arcano (Fantasy)'), findsWidgets);
+
+    // Test Interactive Checkbox: tap 'Hechizos y Magia'
+    final spellCheckbox = find.text('Hechizos y Magia');
+    expect(spellCheckbox, findsOneWidget);
+    await tester.tap(spellCheckbox);
+    await tester.pumpAndSettle();
+
     // Switch to English via provider
     container.read(localeProvider.notifier).setLanguage(AppLanguage.en);
     await tester.pumpAndSettle();
@@ -41,5 +52,7 @@ void main() {
     // Verify UI switched to English
     expect(find.text('Card Gallery'), findsOneWidget);
     expect(find.text('Connect AI Engine'), findsOneWidget);
+    expect(find.text('All Games'), findsOneWidget);
+    expect(find.text('Board Game'), findsWidgets);
   });
 }

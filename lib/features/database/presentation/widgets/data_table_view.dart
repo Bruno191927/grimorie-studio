@@ -18,7 +18,7 @@ class DataTableView extends ConsumerWidget {
     final activeRowIndex = editorState.project.activeRowIndex;
 
     // Collect all unique keys from all rows
-    final Set<String> allKeys = {'card_name', 'cost', 'type', 'rarity', 'attack', 'defense', 'rules_text'};
+    final Set<String> allKeys = {'card_name', 'game', 'cost', 'type', 'rarity', 'attack', 'defense', 'rules_text'};
     for (final r in rows) {
       allKeys.addAll(r.keys);
     }
@@ -61,6 +61,7 @@ class DataTableView extends ConsumerWidget {
             onPressed: () {
               ref.read(editorProvider.notifier).addRow({
                 'card_name': 'New Card ${rows.length + 1}',
+                'game': 'Cyber Arena TCG',
                 'cost': '1',
                 'type': 'Creature',
                 'rarity': 'Common',

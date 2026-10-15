@@ -90,7 +90,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       DropdownMenuItem(
                         value: i,
                         child: Text(
-                          '#${i + 1} - ${rows[i]['card_name'] ?? "Card"} (${rows[i]['cost'] ?? "?"} Mana)',
+                          '#${i + 1} - ${rows[i]['card_name'] ?? "Card"} (${rows[i]['cost'] ?? "?"} ${ref.tr('mana')})',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),

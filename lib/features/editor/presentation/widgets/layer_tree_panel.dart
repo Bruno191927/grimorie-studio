@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/layer_item.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
+import '../../../../core/localization/locale_provider.dart';
 
 class LayerTreePanel extends ConsumerWidget {
   const LayerTreePanel({super.key});
@@ -31,9 +32,9 @@ class LayerTreePanel extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Layers & Hierarchy',
-                  style: TextStyle(
+                Text(
+                  ref.tr('layers_and_hierarchy'),
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -41,7 +42,7 @@ class LayerTreePanel extends ConsumerWidget {
                   ),
                 ),
                 PopupMenuButton<LayerType>(
-                  tooltip: 'Add Layer',
+                  tooltip: ref.tr('add_layer'),
                   color: GrimoireTheme.surfaceElevated,
                   icon: Container(
                     padding: const EdgeInsets.all(4),
@@ -54,33 +55,33 @@ class LayerTreePanel extends ConsumerWidget {
                   ),
                   onSelected: (type) => _addNewLayer(ref, type),
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: LayerType.text,
                       child: Row(
                         children: [
-                          Icon(Icons.text_fields, size: 16, color: GrimoireTheme.accentIndigo),
-                          SizedBox(width: 8),
-                          Text('Text Layer', style: TextStyle(fontSize: 12)),
+                          const Icon(Icons.text_fields, size: 16, color: GrimoireTheme.accentIndigo),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('text_layer'), style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: LayerType.image,
                       child: Row(
                         children: [
-                          Icon(Icons.image, size: 16, color: GrimoireTheme.accentEmerald),
-                          SizedBox(width: 8),
-                          Text('Image Layer', style: TextStyle(fontSize: 12)),
+                          const Icon(Icons.image, size: 16, color: GrimoireTheme.accentEmerald),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('image_layer'), style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: LayerType.shape,
                       child: Row(
                         children: [
-                          Icon(Icons.crop_square, size: 16, color: GrimoireTheme.accentAmber),
-                          SizedBox(width: 8),
-                          Text('Shape / Frame Layer', style: TextStyle(fontSize: 12)),
+                          const Icon(Icons.crop_square, size: 16, color: GrimoireTheme.accentAmber),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('shape_layer'), style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
@@ -94,11 +95,11 @@ class LayerTreePanel extends ConsumerWidget {
           // Layer List (Reorderable)
           Expanded(
             child: layers.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'No layers added yet\nClick + to create one',
+                      ref.tr('no_layers_yet'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: GrimoireTheme.textMuted, fontSize: 12),
+                      style: const TextStyle(color: GrimoireTheme.textMuted, fontSize: 12),
                     ),
                   )
                 : ReorderableListView.builder(
@@ -210,7 +211,7 @@ class LayerTreePanel extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${layers.length} Layers',
+                  '${layers.length} ${ref.tr('layers_count')}',
                   style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                 ),
                 Text(

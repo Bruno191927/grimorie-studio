@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/layer_item.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
+import '../../../../core/localization/locale_provider.dart';
 import 'package:grimoire_studio/features/ai_generator/presentation/widgets/ai_prompt_dialog.dart';
 
 class InspectorPanel extends ConsumerWidget {
@@ -35,9 +36,9 @@ class InspectorPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Project & Card Settings',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+          Text(
+            ref.tr('project_card_settings'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 16),
           Text(
@@ -45,16 +46,16 @@ class InspectorPanel extends ConsumerWidget {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: GrimoireTheme.accentPurple),
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Card Size', '${project.widthMm.toStringAsFixed(1)} x ${project.heightMm.toStringAsFixed(1)} mm (Poker)'),
-          _buildInfoRow('DPI Target', '300 DPI Print-Ready'),
-          _buildInfoRow('Database Rows', '${project.rows.length} cards synchronized'),
-          _buildInfoRow('Active Template', project.activeTemplate.name),
+          _buildInfoRow(ref.tr('card_size'), '${project.widthMm.toStringAsFixed(1)} x ${project.heightMm.toStringAsFixed(1)} mm (Poker)'),
+          _buildInfoRow(ref.tr('dpi_target'), '300 DPI Print-Ready'),
+          _buildInfoRow(ref.tr('database_rows'), '${project.rows.length} cards'),
+          _buildInfoRow(ref.tr('active_template'), project.activeTemplate.name),
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),
-          const Text(
-            'Select a layer on the canvas or from the layers tree to inspect its data bindings, typography, geometry and Smart Token rules.',
-            style: TextStyle(fontSize: 12, color: GrimoireTheme.textMuted, height: 1.5),
+          Text(
+            ref.tr('select_layer_hint'),
+            style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted, height: 1.5),
           ),
         ],
       ),
@@ -78,7 +79,7 @@ class InspectorPanel extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 18, color: GrimoireTheme.accentPink),
-              tooltip: 'Delete Layer',
+              tooltip: ref.tr('delete_layer'),
               onPressed: () {
                 ref.read(editorProvider.notifier).removeLayer(layer.id);
               },
@@ -88,7 +89,7 @@ class InspectorPanel extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // Geometry Section
-        _buildSectionHeader('Transform & Geometry'),
+        _buildSectionHeader(ref.tr('transform_geometry')),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -109,13 +110,13 @@ class InspectorPanel extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: _buildNumberInput('Width', layer.width, (val) {
+              child: _buildNumberInput(ref.tr('width'), layer.width, (val) {
                 ref.read(editorProvider.notifier).updateLayer(layer.copyWith(width: val));
               }),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _buildNumberInput('Height', layer.height, (val) {
+              child: _buildNumberInput(ref.tr('height'), layer.height, (val) {
                 ref.read(editorProvider.notifier).updateLayer(layer.copyWith(height: val));
               }),
             ),
@@ -123,14 +124,14 @@ class InspectorPanel extends ConsumerWidget {
         ),
 
         const SizedBox(height: 16),
-        _buildSectionHeader('Data-Binding Token'),
+        _buildSectionHeader(ref.tr('databinding_token')),
         const SizedBox(height: 8),
         TextFormField(
           initialValue: layer.bindingKey,
           style: const TextStyle(fontSize: 12, color: Colors.white, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            labelText: 'Variable Binding Key',
-            hintText: 'e.g. card_name, cost, attack',
+          decoration: InputDecoration(
+            labelText: ref.tr('variable_key'),
+            hintText: ref.tr('variable_key_hint'),
             isDense: true,
           ),
           onChanged: (val) {
@@ -141,14 +142,14 @@ class InspectorPanel extends ConsumerWidget {
         // Type-Specific Properties
         if (layer.type == LayerType.text) ...[
           const SizedBox(height: 16),
-          _buildSectionHeader('Typography & Style'),
+          _buildSectionHeader(ref.tr('typography_style')),
           const SizedBox(height: 8),
           TextFormField(
             initialValue: layer.text,
             style: const TextStyle(fontSize: 12, color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: 'Static / Template Text',
-              hintText: 'e.g. {{card_name}}',
+            decoration: InputDecoration(
+              labelText: ref.tr('static_template_text'),
+              hintText: ref.tr('static_text_hint'),
               isDense: true,
             ),
             onChanged: (val) {
@@ -159,7 +160,7 @@ class InspectorPanel extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: _buildNumberInput('Font Size', layer.fontSize, (val) {
+                child: _buildNumberInput(ref.tr('font_size'), layer.fontSize, (val) {
                   ref.read(editorProvider.notifier).updateLayer(layer.copyWith(fontSize: val));
                 }),
               ),
@@ -179,18 +180,18 @@ class InspectorPanel extends ConsumerWidget {
 
         if (layer.type == LayerType.shape) ...[
           const SizedBox(height: 16),
-          _buildSectionHeader('Shape & Border Appearance'),
+          _buildSectionHeader(ref.tr('shape_border_appearance')),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: _buildNumberInput('Border Radius', layer.borderRadius, (val) {
+                child: _buildNumberInput(ref.tr('border_radius'), layer.borderRadius, (val) {
                   ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderRadius: val));
                 }),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildNumberInput('Border Width', layer.borderWidth, (val) {
+                child: _buildNumberInput(ref.tr('border_width'), layer.borderWidth, (val) {
                   ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderWidth: val));
                 }),
               ),
@@ -200,14 +201,14 @@ class InspectorPanel extends ConsumerWidget {
 
         // Smart Tokens / Conditional Rules Section
         const SizedBox(height: 16),
-        _buildSectionHeader('Smart Tokens (Conditional Rules)'),
+        _buildSectionHeader(ref.tr('smart_tokens_rules')),
         const SizedBox(height: 8),
         TextFormField(
           initialValue: layer.conditionalRules['condition']?.toString() ?? '',
           style: const TextStyle(fontSize: 12, color: Colors.white, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            labelText: 'Rule Expression',
-            hintText: 'e.g. cost > 5, rarity == "Mythic"',
+          decoration: InputDecoration(
+            labelText: ref.tr('rule_expression'),
+            hintText: ref.tr('rule_expression_hint'),
             isDense: true,
           ),
           onChanged: (val) {
@@ -219,7 +220,7 @@ class InspectorPanel extends ConsumerWidget {
 
         // AI Art Generation Trigger (as required by AGENT.MD Section 3.B)
         const SizedBox(height: 20),
-        _buildSectionHeader('Generative AI Art Integration'),
+        _buildSectionHeader(ref.tr('generative_ai_art')),
         const SizedBox(height: 8),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
@@ -229,7 +230,7 @@ class InspectorPanel extends ConsumerWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           icon: const Icon(Icons.auto_awesome, size: 16),
-          label: const Text('Generate AI Art for Layer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          label: Text(ref.tr('generate_ai_for_layer'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           onPressed: () {
             showDialog(
               context: context,

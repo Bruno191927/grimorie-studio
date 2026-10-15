@@ -185,6 +185,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFFF59E0B,
         'rules_text': 'When summoned, deals 3 damage to any target. If cost > 5, ignite enemy battlefield.',
         'prompt': 'Cute 3D robot character wearing futuristic glass helmet, miniature stylized tabletop figurine',
+        'game': 'Cyber Arena TCG',
+        'category': 'cat_art_creature',
       },
       {
         'card_name': 'Hamlet Contemplates',
@@ -200,6 +202,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFFEAB308,
         'rules_text': 'Defender. At end of turn, draw 1 card if no damage was taken.',
         'prompt': 'Small cylindrical cyber panda robot contemplating on a minimalist platform, round aesthetic',
+        'game': 'Cyber Arena TCG',
+        'category': 'cat_art_creature',
       },
       {
         'card_name': 'Loving Vase 01',
@@ -215,6 +219,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFFEA580C,
         'rules_text': 'Trample. Whenever this creature attacks, gain 3 life.',
         'prompt': 'Stylized warm brown standing bear toy figure, glossy vinyl toy, tabletop mini',
+        'game': 'Cyber Arena TCG',
+        'category': 'cat_art_creature',
       },
       {
         'card_name': 'Triumphant Awakening',
@@ -230,6 +236,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFF16A34A,
         'rules_text': 'Target allied creature gets +2/+2 and vigilance until end of turn.',
         'prompt': 'Cute anthropomorphic plant sprout creature with leafy ears sticking out tongue',
+        'game': 'Reino Arcano (Fantasy)',
+        'category': 'cat_spell_magic',
       },
       {
         'card_name': 'Forest Nymph Stalker',
@@ -245,6 +253,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFF0D9488,
         'rules_text': 'Forestwalk. Cannot be countered by spell abilities.',
         'prompt': 'Slender mystical deer nymph with celestial horns and golden spots, enchanted forest',
+        'game': 'Reino Arcano (Fantasy)',
+        'category': 'cat_art_creature',
       },
       {
         'card_name': 'Celestial Kitsune',
@@ -260,6 +270,42 @@ class EditorNotifier extends StateNotifier<EditorState> {
         'art_color': 0xFF2563EB,
         'rules_text': 'Flash. When Celestial Kitsune enters, return target permanent to its owner hand.',
         'prompt': 'Blue magical fox spirit with glowing cyan eyes, mystical familiar for fantasy tabletop',
+        'game': 'Reino Arcano (Fantasy)',
+        'category': 'cat_art_creature',
+      },
+      {
+        'card_name': 'Chrono-Warp Relic',
+        'cost': '4',
+        'type': 'Artifact',
+        'rarity': 'Mythic',
+        'attack': '0',
+        'defense': '5',
+        'creator': 'Tyler Covington',
+        'bid': '4.89 ETH',
+        'chain': 'BSC',
+        'icon': '⏳',
+        'art_color': 0xFF9333EA,
+        'rules_text': 'Tap: Reverse time by 1 turn or warp past any encounter trap.',
+        'prompt': 'Ancient celestial hourglass with floating glowing purple sand and golden filigree',
+        'game': 'Star Odyssey (Sci-Fi)',
+        'category': 'cat_relic_artifact',
+      },
+      {
+        'card_name': 'Neon Cyber City',
+        'cost': '0',
+        'type': 'Land',
+        'rarity': 'Uncommon',
+        'attack': '0',
+        'defense': '8',
+        'creator': 'Tyler Covington',
+        'bid': '4.89 ETH',
+        'chain': 'BSC',
+        'icon': '🏙️',
+        'art_color': 0xFF0284C7,
+        'rules_text': 'Generates 1 Cyber Matrix Point. All allied mechs gain +1/+0 shield.',
+        'prompt': 'Futuristic neon cyberpunk floating city core with holographic data pillars',
+        'game': 'Cyber Arena TCG',
+        'category': 'cat_virtual_lands',
       },
     ];
 
@@ -382,6 +428,38 @@ class EditorNotifier extends StateNotifier<EditorState> {
         activeRowIndex: rows.length - 1,
       ),
     );
+  }
+
+  void assignCardToGame(int rowIndex, String gameName) {
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    if (rowIndex >= 0 && rowIndex < rows.length) {
+      final updatedRow = Map<String, dynamic>.from(rows[rowIndex]);
+      updatedRow['game'] = gameName;
+      rows[rowIndex] = updatedRow;
+      state = state.copyWith(
+        project: state.project.copyWith(rows: rows),
+      );
+    }
+  }
+
+  void addCardToGame(String gameName, {String? cardName, String? type, String? icon, String? category}) {
+    final newCard = {
+      'card_name': cardName ?? 'Nueva Carta ($gameName)',
+      'cost': '3',
+      'type': type ?? 'Creature',
+      'rarity': 'Common',
+      'attack': '2',
+      'defense': '2',
+      'creator': 'Tyler Covington',
+      'bid': '4.89 ETH',
+      'chain': 'BSC',
+      'icon': icon ?? '🃏',
+      'art_color': 0xFF7C3AED,
+      'rules_text': 'Habilidad especial para el juego $gameName.',
+      'game': gameName,
+      'category': category ?? 'cat_art_creature',
+    };
+    addRow(newCard);
   }
 
   void removeRow(int index) {
