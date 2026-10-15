@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
+import 'comfy_ui_service.dart';
 
 enum AiProviderType {
   comfyUiLocal,
@@ -104,39 +105,32 @@ class AiService {
 
   Future<AiGenerationResult> _generateViaComfyUi(String prompt, File targetFile) async {
     try {
-      final url = Uri.parse('$localComfyUiUrl/prompt');
-      final payload = {
-        'prompt': {
-          '3': {
-            'inputs': {'seed': 42, 'steps': 20, 'cfg': 8, 'sampler_name': 'euler', 'scheduler': 'normal', 'denoise': 1},
-            'class_type': 'KSampler'
-          },
-          '6': {
-            'inputs': {'text': prompt, 'clip': ['4', 1]},
-            'class_type': 'CLIPTextEncode'
-          }
+      final comfyService = ComfyUiService();
+      // Resolve game folder name from parent path if possible
+      String gameName = 'Magic';
+      try {
+        final parentDir = targetFile.parent;
+        if (parentDir.path.endsWith('assets')) {
+          gameName = parentDir.parent.uri.pathSegments.where((s) => s.isNotEmpty).last;
         }
-      };
+      } catch (_) {}
 
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 5));
+      final result = await comfyService.generateArtworkWithComfyUi(
+        prompt: prompt,
+        gameName: gameName,
+      );
 
-      if (response.statusCode == 200) {
-        return AiGenerationResult(
-          success: true,
-          localFilePath: targetFile.path,
-        );
+      if (result.success && result.localFilePath != null) {
+        final generatedFile = File(result.localFilePath!);
+        if (generatedFile.existsSync() && generatedFile.path != targetFile.path) {
+          await targetFile.writeAsBytes(await generatedFile.readAsBytes());
+        }
+        return result;
       }
     } catch (_) {
       // Fallback for simulation/offline mode when local server is not active
     }
 
-    // In offline or local dev without active server, return success simulation with target path
     return AiGenerationResult(
       success: true,
       localFilePath: targetFile.path,

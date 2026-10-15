@@ -10,6 +10,7 @@ import 'features/editor/presentation/providers/editor_provider.dart';
 import 'core/localization/locale_provider.dart';
 import 'core/localization/language_selector.dart';
 import 'features/export/presentation/dialogs/export_options_dialog.dart';
+import 'features/ai_generator/presentation/widgets/comfy_ui_connection_dialog.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,53 +47,7 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   final GlobalKey _repaintBoundaryKey = GlobalKey();
 
   void _showAiEngineStatusDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: GrimoireTheme.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.bolt, color: GrimoireTheme.accentPurple),
-            SizedBox(width: 8),
-            Text('AI Engine Pipeline Status', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _EngineStatusTile(
-              name: 'ComfyUI Local Server',
-              url: AppConstants.defaultComfyUiUrl,
-              status: 'Ready / Standby',
-              isOnline: true,
-            ),
-            SizedBox(height: 10),
-            _EngineStatusTile(
-              name: 'Ollama / LM Studio LLM',
-              url: AppConstants.defaultOllamaUrl,
-              status: 'Ready / Standby',
-              isOnline: true,
-            ),
-            SizedBox(height: 10),
-            _EngineStatusTile(
-              name: 'Cloud API (SDXL / Flux)',
-              url: 'api.openai.com/v1/images',
-              status: 'Configured',
-              isOnline: true,
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: GrimoireTheme.accentPurple),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    ComfyUiConnectionDialog.show(context);
   }
 
   Future<void> _handleBatchExport() async {
@@ -305,55 +260,3 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   }
 }
 
-class _EngineStatusTile extends StatelessWidget {
-  final String name;
-  final String url;
-  final String status;
-  final bool isOnline;
-
-  const _EngineStatusTile({
-    required this.name,
-    required this.url,
-    required this.status,
-    required this.isOnline,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: GrimoireTheme.surfacePanel,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: GrimoireTheme.borderSubtle),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 2),
-              Text(url, style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, fontFamily: 'monospace')),
-            ],
-          ),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isOnline ? GrimoireTheme.accentEmerald : GrimoireTheme.accentPink,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(status, style: TextStyle(fontSize: 11, color: isOnline ? GrimoireTheme.accentEmerald : GrimoireTheme.accentPink)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
