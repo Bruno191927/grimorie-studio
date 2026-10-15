@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/core/theme/grimoire_theme.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class CardGalleryScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenEditor;
@@ -51,13 +52,13 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ),
             child: Row(
               children: [
-                _buildSubNavTab('Live Deck Projects', isSelected: true),
+                _buildSubNavTab(ref.tr('tab_live_projects'), isSelected: true),
                 const SizedBox(width: 24),
-                _buildSubNavTab("Today's AI Generation"),
+                _buildSubNavTab(ref.tr('tab_today_ai')),
                 const SizedBox(width: 24),
-                _buildSubNavTab('Tabletop Lands'),
+                _buildSubNavTab(ref.tr('tab_tabletop_lands')),
                 const SizedBox(width: 24),
-                _buildSubNavTab('Card Vault (1,000)'),
+                _buildSubNavTab(ref.tr('tab_card_vault')),
               ],
             ),
           ),
@@ -84,7 +85,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             Row(
                               children: [
                                 Text(
-                                  '${filteredRows.length} Items',
+                                  '${filteredRows.length} ${ref.tr('items_count')}',
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
@@ -99,9 +100,9 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
                                   ),
-                                  child: const Text(
-                                    'Deck Sync OK',
-                                    style: TextStyle(
+                                  child: Text(
+                                    ref.tr('deck_sync_ok'),
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: GrimoireTheme.accentPurple,
@@ -145,11 +146,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: GrimoireTheme.borderSubtle),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     children: [
-                                      Text('Low to High', style: TextStyle(fontSize: 12, color: Colors.white)),
-                                      SizedBox(width: 6),
-                                      Icon(Icons.keyboard_arrow_down, size: 16, color: GrimoireTheme.textMuted),
+                                      Text(ref.tr('sort_low_to_high'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.keyboard_arrow_down, size: 16, color: GrimoireTheme.textMuted),
                                     ],
                                   ),
                                 ),
@@ -226,10 +227,20 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
       child: ListView(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Filter', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+              Expanded(
+                child: Text(
+                  ref.tr('filter_title'),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: () {
                   setState(() {
                     _maxMana = 10;
@@ -237,7 +248,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     _selectedCategory = 'All';
                   });
                 },
-                child: const Text('Reset', style: TextStyle(fontSize: 12, color: GrimoireTheme.accentPurple)),
+                child: Text(ref.tr('filter_reset'), style: const TextStyle(fontSize: 12, color: GrimoireTheme.accentPurple)),
               ),
             ],
           ),
@@ -248,7 +259,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           TextField(
             style: const TextStyle(fontSize: 12, color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'Search cards...',
+              hintText: ref.tr('filter_search_hint'),
               prefixIcon: const Icon(Icons.search, size: 16, color: GrimoireTheme.textMuted),
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -259,22 +270,22 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           const SizedBox(height: 16),
 
           // Categories Checklist
-          _buildFilterSectionTitle('Categories'),
-          _buildCheckbox('Art & Creature', true),
-          _buildCheckbox('Spell / Magic', false),
-          _buildCheckbox('Relic & Artifact', false),
-          _buildCheckbox('Virtual Worlds / Land', false),
-          _buildCheckbox('Trading Cards', true),
-          _buildCheckbox('Utility & Rules', true),
+          _buildFilterSectionTitle(ref.tr('filter_categories')),
+          _buildCheckbox(ref.tr('cat_art_creature'), true),
+          _buildCheckbox(ref.tr('cat_spell_magic'), false),
+          _buildCheckbox(ref.tr('cat_relic_artifact'), false),
+          _buildCheckbox(ref.tr('cat_virtual_lands'), false),
+          _buildCheckbox(ref.tr('cat_trading_cards'), true),
+          _buildCheckbox(ref.tr('cat_utility_rules'), true),
 
           const SizedBox(height: 16),
-          _buildFilterSectionTitle('File Types & Output'),
-          _buildCheckbox('300 DPI Image', true),
-          _buildCheckbox('Print PDF Ready', false),
-          _buildCheckbox('Vector Template', false),
+          _buildFilterSectionTitle(ref.tr('filter_file_types')),
+          _buildCheckbox(ref.tr('type_300dpi'), true),
+          _buildCheckbox(ref.tr('type_pdf_print'), false),
+          _buildCheckbox(ref.tr('type_vector'), false),
 
           const SizedBox(height: 16),
-          _buildFilterSectionTitle('Mana Cost (≤ ${_maxMana.toInt()})'),
+          _buildFilterSectionTitle('${ref.tr('filter_mana_cost')} (≤ ${_maxMana.toInt()})'),
           Slider(
             value: _maxMana,
             min: 1,
@@ -369,7 +380,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Creator', style: TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
+                      Text(ref.tr('creator_label'), style: const TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
                       Text(creator, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
                     ],
                   ),
@@ -458,7 +469,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Current Bid', style: TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
+                      Text(ref.tr('current_bid'), style: const TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
                       Text(bid, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
                     ],
                   ),

@@ -8,6 +8,8 @@ import 'features/database/presentation/widgets/data_table_view.dart';
 import 'features/playtest/presentation/screens/playtest_screen.dart';
 import 'features/editor/presentation/providers/editor_provider.dart';
 import 'features/export/services/export_service.dart';
+import 'core/localization/locale_provider.dart';
+import 'core/localization/language_selector.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -155,97 +157,126 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
               color: GrimoireTheme.surfacePanel,
               border: Border(bottom: BorderSide(color: GrimoireTheme.borderSubtle)),
             ),
-            child: Row(
-              children: [
-                // Logo & Brand Name
-                Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [GrimoireTheme.accentPurple, GrimoireTheme.accentIndigo, GrimoireTheme.accentPink],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Left Section: Logo & Nav Tabs
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Logo & Brand Name
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [GrimoireTheme.accentPurple, GrimoireTheme.accentIndigo, GrimoireTheme.accentPink],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.4),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.local_fire_department, color: Colors.white, size: 20),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Grimoire ',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const Text(
+                                  'Studio',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: GrimoireTheme.accentPurple,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 28),
+
+                            // Navigation Tabs
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildNavTab(0, ref.tr('nav_gallery'), Icons.collections_bookmark_outlined),
+                                const SizedBox(width: 8),
+                                _buildNavTab(1, ref.tr('nav_editor'), Icons.palette_outlined),
+                                const SizedBox(width: 8),
+                                _buildNavTab(2, ref.tr('nav_database'), Icons.table_chart_outlined),
+                                const SizedBox(width: 8),
+                                _buildNavTab(3, ref.tr('nav_playtest'), Icons.casino_outlined),
+                              ],
+                            ),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: GrimoireTheme.accentPurple.withOpacity(0.4),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.local_fire_department, color: Colors.white, size: 20),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Grimoire ',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const Text(
-                      'Studio',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: GrimoireTheme.accentPurple,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 32),
 
-                // Navigation Tabs
-                Row(
-                  children: [
-                    _buildNavTab(0, 'Card Gallery', Icons.collections_bookmark_outlined),
-                    const SizedBox(width: 8),
-                    _buildNavTab(1, 'Canvas Editor', Icons.palette_outlined),
-                    const SizedBox(width: 8),
-                    _buildNavTab(2, 'Database & CSV', Icons.table_chart_outlined),
-                    const SizedBox(width: 8),
-                    _buildNavTab(3, 'Playtest Mat', Icons.casino_outlined),
-                  ],
-                ),
+                        const SizedBox(width: 24),
 
-                const Spacer(),
+                        // Right Section: Language Selector & Action Buttons
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Language Selector (ES / EN)
+                            const LanguageSelector(),
+                            const SizedBox(width: 12),
 
-                // Action: Connect AI Engine Button (Styled like "Wallet Connect" in the reference image)
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: GrimoireTheme.accentPurple.withOpacity(0.6)),
-                    backgroundColor: const Color(0xFF16172B),
-                    foregroundColor: const Color(0xFFE9D5FF),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            // Action: Connect AI Engine Button (Styled like "Wallet Connect" in the reference image)
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.6)),
+                                backgroundColor: const Color(0xFF16172B),
+                                foregroundColor: const Color(0xFFE9D5FF),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                              icon: const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
+                              label: Text(ref.tr('btn_connect_ai'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              onPressed: _showAiEngineStatusDialog,
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Batch 300 DPI Export Button
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: GrimoireTheme.accentPurple,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                              icon: _isBatchExporting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.archive_outlined, size: 16),
+                              label: Text(_isBatchExporting ? ref.tr('exporting') : ref.tr('btn_batch_export')),
+                              onPressed: _isBatchExporting ? null : _handleBatchExport,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  icon: const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
-                  label: const Text('Connect AI Engine', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  onPressed: _showAiEngineStatusDialog,
-                ),
-                const SizedBox(width: 12),
-
-                // Batch 300 DPI Export Button
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GrimoireTheme.accentPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  icon: _isBatchExporting
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.archive_outlined, size: 16),
-                  label: Text(_isBatchExporting ? 'Exporting...' : 'Batch 300 DPI'),
-                  onPressed: _isBatchExporting ? null : _handleBatchExport,
-                ),
-              ],
+                );
+              },
             ),
           ),
 
@@ -286,7 +317,7 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? GrimoireTheme.accentPurple.withOpacity(0.18) : Colors.transparent,
+          color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.18) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? GrimoireTheme.accentPurple : Colors.transparent,
@@ -294,6 +325,7 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 16, color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textSecondary),
             const SizedBox(width: 6),

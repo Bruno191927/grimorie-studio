@@ -108,7 +108,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: GrimoireTheme.accentPurple.withOpacity(0.2),
+                    color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.auto_awesome, color: GrimoireTheme.accentPurple, size: 20),
@@ -129,7 +129,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<AiProviderType>(
-              value: _selectedProvider,
+              initialValue: _selectedProvider,
               dropdownColor: GrimoireTheme.surfacePanel,
               style: const TextStyle(fontSize: 12, color: Colors.white),
               decoration: const InputDecoration(isDense: true),

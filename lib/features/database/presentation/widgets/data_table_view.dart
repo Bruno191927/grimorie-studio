@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:grimoire_studio/core/theme/grimoire_theme.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class DataTableView extends ConsumerWidget {
   const DataTableView({super.key});
@@ -32,17 +33,17 @@ class DataTableView extends ConsumerWidget {
           children: [
             const Icon(Icons.table_chart_outlined, color: GrimoireTheme.accentPurple, size: 20),
             const SizedBox(width: 8),
-            const Text('Card Database & CSV Data-Binding', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            Text(ref.tr('db_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: GrimoireTheme.accentPurple.withOpacity(0.15),
+                color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: GrimoireTheme.accentPurple.withOpacity(0.4)),
+                border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
               ),
               child: Text(
-                '${rows.length} Total Cards',
+                '${rows.length} ${ref.tr('total_cards')}',
                 style: const TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.w600),
               ),
             ),
@@ -51,12 +52,12 @@ class DataTableView extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.file_upload_outlined, color: GrimoireTheme.accentIndigo),
-            tooltip: 'Import CSV / JSON',
+            tooltip: ref.tr('import_file'),
             onPressed: () => _importFile(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: GrimoireTheme.accentEmerald),
-            tooltip: 'Add Card Row',
+            tooltip: ref.tr('add_row'),
             onPressed: () {
               ref.read(editorProvider.notifier).addRow({
                 'card_name': 'New Card ${rows.length + 1}',
@@ -73,9 +74,9 @@ class DataTableView extends ConsumerWidget {
         ],
       ),
       body: rows.isEmpty
-          ? const Center(
-              child: Text('No data rows. Click + or Import CSV to load cards.',
-                  style: TextStyle(color: GrimoireTheme.textMuted)),
+          ? Center(
+              child: Text(ref.tr('no_data_rows'),
+                  style: const TextStyle(color: GrimoireTheme.textMuted)),
             )
           : Scrollbar(
               child: SingleChildScrollView(
@@ -85,7 +86,7 @@ class DataTableView extends ConsumerWidget {
                     headingRowColor: WidgetStateProperty.all(GrimoireTheme.surfaceElevated),
                     dataRowColor: WidgetStateProperty.resolveWith((states) {
                       if (states.contains(WidgetState.selected)) {
-                        return GrimoireTheme.accentPurple.withOpacity(0.15);
+                        return GrimoireTheme.accentPurple.withValues(alpha: 0.15);
                       }
                       return Colors.transparent;
                     }),
@@ -102,7 +103,7 @@ class DataTableView extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                      DataColumn(label: Text(ref.tr('actions'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                     ],
                     rows: [
                       for (int i = 0; i < rows.length; i++)
@@ -149,7 +150,7 @@ class DataTableView extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GrimoireTheme.surfaceElevated,
-        title: Text('Edit $key for Row #${rowIndex + 1}', style: const TextStyle(fontSize: 14)),
+        title: Text('${ref.tr('edit_cell')} ($key) - #${rowIndex + 1}', style: const TextStyle(fontSize: 14)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -159,7 +160,7 @@ class DataTableView extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(ref.tr('cancel')),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: GrimoireTheme.accentPurple),
@@ -168,7 +169,7 @@ class DataTableView extends ConsumerWidget {
               ref.read(editorProvider.notifier).updateActiveRowData(key, controller.text.trim());
               Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: Text(ref.tr('save')),
           ),
         ],
       ),

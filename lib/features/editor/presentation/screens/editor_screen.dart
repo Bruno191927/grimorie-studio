@@ -6,6 +6,7 @@ import '../widgets/card_canvas.dart';
 import '../widgets/layer_tree_panel.dart';
 import '../widgets/inspector_panel.dart';
 import '../../../export/services/export_service.dart';
+import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class EditorScreen extends ConsumerStatefulWidget {
   final GlobalKey repaintBoundaryKey;
@@ -77,7 +78,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             child: Row(
               children: [
                 // Active Card Selector from Database Rows
-                const Text('Active Card:', style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
+                Text(ref.tr('active_card'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
                 const SizedBox(width: 8),
                 DropdownButton<int>(
                   value: activeRowIndex,
@@ -111,7 +112,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     size: 16,
                     color: editorState.showGrid ? GrimoireTheme.accentPurple : GrimoireTheme.textMuted,
                   ),
-                  tooltip: 'Toggle Grid',
+                  tooltip: ref.tr('toggle_grid'),
                   onPressed: () => ref.read(editorProvider.notifier).toggleGrid(),
                 ),
                 IconButton(
@@ -120,14 +121,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     size: 16,
                     color: editorState.showSnapping ? GrimoireTheme.accentPink : GrimoireTheme.textMuted,
                   ),
-                  tooltip: 'Toggle Snapping Guides',
+                  tooltip: ref.tr('toggle_snapping'),
                   onPressed: () => ref.read(editorProvider.notifier).toggleSnapping(),
                 ),
                 const SizedBox(width: 8),
                 // Zoom Controls
                 IconButton(
                   icon: const Icon(Icons.remove, size: 16, color: GrimoireTheme.textSecondary),
-                  tooltip: 'Zoom Out',
+                  tooltip: ref.tr('zoom_out'),
                   onPressed: () => ref.read(editorProvider.notifier).setZoom(editorState.zoom - 0.1),
                 ),
                 Text(
@@ -136,7 +137,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.add, size: 16, color: GrimoireTheme.textSecondary),
-                  tooltip: 'Zoom In',
+                  tooltip: ref.tr('zoom_in'),
                   onPressed: () => ref.read(editorProvider.notifier).setZoom(editorState.zoom + 0.1),
                 ),
 
@@ -157,7 +158,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.print_outlined, size: 14),
-                  label: Text(_isExporting ? 'Rendering 300 DPI...' : 'Render 300 DPI Card'),
+                  label: Text(_isExporting ? ref.tr('rendering_300dpi') : ref.tr('render_300dpi_card')),
                   onPressed: _isExporting ? null : _handleQuickExport,
                 ),
               ],

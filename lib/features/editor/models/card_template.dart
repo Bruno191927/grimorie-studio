@@ -41,7 +41,7 @@ class CardTemplate {
       'id': id,
       'name': name,
       'layers': layers.map((l) => l.toJson()).toList(),
-      'backgroundColor': backgroundColor.value,
+      'backgroundColor': backgroundColor.toARGB32(),
       'backgroundImage': backgroundImage,
       'cornerRadius': cornerRadius,
     };

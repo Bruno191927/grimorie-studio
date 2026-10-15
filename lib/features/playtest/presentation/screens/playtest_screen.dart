@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/core/theme/grimoire_theme.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
 class PlaytestCard {
   final String id;
@@ -78,7 +79,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
           children: [
             const Icon(Icons.casino_outlined, color: GrimoireTheme.accentPurple, size: 22),
             const SizedBox(width: 8),
-            const Text('Tabletop Playtest Mat', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            Text(ref.tr('playtest_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const Spacer(),
             // Life counter
             Container(
@@ -90,7 +91,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
               ),
               child: Row(
                 children: [
-                  const Text('❤️ Life: ', style: TextStyle(fontSize: 12, color: GrimoireTheme.textMuted)),
+                  Text('❤️ ${ref.tr('player_life')} ', style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted)),
                   IconButton(
                     icon: const Icon(Icons.remove, size: 14, color: GrimoireTheme.accentPink),
                     padding: EdgeInsets.zero,
@@ -118,7 +119,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               icon: const Icon(Icons.refresh, size: 14, color: GrimoireTheme.accentIndigo),
-              label: Text('Next Turn ($_turn)'),
+              label: Text('${ref.tr('next_turn')} ($_turn)'),
               onPressed: () {
                 setState(() {
                   _turn++;
@@ -156,11 +157,11 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                   child: Stack(
                     children: [
                       // Mat subtle grid pattern
-                      const Center(
+                      Center(
                         child: Text(
-                          'BATTLEFIELD ZONE\nDrag cards from your hand onto the play mat',
+                          '${ref.tr('battlefield_zone')}\n${ref.tr('drag_hint')}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1E2438),
@@ -220,13 +221,13 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: GrimoireTheme.accentPurple),
                     ),
-                    child: const Column(
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.layers, color: GrimoireTheme.accentPurple, size: 24),
-                        SizedBox(height: 4),
-                        Text('DECK', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                        Text('Draw', style: TextStyle(fontSize: 9, color: GrimoireTheme.textMuted)),
+                        const Icon(Icons.layers, color: GrimoireTheme.accentPurple, size: 24),
+                        const SizedBox(height: 4),
+                        Text(ref.tr('deck'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(ref.tr('draw'), style: const TextStyle(fontSize: 9, color: GrimoireTheme.textMuted)),
                       ],
                     ),
                   ),
@@ -238,9 +239,9 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                 // Player Hand Cards
                 Expanded(
                   child: _hand.isEmpty
-                      ? const Center(
-                          child: Text('Hand is empty. Tap the Deck to draw cards.',
-                              style: TextStyle(fontSize: 12, color: GrimoireTheme.textMuted)),
+                      ? Center(
+                          child: Text(ref.tr('hand_empty'),
+                              style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted)),
                         )
                       : ListView.separated(
                           scrollDirection: Axis.horizontal,
@@ -291,7 +292,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: elevation * 2,
             offset: Offset(0, elevation),
           ),

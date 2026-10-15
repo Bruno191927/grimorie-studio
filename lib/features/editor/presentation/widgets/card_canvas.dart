@@ -44,13 +44,13 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
             borderRadius: BorderRadius.circular(template.cornerRadius + 2),
             boxShadow: [
               BoxShadow(
-                color: GrimoireTheme.accentPurple.withOpacity(0.18),
+                color: GrimoireTheme.accentPurple.withValues(alpha: 0.18),
                 blurRadius: 30,
                 spreadRadius: 2,
                 offset: const Offset(0, 10),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -306,7 +306,7 @@ class _CanvasGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF23283E).withOpacity(0.35)
+      ..color = const Color(0xFF23283E).withValues(alpha: 0.35)
       ..strokeWidth = 0.5;
 
     const step = 20.0;

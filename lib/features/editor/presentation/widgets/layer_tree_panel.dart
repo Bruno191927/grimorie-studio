@@ -46,9 +46,9 @@ class LayerTreePanel extends ConsumerWidget {
                   icon: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: GrimoireTheme.accentPurple.withOpacity(0.2),
+                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: GrimoireTheme.accentPurple.withOpacity(0.5)),
+                      border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
                     ),
                     child: const Icon(Icons.add, size: 16, color: GrimoireTheme.accentPurple),
                   ),
@@ -103,8 +103,8 @@ class LayerTreePanel extends ConsumerWidget {
                   )
                 : ReorderableListView.builder(
                     itemCount: layers.length,
-                    onReorder: (oldIdx, newIdx) {
-                      ref.read(editorProvider.notifier).reorderLayers(oldIdx, newIdx);
+                    onReorderItem: (oldIdx, newIdx) {
+                      ref.read(editorProvider.notifier).reorderLayersDirect(oldIdx, newIdx);
                     },
                     itemBuilder: (context, index) {
                       final layer = layers[index];
@@ -115,7 +115,7 @@ class LayerTreePanel extends ConsumerWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? GrimoireTheme.accentPurple.withOpacity(0.15)
+                              ? GrimoireTheme.accentPurple.withValues(alpha: 0.15)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(

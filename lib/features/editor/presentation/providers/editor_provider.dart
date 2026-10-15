@@ -346,6 +346,14 @@ class EditorNotifier extends StateNotifier<EditorState> {
     _updateTemplateLayers(layers);
   }
 
+  void reorderLayersDirect(int oldIndex, int newIndex) {
+    final template = state.project.activeTemplate;
+    final layers = List<LayerItem>.from(template.layers);
+    final item = layers.removeAt(oldIndex);
+    layers.insert(newIndex, item);
+    _updateTemplateLayers(layers);
+  }
+
   void setActiveRow(int index) {
     if (index >= 0 && index < state.project.rows.length) {
       state = state.copyWith(
