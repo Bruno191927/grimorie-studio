@@ -56,6 +56,42 @@ class InspectorPanel extends ConsumerWidget {
         _buildInfoRow(ref.tr('database_rows'), '${project.rows.length} cards'),
         _buildInfoRow(ref.tr('active_template'), project.activeTemplate.name),
         const SizedBox(height: 16),
+        _buildSectionHeader(ref.tr('card_background_settings')),
+        const SizedBox(height: 10),
+        _buildColorPickerSection(
+          context,
+          ref,
+          title: ref.tr('shape_fill_color'),
+          currentColor: project.activeTemplate.getBackgroundColor(state.currentSide),
+          onChanged: (newColor) {
+            ref.read(editorProvider.notifier).updateBackgroundColor(newColor);
+            final bgLayer = project.activeTemplate
+                .getLayers(state.currentSide)
+                .where((l) => l.name.toLowerCase().contains('background'))
+                .firstOrNull;
+            if (bgLayer != null) {
+              ref.read(editorProvider.notifier).updateLayer(bgLayer.copyWith(shapeColor: newColor));
+            }
+          },
+          allowTransparent: false,
+        ),
+        const SizedBox(height: 12),
+        _buildCornerRadiusSelector(
+          context,
+          ref,
+          currentRadius: project.activeTemplate.cornerRadius,
+          onChanged: (newRadius) {
+            ref.read(editorProvider.notifier).updateCornerRadius(newRadius);
+            final bgLayer = project.activeTemplate
+                .getLayers(state.currentSide)
+                .where((l) => l.name.toLowerCase().contains('background'))
+                .firstOrNull;
+            if (bgLayer != null) {
+              ref.read(editorProvider.notifier).updateLayer(bgLayer.copyWith(borderRadius: newRadius));
+            }
+          },
+        ),
+        const SizedBox(height: 16),
         const Divider(),
         const SizedBox(height: 12),
         Text(
@@ -394,21 +430,59 @@ class InspectorPanel extends ConsumerWidget {
         if (layer.type == LayerType.shape) ...[
           const SizedBox(height: 16),
           _buildSectionHeader(ref.tr('shape_border_appearance')),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildNumberInput(ref.tr('border_radius'), layer.borderRadius, (val) {
-                  ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderRadius: val));
-                }),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildNumberInput(ref.tr('border_width'), layer.borderWidth, (val) {
-                  ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderWidth: val));
-                }),
-              ),
-            ],
+          const SizedBox(height: 10),
+
+          // 1. Color de Fondo (Background Fill Color)
+          _buildColorPickerSection(
+            context,
+            ref,
+            title: ref.tr('shape_fill_color'),
+            currentColor: layer.shapeColor,
+            onChanged: (newColor) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(shapeColor: newColor));
+              if (layer.name.toLowerCase().contains('background')) {
+                ref.read(editorProvider.notifier).updateBackgroundColor(newColor);
+              }
+            },
+            allowTransparent: true,
+          ),
+          const SizedBox(height: 12),
+
+          // 2. Radio de los Bordes (Corner Radius)
+          _buildCornerRadiusSelector(
+            context,
+            ref,
+            currentRadius: layer.borderRadius,
+            onChanged: (newRadius) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderRadius: newRadius));
+              if (layer.name.toLowerCase().contains('background')) {
+                ref.read(editorProvider.notifier).updateCornerRadius(newRadius);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Color de Borde (Border Color)
+          _buildColorPickerSection(
+            context,
+            ref,
+            title: ref.tr('border_color'),
+            currentColor: layer.borderColor,
+            onChanged: (newColor) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderColor: newColor));
+            },
+            allowTransparent: true,
+          ),
+          const SizedBox(height: 12),
+
+          // 4. Grosor de Borde (Border Width)
+          _buildBorderWidthSelector(
+            context,
+            ref,
+            currentWidth: layer.borderWidth,
+            onChanged: (newWidth) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(borderWidth: newWidth));
+            },
           ),
         ],
 
@@ -794,9 +868,9 @@ class InspectorPanel extends ConsumerWidget {
     );
   }
 
-  Widget _buildNumberInput(String label, double value, ValueChanged<double> onChanged) {
+  Widget _buildNumberInput(String label, double value, ValueChanged<double> onChanged, {String? keyPrefix}) {
     return TextFormField(
-      key: ValueKey('${label}_$value'),
+      key: ValueKey('${keyPrefix ?? ''}_$label'),
       initialValue: value.toStringAsFixed(1),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       style: const TextStyle(fontSize: 12, color: Colors.white, fontFamily: 'monospace'),
@@ -809,6 +883,413 @@ class InspectorPanel extends ConsumerWidget {
         if (parsed != null) onChanged(parsed);
       },
     );
+  }
+
+  // --- Corner Radius Selector with Slider & TCG Presets ---
+  Widget _buildCornerRadiusSelector(
+    BuildContext context,
+    WidgetRef ref, {
+    required double currentRadius,
+    required ValueChanged<double> onChanged,
+  }) {
+    final presets = [0.0, 8.0, 12.0, 16.0, 24.0, 32.0];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F111D),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.rounded_corner, size: 14, color: GrimoireTheme.accentPurple),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  ref.tr('border_radius'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  '${currentRadius.toStringAsFixed(1)} px',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE9D5FF), fontFamily: 'monospace'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: GrimoireTheme.accentPurple,
+              inactiveTrackColor: const Color(0xFF222638),
+              thumbColor: GrimoireTheme.accentPurple,
+              overlayColor: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              value: currentRadius.clamp(0.0, 48.0),
+              min: 0.0,
+              max: 48.0,
+              onChanged: (val) => onChanged(double.parse(val.toStringAsFixed(1))),
+            ),
+          ),
+
+          // Quick Presets
+          Text(
+            ref.tr('corner_radius_presets'),
+            style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: presets.map((p) {
+              final isSelected = (currentRadius - p).abs() < 0.5;
+              String label = '${p.toInt()} px';
+              if (p == 0) label = '0 (Recto)';
+              if (p == 12) label = '12 (TCG)';
+              if (p == 16) label = '16 (Póker)';
+              return InkWell(
+                onTap: () => onChanged(p),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
+                        : const Color(0xFF161928),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Color Picker with Palette Swatches, Hex Input & Opacity Slider ---
+  Widget _buildColorPickerSection(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required Color currentColor,
+    required ValueChanged<Color> onChanged,
+    bool allowTransparent = true,
+  }) {
+    final hexString = '#${currentColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+    final isTransparent = currentColor.a == 0;
+
+    final palette = [
+      const Color(0xFF0C0E17), // Obsidian
+      const Color(0xFF131622), // Grimoire Dark Slate
+      const Color(0xFF1E2337), // Midnight Navy
+      const Color(0xFF2E1065), // Arcane Violet
+      const Color(0xFF1E1B4B), // Mystic Indigo
+      const Color(0xFF064E3B), // Abyssal Emerald
+      const Color(0xFF450A0A), // Dragon Crimson
+      const Color(0xFF451A03), // Ancient Amber
+      const Color(0xFF18181B), // Charcoal Dark
+      const Color(0xFF000000), // Pure Black
+      const Color(0xFFF8FAFC), // Celestial White
+      if (allowTransparent) Colors.transparent,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F111D),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: currentColor,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+                ),
+                child: isTransparent
+                    ? const Icon(Icons.block, size: 12, color: Colors.redAccent)
+                    : null,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                hexString,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC7D2FE), fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Palette Swatches
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: palette.map((col) {
+              final isSelected = col.toARGB32() == currentColor.toARGB32();
+              final isTrans = col.a == 0;
+
+              return InkWell(
+                onTap: () => onChanged(col),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: col,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSelected
+                          ? GrimoireTheme.accentPurple
+                          : Colors.white.withValues(alpha: 0.2),
+                      width: isSelected ? 2.5 : 1.0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: GrimoireTheme.accentPurple.withValues(alpha: 0.5),
+                              blurRadius: 6,
+                            )
+                          ]
+                        : null,
+                  ),
+                  child: isTrans
+                      ? const Icon(Icons.block, size: 14, color: Colors.redAccent)
+                      : isSelected
+                          ? Icon(
+                              Icons.check,
+                              size: 14,
+                              color: ThemeData.estimateBrightnessForColor(col) == Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black,
+                            )
+                          : null,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+
+          // Hex input row + opacity slider
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: TextFormField(
+                  key: ValueKey('hex_${currentColor.toARGB32()}'),
+                  initialValue: hexString,
+                  style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    labelText: ref.tr('custom_hex'),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                  onFieldSubmitted: (val) {
+                    final parsed = _tryParseHexColor(val);
+                    if (parsed != null) onChanged(parsed);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(ref.tr('opacity'), style: const TextStyle(fontSize: 9, color: GrimoireTheme.textMuted)),
+                        Text('${(currentColor.a * 100).toInt()}%', style: const TextStyle(fontSize: 9, color: Colors.white, fontFamily: 'monospace')),
+                      ],
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: GrimoireTheme.accentPurple,
+                        inactiveTrackColor: const Color(0xFF222638),
+                        thumbColor: GrimoireTheme.accentPurple,
+                        overlayColor: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      ),
+                      child: Slider(
+                        value: currentColor.a,
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: (val) {
+                          onChanged(currentColor.withValues(alpha: val));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Border Width Selector with Presets ---
+  Widget _buildBorderWidthSelector(
+    BuildContext context,
+    WidgetRef ref, {
+    required double currentWidth,
+    required ValueChanged<double> onChanged,
+  }) {
+    final presets = [0.0, 1.0, 1.5, 2.0, 3.0, 4.0];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F111D),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.line_weight, size: 14, color: GrimoireTheme.accentPurple),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  ref.tr('border_width'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  '${currentWidth.toStringAsFixed(1)} px',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE9D5FF), fontFamily: 'monospace'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: GrimoireTheme.accentPurple,
+              inactiveTrackColor: const Color(0xFF222638),
+              thumbColor: GrimoireTheme.accentPurple,
+              overlayColor: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              value: currentWidth.clamp(0.0, 12.0),
+              min: 0.0,
+              max: 12.0,
+              onChanged: (val) => onChanged(double.parse(val.toStringAsFixed(1))),
+            ),
+          ),
+
+          // Presets
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: presets.map((p) {
+              final isSelected = (currentWidth - p).abs() < 0.2;
+              String label = '${p.toStringAsFixed(p.truncateToDouble() == p ? 0 : 1)} px';
+              if (p == 0) label = '0 (Sin borde)';
+              return InkWell(
+                onTap: () => onChanged(p),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
+                        : const Color(0xFF161928),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color? _tryParseHexColor(String input) {
+    var hex = input.trim().replaceAll('#', '').replaceAll('0x', '').replaceAll('0X', '');
+    if (hex.length == 6) {
+      hex = 'FF$hex';
+    }
+    if (hex.length == 8) {
+      final val = int.tryParse(hex, radix: 16);
+      if (val != null) return Color(val);
+    }
+    return null;
   }
 
   Widget _buildInfoRow(String label, String value) {

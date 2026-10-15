@@ -1488,6 +1488,17 @@ class EditorNotifier extends StateNotifier<EditorState> {
     );
   }
 
+  void updateCornerRadius(double radius) {
+    final currentTemplate = state.project.activeTemplate;
+    final updatedTemplate = currentTemplate.copyWith(cornerRadius: radius);
+    final templates = List<CardTemplate>.from(state.project.templates);
+    templates[state.project.activeTemplateIndex] = updatedTemplate;
+
+    state = state.copyWith(
+      project: state.project.copyWith(templates: templates),
+    );
+  }
+
   Future<void> syncGameDataCsv(String gameName) async {
     final gameCards = state.project.rows
         .where((r) => (r['game'] ?? '').toString().toLowerCase() == gameName.toLowerCase())

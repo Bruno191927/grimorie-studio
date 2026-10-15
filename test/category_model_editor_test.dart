@@ -146,5 +146,55 @@ void main() {
 
       expect(selectedEmoji, equals('🐉'));
     });
+
+    test('EditorNotifier updates corner radius and background color correctly', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(editorProvider.notifier);
+
+      // Verify initial corner radius
+      expect(container.read(editorProvider).project.activeTemplate.cornerRadius, equals(16.0));
+
+      // Update corner radius to 24.0 (Suave)
+      notifier.updateCornerRadius(24.0);
+      expect(container.read(editorProvider).project.activeTemplate.cornerRadius, equals(24.0));
+
+      // Update background color
+      const newColor = Color(0xFF1E293B);
+      notifier.updateBackgroundColor(newColor);
+      expect(container.read(editorProvider).project.activeTemplate.backgroundColor, equals(newColor));
+    });
+
+    testWidgets('EditorScreen Inspector displays corner radius and background color controls', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: EditorScreen(repaintBoundaryKey: GlobalKey()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // With no layer selected, Project Settings shows corner radius & background controls
+      expect(find.text('Radio de Borde'), findsWidgets);
+      expect(find.text('FONDO Y BORDE DE LA CARTA'), findsOneWidget);
+
+      // Verify quick presets are available (e.g. 16 (Póker), 24 px)
+      expect(find.text('16 (Póker)'), findsOneWidget);
+      expect(find.text('24 px'), findsOneWidget);
+
+      // Tap 24 px preset
+      await tester.tap(find.text('24 px'));
+      await tester.pumpAndSettle();
+
+      // Badge should now show 24.0 px
+      expect(find.text('24.0 px'), findsOneWidget);
+    });
   });
 }
+

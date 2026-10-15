@@ -230,6 +230,13 @@ class AppStrings {
       'game_has_no_cards_title': 'Este juego aún no tiene cartas',
       'game_has_no_cards_desc': 'Usa las plantillas de categoría de arriba o añade una carta nueva para comenzar.',
       'add_first_card_to_game': 'Añadir Primera Carta',
+      'shape_fill_color': 'Color de Fondo (Relleno)',
+      'border_color': 'Color de Borde',
+      'corner_radius_presets': 'Preajustes de Esquinas',
+      'border_width_presets': 'Grosor de Borde',
+      'card_background_settings': 'Fondo y Borde de la Carta',
+      'custom_hex': 'Código Hex',
+      'opacity': 'Opacidad',
     },
     AppLanguage.en: {
       // Header Nav
@@ -456,6 +463,13 @@ class AppStrings {
       'game_has_no_cards_title': 'This game has no cards yet',
       'game_has_no_cards_desc': 'Use the category blueprints above or add a new card to get started.',
       'add_first_card_to_game': 'Add First Card',
+      'shape_fill_color': 'Background Fill Color',
+      'border_color': 'Border Color',
+      'corner_radius_presets': 'Corner Presets',
+      'border_width_presets': 'Border Width',
+      'card_background_settings': 'Card Background & Border',
+      'custom_hex': 'Hex Code',
+      'opacity': 'Opacity',
     },
   };
 
