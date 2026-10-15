@@ -5,6 +5,10 @@ class GameCategory {
   final String defaultType;
   final int defaultColor;
   final String defaultRules;
+  final String defaultCost;
+  final String defaultAttack;
+  final String defaultDefense;
+  final String defaultRarity;
 
   const GameCategory({
     required this.id,
@@ -13,6 +17,10 @@ class GameCategory {
     this.defaultType = 'Criatura',
     this.defaultColor = 0xFF7C3AED,
     this.defaultRules = '',
+    this.defaultCost = '3',
+    this.defaultAttack = '0',
+    this.defaultDefense = '0',
+    this.defaultRarity = 'Común',
   });
 
   GameCategory copyWith({
@@ -22,6 +30,10 @@ class GameCategory {
     String? defaultType,
     int? defaultColor,
     String? defaultRules,
+    String? defaultCost,
+    String? defaultAttack,
+    String? defaultDefense,
+    String? defaultRarity,
   }) {
     return GameCategory(
       id: id ?? this.id,
@@ -30,6 +42,10 @@ class GameCategory {
       defaultType: defaultType ?? this.defaultType,
       defaultColor: defaultColor ?? this.defaultColor,
       defaultRules: defaultRules ?? this.defaultRules,
+      defaultCost: defaultCost ?? this.defaultCost,
+      defaultAttack: defaultAttack ?? this.defaultAttack,
+      defaultDefense: defaultDefense ?? this.defaultDefense,
+      defaultRarity: defaultRarity ?? this.defaultRarity,
     );
   }
 
@@ -40,6 +56,10 @@ class GameCategory {
     'defaultType': defaultType,
     'defaultColor': defaultColor,
     'defaultRules': defaultRules,
+    'defaultCost': defaultCost,
+    'defaultAttack': defaultAttack,
+    'defaultDefense': defaultDefense,
+    'defaultRarity': defaultRarity,
   };
 
   factory GameCategory.fromJson(Map<String, dynamic> json) => GameCategory(
@@ -49,5 +69,9 @@ class GameCategory {
     defaultType: json['defaultType'] as String? ?? 'Criatura',
     defaultColor: json['defaultColor'] as int? ?? 0xFF7C3AED,
     defaultRules: json['defaultRules'] as String? ?? '',
+    defaultCost: json['defaultCost'] as String? ?? '3',
+    defaultAttack: json['defaultAttack'] as String? ?? '0',
+    defaultDefense: json['defaultDefense'] as String? ?? '0',
+    defaultRarity: json['defaultRarity'] as String? ?? 'Común',
   );
 }

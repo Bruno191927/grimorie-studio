@@ -1211,11 +1211,11 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
     final newCard = {
       'card_name': cardName ?? 'Nueva ${category.name}',
-      'cost': '3',
+      'cost': category.defaultCost.isNotEmpty ? category.defaultCost : '3',
       'type': category.defaultType,
-      'rarity': 'Common',
-      'attack': category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0',
-      'defense': category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0',
+      'rarity': category.defaultRarity.isNotEmpty ? category.defaultRarity : 'Common',
+      'attack': category.defaultAttack.isNotEmpty ? category.defaultAttack : (category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0'),
+      'defense': category.defaultDefense.isNotEmpty ? category.defaultDefense : (category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0'),
       'creator': 'Tyler Covington',
       'bid': '4.89 ETH',
       'chain': 'BSC',

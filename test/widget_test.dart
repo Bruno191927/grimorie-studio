@@ -70,8 +70,8 @@ void main() {
     // Verify card Flame Dress exists initially
     expect(find.text('"Flame Dress"'), findsOneWidget);
 
-    // Find the first three dots button and tap it
-    final moreVertButton = find.byIcon(Icons.more_vert).first;
+    // Find the three dots button on card Flame Dress and tap it
+    final moreVertButton = find.byKey(const ValueKey('card_menu_Flame Dress'));
     await tester.tap(moreVertButton);
     await tester.pumpAndSettle();
 
