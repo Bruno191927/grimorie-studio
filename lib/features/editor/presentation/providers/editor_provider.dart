@@ -1118,6 +1118,16 @@ class EditorNotifier extends StateNotifier<EditorState> {
     }
   }
 
+  void updateRow(int index, Map<String, dynamic> row) {
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    if (index >= 0 && index < rows.length) {
+      rows[index] = row;
+      state = state.copyWith(
+        project: state.project.copyWith(rows: rows),
+      );
+    }
+  }
+
   void addRow(Map<String, dynamic> row) {
     final rows = [...state.project.rows, row];
     state = state.copyWith(
@@ -1186,26 +1196,135 @@ class EditorNotifier extends StateNotifier<EditorState> {
       state = state.copyWith(deletedGames: updatedDeleted);
     }
 
-    final newCard = {
+    final newCard = <String, dynamic>{
       'card_name': cardName ?? 'Nueva ${category.name}',
-      'cost': category.defaultCost.isNotEmpty ? category.defaultCost : '3',
       'type': category.defaultType,
-      'rarity': category.defaultRarity.isNotEmpty ? category.defaultRarity : 'Common',
-      'attack': category.defaultAttack.isNotEmpty ? category.defaultAttack : (category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0'),
-      'defense': category.defaultDefense.isNotEmpty ? category.defaultDefense : (category.defaultType.toLowerCase().contains('creature') || category.defaultType.toLowerCase().contains('unicorn') ? '2' : '0'),
       'creator': 'Grimoire Studio',
       'icon': category.icon,
       'art_color': category.defaultColor,
-      'rules_text': category.defaultRules.isNotEmpty
-          ? category.defaultRules
-          : 'Habilidad de ${category.name} para $gameName.',
-      'rules': category.defaultRules.isNotEmpty
-          ? category.defaultRules
-          : 'Habilidad de ${category.name} para $gameName.',
       'game': gameName,
       'category': category.name,
     };
+
+    if (category.hasCost && category.defaultCost.isNotEmpty) {
+      newCard['cost'] = category.defaultCost;
+    } else {
+      newCard['cost'] = '';
+    }
+
+    if (category.hasCombatStats) {
+      newCard['attack'] = category.defaultAttack;
+      newCard['defense'] = category.defaultDefense;
+    } else {
+      newCard['attack'] = '';
+      newCard['defense'] = '';
+    }
+
+    if (category.hasRarity && category.defaultRarity.isNotEmpty) {
+      newCard['rarity'] = category.defaultRarity;
+    } else {
+      newCard['rarity'] = '';
+    }
+
+    if (category.hasRules && category.defaultRules.isNotEmpty) {
+      newCard['rules_text'] = category.defaultRules;
+      newCard['rules'] = category.defaultRules;
+    } else {
+      newCard['rules_text'] = '';
+      newCard['rules'] = '';
+    }
+
+    category.customFields.forEach((k, v) {
+      newCard[k] = v;
+    });
+
     addRow(newCard);
+  }
+
+  void setCategoryForActiveCard(String categoryName, {bool applyModelAttributes = false}) {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = Map<String, dynamic>.from(state.project.activeRow);
+    activeRow['category'] = categoryName;
+
+    final game = (activeRow['game'] ?? 'Magic').toString();
+    final categories = getCategoriesForGame(game);
+    final match = categories.firstWhere(
+      (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+      orElse: () => GameCategory(id: 'cat', name: categoryName),
+    );
+
+    if (match.id != 'cat') {
+      activeRow['icon'] = match.icon;
+      activeRow['art_color'] = match.defaultColor;
+
+      if (applyModelAttributes) {
+        if (match.defaultType.isNotEmpty) activeRow['type'] = match.defaultType;
+        if (match.hasCost) {
+          activeRow['cost'] = match.defaultCost;
+        } else {
+          activeRow['cost'] = '';
+        }
+        if (match.hasCombatStats) {
+          activeRow['attack'] = match.defaultAttack;
+          activeRow['defense'] = match.defaultDefense;
+        } else {
+          activeRow['attack'] = '';
+          activeRow['defense'] = '';
+        }
+        if (match.hasRarity) {
+          activeRow['rarity'] = match.defaultRarity;
+        } else {
+          activeRow['rarity'] = '';
+        }
+        if (match.hasRules && match.defaultRules.isNotEmpty) {
+          activeRow['rules_text'] = match.defaultRules;
+          activeRow['rules'] = match.defaultRules;
+        }
+        match.customFields.forEach((k, v) {
+          activeRow[k] = v;
+        });
+      }
+    }
+
+    updateRow(state.project.activeRowIndex, activeRow);
+    syncGameDataCsv(game);
+  }
+
+  void applyCategoryModelToActiveCard(GameCategory category) {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = Map<String, dynamic>.from(state.project.activeRow);
+    activeRow['category'] = category.name;
+    activeRow['icon'] = category.icon;
+    activeRow['art_color'] = category.defaultColor;
+    if (category.defaultType.isNotEmpty) activeRow['type'] = category.defaultType;
+    if (category.hasCost) {
+      activeRow['cost'] = category.defaultCost;
+    } else {
+      activeRow['cost'] = '';
+    }
+    if (category.hasCombatStats) {
+      activeRow['attack'] = category.defaultAttack;
+      activeRow['defense'] = category.defaultDefense;
+    } else {
+      activeRow['attack'] = '';
+      activeRow['defense'] = '';
+    }
+    if (category.hasRarity) {
+      activeRow['rarity'] = category.defaultRarity;
+    } else {
+      activeRow['rarity'] = '';
+    }
+    if (category.hasRules && category.defaultRules.isNotEmpty) {
+      activeRow['rules_text'] = category.defaultRules;
+      activeRow['rules'] = category.defaultRules;
+    }
+    category.customFields.forEach((k, v) {
+      activeRow[k] = v;
+    });
+
+    final game = (activeRow['game'] ?? 'Magic').toString();
+    updateRow(state.project.activeRowIndex, activeRow);
+    syncGameDataCsv(game);
   }
 
   void addCardToGame(

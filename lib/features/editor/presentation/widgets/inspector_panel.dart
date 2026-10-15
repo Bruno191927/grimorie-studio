@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../models/layer_item.dart';
+import '../../models/game_category.dart';
 import '../../services/game_folder_service.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
@@ -33,35 +34,243 @@ class InspectorPanel extends ConsumerWidget {
   Widget _buildProjectSettings(BuildContext context, WidgetRef ref, EditorState state) {
     final project = state.project;
 
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          ref.tr('project_card_settings'),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        const SizedBox(height: 12),
+        _buildActiveCardCategorySection(context, ref, state),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text(
+          project.name,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: GrimoireTheme.accentPurple),
+        ),
+        const SizedBox(height: 10),
+        _buildInfoRow(ref.tr('card_size'), '${project.widthMm.toStringAsFixed(1)} x ${project.heightMm.toStringAsFixed(1)} mm (Poker)'),
+        _buildInfoRow(ref.tr('dpi_target'), '300 DPI Print-Ready'),
+        _buildInfoRow(ref.tr('database_rows'), '${project.rows.length} cards'),
+        _buildInfoRow(ref.tr('active_template'), project.activeTemplate.name),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text(
+          ref.tr('select_layer_hint'),
+          style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted, height: 1.4),
+        ),
+        const SizedBox(height: 16),
+        _buildLocalImageAssetsSection(context, ref, state, null),
+      ],
+    );
+  }
+
+  Widget _buildActiveCardCategorySection(BuildContext context, WidgetRef ref, EditorState state) {
+    if (state.project.rows.isEmpty) return const SizedBox.shrink();
+
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    final cardName = (activeRow['card_name'] ?? 'Carta').toString();
+    final activeCategory = (activeRow['category'] ?? '').toString();
+    final gameCategories = ref.read(editorProvider.notifier).getCategoriesForGame(gameName);
+
+    final matchingCategory = gameCategories.firstWhere(
+      (c) => c.name.toLowerCase() == activeCategory.toLowerCase(),
+      orElse: () => GameCategory(
+        id: '',
+        name: activeCategory.isNotEmpty ? activeCategory : ref.tr('no_category'),
+        icon: '🏷️',
+      ),
+    );
+
+    final catColor = matchingCategory.defaultColor != 0
+        ? Color(matchingCategory.defaultColor)
+        : GrimoireTheme.accentPurple;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141226),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: catColor.withValues(alpha: 0.35)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            ref.tr('project_card_settings'),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            project.name,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: GrimoireTheme.accentPurple),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: catColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(matchingCategory.icon.isNotEmpty ? matchingCategory.icon : '🏷️', style: const TextStyle(fontSize: 16)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cardName,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '$gameName • ${activeCategory.isNotEmpty ? activeCategory : ref.tr('no_category')}',
+                      style: TextStyle(fontSize: 11, color: catColor, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow(ref.tr('card_size'), '${project.widthMm.toStringAsFixed(1)} x ${project.heightMm.toStringAsFixed(1)} mm (Poker)'),
-          _buildInfoRow(ref.tr('dpi_target'), '300 DPI Print-Ready'),
-          _buildInfoRow(ref.tr('database_rows'), '${project.rows.length} cards'),
-          _buildInfoRow(ref.tr('active_template'), project.activeTemplate.name),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
-          Text(
-            ref.tr('select_layer_hint'),
-            style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted, height: 1.5),
+          Text(ref.tr('select_category'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: GrimoireTheme.bgCanvas,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: GrimoireTheme.borderSubtle),
+            ),
+            child: DropdownButton<String>(
+              value: gameCategories.any((c) => c.name.toLowerCase() == activeCategory.toLowerCase())
+                  ? matchingCategory.name
+                  : '',
+              isExpanded: true,
+              underline: const SizedBox.shrink(),
+              dropdownColor: GrimoireTheme.surfaceElevated,
+              style: const TextStyle(fontSize: 12, color: Colors.white),
+              items: [
+                DropdownMenuItem<String>(
+                  value: '',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.block, size: 14, color: GrimoireTheme.textMuted),
+                      const SizedBox(width: 6),
+                      Text(ref.tr('no_category'), style: const TextStyle(color: GrimoireTheme.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                for (final cat in gameCategories)
+                  DropdownMenuItem<String>(
+                    value: cat.name,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Color(cat.defaultColor),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(cat.icon, style: const TextStyle(fontSize: 13)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            cat.name,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              onChanged: (chosen) {
+                if (chosen != null && chosen != activeCategory) {
+                  ref.read(editorProvider.notifier).setCategoryForActiveCard(chosen);
+                }
+              },
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildLocalImageAssetsSection(context, ref, state, null),
+          if (matchingCategory.id.isNotEmpty && matchingCategory.name != ref.tr('no_category')) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                _buildModelBadge(ref.tr('include_cost'), matchingCategory.hasCost ? (matchingCategory.defaultCost.isNotEmpty ? matchingCategory.defaultCost : 'Sí') : 'No', matchingCategory.hasCost),
+                _buildModelBadge(ref.tr('include_combat_stats'), matchingCategory.hasCombatStats ? '${matchingCategory.defaultAttack}/${matchingCategory.defaultDefense}' : 'No', matchingCategory.hasCombatStats),
+                _buildModelBadge(ref.tr('include_rarity'), matchingCategory.hasRarity ? (matchingCategory.defaultRarity.isNotEmpty ? matchingCategory.defaultRarity : 'Sí') : 'No', matchingCategory.hasRarity),
+                _buildModelBadge(ref.tr('include_rules'), matchingCategory.hasRules ? 'Sí' : 'No', matchingCategory.hasRules),
+              ],
+            ),
+            if (matchingCategory.customFields.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                children: matchingCategory.customFields.entries.map((e) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: GrimoireTheme.accentIndigo.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.3)),
+                  ),
+                  child: Text('${e.key}: ${e.value}', style: const TextStyle(fontSize: 9, color: Color(0xFFC7D2FE))),
+                )).toList(),
+              ),
+            ],
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: catColor.withValues(alpha: 0.25),
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: catColor.withValues(alpha: 0.6)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.flash_on, size: 14),
+                label: Text(
+                  ref.tr('apply_category_model'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  ref.read(editorProvider.notifier).applyCategoryModelToActiveCard(matchingCategory);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: GrimoireTheme.accentEmerald,
+                      content: Text(ref.tr('apply_model_toast')),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildModelBadge(String label, String value, bool isEnabled) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: isEnabled ? const Color(0xFF1E1B4B) : const Color(0xFF18181B),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isEnabled ? GrimoireTheme.accentIndigo.withValues(alpha: 0.4) : Colors.white12,
+        ),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 9.5,
+          fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+          color: isEnabled ? const Color(0xFFA5B4FC) : GrimoireTheme.textMuted,
+        ),
       ),
     );
   }

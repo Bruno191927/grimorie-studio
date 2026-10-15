@@ -415,7 +415,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 const Icon(Icons.add, size: 14, color: GrimoireTheme.accentPurple),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '+ ${ref.tr('add_row')}',
+                                  ref.tr('add_row'),
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GrimoireTheme.accentPurple),
                                 ),
                                 const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.accentPurple),
@@ -599,7 +599,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 foregroundColor: Colors.white,
                               ),
                               icon: const Icon(Icons.add, size: 14),
-                              label: const Text('+ Crear Carta'),
+                              label: const Text('Crear Carta'),
                               onPressed: () {
                                 final cats = ref.read(editorProvider.notifier).getCategoriesForGame(entry.key);
                                 final activeCatName = _gameCategoryFilter[entry.key];
@@ -1433,35 +1433,64 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Text('⚡ ', style: TextStyle(fontSize: 10)),
-              Text('Coste: ${cat.defaultCost}', style: const TextStyle(fontSize: 10, color: Colors.white)),
-              const Spacer(),
-              const Text('⚔️ ', style: TextStyle(fontSize: 10)),
-              Text('${cat.defaultAttack}/${cat.defaultDefense}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: _getRarityColor(cat.defaultRarity), shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 5),
-              Text(cat.defaultRarity, style: TextStyle(fontSize: 10, color: _getRarityColor(cat.defaultRarity), fontWeight: FontWeight.w600)),
-            ],
-          ),
-          if (cat.defaultRules.isNotEmpty) ...[
+          if (cat.hasCost && cat.defaultCost.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Text('⚡ ', style: TextStyle(fontSize: 10)),
+                Text('Coste: ${cat.defaultCost}', style: const TextStyle(fontSize: 10, color: Colors.white)),
+              ],
+            ),
+          ],
+          if (cat.hasCombatStats && (cat.defaultAttack.isNotEmpty || cat.defaultDefense.isNotEmpty)) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Text('⚔️ ', style: TextStyle(fontSize: 10)),
+                Text('${cat.defaultAttack} / 🛡️ ${cat.defaultDefense}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+          ],
+          if (cat.hasRarity && cat.defaultRarity.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: _getRarityColor(cat.defaultRarity), shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 5),
+                Text(cat.defaultRarity, style: TextStyle(fontSize: 10, color: _getRarityColor(cat.defaultRarity), fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+          if (cat.hasRules && cat.defaultRules.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               '"${cat.defaultRules}"',
               style: const TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: GrimoireTheme.textMuted),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (cat.customFields.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: cat.customFields.entries.map((e) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: GrimoireTheme.surfaceElevated,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: GrimoireTheme.borderSubtle),
+                ),
+                child: Text(
+                  '${e.key}: ${e.value}',
+                  style: const TextStyle(fontSize: 9, color: Color(0xFFC7D2FE), fontWeight: FontWeight.w500),
+                ),
+              )).toList(),
             ),
           ],
           const SizedBox(height: 10),
@@ -1480,7 +1509,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(Icons.flash_on, size: 12),
-                  label: const Text('+ Usar Modelo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  label: const Text('Usar Modelo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: () => _generateCardFromModel(gameName, cat),
                 ),
               ),
@@ -2486,7 +2515,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                 ),
                                 icon: const Icon(Icons.add, size: 12),
-                                label: const Text('+ Carta', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                label: const Text('Carta', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                 onPressed: () {
                                   Navigator.pop(ctx);
                                   _generateCardFromModel(gameName, cat);
@@ -2564,6 +2593,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final rarityController = TextEditingController(text: existingCategory?.defaultRarity ?? 'Común');
     final rulesController = TextEditingController(text: existingCategory?.defaultRules ?? '');
 
+    final customKeyCtrl = TextEditingController();
+    final customValCtrl = TextEditingController();
+
+    bool hasCost = existingCategory?.hasCost ?? (!chosenGame.toLowerCase().contains('unicorn'));
+    bool hasCombatStats = existingCategory?.hasCombatStats ?? (!chosenGame.toLowerCase().contains('unicorn'));
+    bool hasRarity = existingCategory?.hasRarity ?? true;
+    bool hasRules = existingCategory?.hasRules ?? true;
+    Map<String, String> customFields = Map<String, String>.from(existingCategory?.customFields ?? {});
+    bool showAddCustom = false;
+
     int selectedColor = existingCategory?.defaultColor ?? 0xFF8B5CF6;
     final colorOptions = [
       0xFF8B5CF6, // Purple
@@ -2576,7 +2615,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
       0xFF6B7280, // Slate / Gray
     ];
 
-    final emojiPresets = ['🦄', '🌟', '✨', '💣', '🚫', '⚔️', '🛡️', '🤖', '🔮', '⚡', '👑', '📜', '🐼', '🚀', '🦌'];
+    final emojiPresets = ['🦄', '🌟', '✨', '💣', '🚫', '⚔️', '🛡️', '🤖', '🔮', '⚡', '👑', '📜', '🐼', '🚀', '🔥', '💧', '🌿', '💀', '🎲'];
 
     showDialog(
       context: context,
@@ -2621,7 +2660,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ],
           ),
           content: SizedBox(
-            width: 480,
+            width: 520,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2654,7 +2693,15 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                           child: Text(g, style: const TextStyle(fontSize: 12, color: Colors.white)),
                         )).toList(),
                         onChanged: (val) {
-                          if (val != null) setDialogState(() => chosenGame = val);
+                          if (val != null) {
+                            setDialogState(() {
+                              chosenGame = val;
+                              if (val.toLowerCase().contains('unicorn')) {
+                                hasCost = false;
+                                hasCombatStats = false;
+                              }
+                            });
+                          }
                         },
                       ),
                     ),
@@ -2668,7 +2715,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     controller: nameController,
                     style: const TextStyle(fontSize: 12, color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'ej. Unicornios (Básicos y Mágicos), Cartas de Mejora',
+                      hintText: 'ej. Unicornios Mágicos, Cartas de Mejora, Hechizos',
                       isDense: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -2680,150 +2727,344 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Emoji / Icon
+                  // Emoji / Icon Picker (Revamped from Image 1 feedback)
                   Text(ref.tr('category_icon'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      SizedBox(
-                        width: 55,
-                        child: TextField(
-                          controller: iconController,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 20),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
+                      // Selected icon preview
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Color(selectedColor).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Color(selectedColor), width: 1.5),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          iconController.text.isEmpty ? '🃏' : iconController.text,
+                          style: const TextStyle(fontSize: 22),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
+                      // Preset emojis
                       Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: emojiPresets.map((emoji) => InkWell(
-                              onTap: () => setDialogState(() => iconController.text = emoji),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                              ),
-                            )).toList(),
+                            children: emojiPresets.map((emoji) {
+                              final isCurrent = iconController.text == emoji;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: () => setDialogState(() => iconController.text = emoji),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: isCurrent ? GrimoireTheme.accentPurple.withValues(alpha: 0.3) : const Color(0xFF131522),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isCurrent ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
+                                        width: isCurrent ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // Default Card Type & Cost Row
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(ref.tr('category_default_type'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: typeController,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: 'ej. Unicornio Mágico, Instantánea',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(ref.tr('default_cost'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: costController,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: '2',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ],
+                      Text(ref.tr('custom_emoji_hint'), style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted)),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 55,
+                        height: 28,
+                        child: TextField(
+                          controller: iconController,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          onChanged: (val) => setDialogState(() {}),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Attack, Defense & Rarity Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Ataque Base', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: attackController,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: '2',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Defensa Base', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: defenseController,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: '2',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(ref.tr('default_rarity'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: rarityController,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: 'Común',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  // Default Card Type
+                  Text(ref.tr('category_default_type'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: typeController,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'ej. Unicornio Mágico, Instantánea, Equipamiento',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+
+                  // Predefined Card Attributes & Modular Feature Toggles
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F121E),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: GrimoireTheme.borderSubtle),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Atributos de esta Plantilla / Carta Predefinida:',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Toggle Coste / Maná
+                        _buildDialogToggleRow(
+                          title: ref.tr('include_cost'),
+                          subtitle: 'Actívalo si las cartas de esta categoría usan coste de maná/recursos',
+                          value: hasCost,
+                          onChanged: (v) => setDialogState(() => hasCost = v),
+                        ),
+                        if (hasCost) ...[
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 28, bottom: 8),
+                            child: SizedBox(
+                              width: 140,
+                              child: TextField(
+                                controller: costController,
+                                style: const TextStyle(fontSize: 12, color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: ref.tr('default_cost'),
+                                  hintText: 'ej. 2 o {1}{U}',
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // Toggle Estadísticas de Combate
+                        _buildDialogToggleRow(
+                          title: ref.tr('include_combat_stats'),
+                          subtitle: 'Ataque y defensa para criaturas o combatientes',
+                          value: hasCombatStats,
+                          onChanged: (v) => setDialogState(() => hasCombatStats = v),
+                        ),
+                        if (hasCombatStats) ...[
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 28, bottom: 8),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 110,
+                                  child: TextField(
+                                    controller: attackController,
+                                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ataque (⚔️)',
+                                      hintText: '2',
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 110,
+                                  child: TextField(
+                                    controller: defenseController,
+                                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Defensa (🛡️)',
+                                      hintText: '2',
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Toggle Rareza
+                        _buildDialogToggleRow(
+                          title: ref.tr('include_rarity'),
+                          subtitle: 'Nivel o categoría de rareza',
+                          value: hasRarity,
+                          onChanged: (v) => setDialogState(() => hasRarity = v),
+                        ),
+                        if (hasRarity) ...[
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 28, bottom: 8),
+                            child: SizedBox(
+                              width: 160,
+                              child: TextField(
+                                controller: rarityController,
+                                style: const TextStyle(fontSize: 12, color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: ref.tr('default_rarity'),
+                                  hintText: 'Común, Rara...',
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // Toggle Reglas Preestablecidas
+                        _buildDialogToggleRow(
+                          title: ref.tr('include_rules'),
+                          subtitle: 'Texto de regla o habilidad por defecto',
+                          value: hasRules,
+                          onChanged: (v) => setDialogState(() => hasRules = v),
+                        ),
+                        if (hasRules) ...[
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 28, bottom: 8),
+                            child: TextField(
+                              controller: rulesController,
+                              maxLines: 2,
+                              style: const TextStyle(fontSize: 12, color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: 'ej. Al entrar a tu Establo, puedes activar...',
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // Custom Attributes / Magic / Extras
+                        const Divider(height: 16, color: GrimoireTheme.borderSubtle),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              ref.tr('custom_attributes'),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: Icon(showAddCustom ? Icons.close : Icons.add, size: 13, color: GrimoireTheme.accentPurple),
+                              label: Text(
+                                ref.tr('add_custom_field'),
+                                style: const TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () => setDialogState(() => showAddCustom = !showAddCustom),
+                            ),
+                          ],
+                        ),
+                        if (customFields.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: customFields.entries.map((e) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1D2E),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: GrimoireTheme.borderSubtle),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('${e.key}: ', style: const TextStyle(fontSize: 11, color: Color(0xFFC7D2FE), fontWeight: FontWeight.bold)),
+                                  Text(e.value, style: const TextStyle(fontSize: 11, color: Colors.white)),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () => setDialogState(() => customFields.remove(e.key)),
+                                    child: const Icon(Icons.close, size: 12, color: GrimoireTheme.accentPink),
+                                  ),
+                                ],
+                              ),
+                            )).toList(),
+                          ),
+                        ],
+                        if (showAddCustom) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: customKeyCtrl,
+                                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                                  decoration: InputDecoration(
+                                    hintText: ref.tr('field_name'),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: TextField(
+                                  controller: customValCtrl,
+                                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                                  decoration: InputDecoration(
+                                    hintText: ref.tr('field_value'),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: GrimoireTheme.accentPurple,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () {
+                                  final k = customKeyCtrl.text.trim();
+                                  final v = customValCtrl.text.trim();
+                                  if (k.isNotEmpty && v.isNotEmpty) {
+                                    setDialogState(() {
+                                      customFields[k] = v;
+                                      customKeyCtrl.clear();
+                                      customValCtrl.clear();
+                                      showAddCustom = false;
+                                    });
+                                  }
+                                },
+                                child: const Text('OK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // Theme Color
                   Text(ref.tr('category_color'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -2855,21 +3096,6 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Default Rules Template
-                  Text(ref.tr('category_rules_template'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: rulesController,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'ej. Al entrar a tu Establo, puedes activar un efecto...',
-                      isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -2894,11 +3120,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     icon: iconController.text.trim().isEmpty ? '🦄' : iconController.text.trim(),
                     defaultType: typeController.text.trim().isEmpty ? catName : typeController.text.trim(),
                     defaultColor: selectedColor,
-                    defaultRules: rulesController.text.trim(),
-                    defaultCost: costController.text.trim().isEmpty ? '3' : costController.text.trim(),
-                    defaultAttack: attackController.text.trim().isEmpty ? '0' : attackController.text.trim(),
-                    defaultDefense: defenseController.text.trim().isEmpty ? '0' : defenseController.text.trim(),
-                    defaultRarity: rarityController.text.trim().isEmpty ? 'Común' : rarityController.text.trim(),
+                    hasCost: hasCost,
+                    defaultCost: hasCost ? costController.text.trim() : '',
+                    hasCombatStats: hasCombatStats,
+                    defaultAttack: hasCombatStats ? attackController.text.trim() : '',
+                    defaultDefense: hasCombatStats ? defenseController.text.trim() : '',
+                    hasRarity: hasRarity,
+                    defaultRarity: hasRarity ? rarityController.text.trim() : '',
+                    hasRules: hasRules,
+                    defaultRules: hasRules ? rulesController.text.trim() : '',
+                    customFields: customFields,
                   );
                   ref.read(editorProvider.notifier).addCategoryToGame(chosenGame, cat);
                   Navigator.pop(ctx);
@@ -2911,6 +3142,45 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 }
               },
               child: Text(isEditing ? ref.tr('save_model') : ref.tr('create')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogToggleRow({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: Checkbox(
+                value: value,
+                activeColor: GrimoireTheme.accentPurple,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: (v) => onChanged(v ?? false),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(subtitle, style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted)),
+                ],
+              ),
             ),
           ],
         ),
