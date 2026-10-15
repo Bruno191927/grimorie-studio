@@ -86,8 +86,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
         width: 254, // in canvas units (~63.5mm * 4)
         height: 355.6, // in canvas units (~88.9mm * 4)
         shapeColor: const Color(0xFF131622),
-        borderColor: const Color(0xFF23283E),
-        borderWidth: 2,
+        borderColor: Colors.transparent,
+        borderWidth: 0,
         borderRadius: 16,
         isLocked: true,
       ),

@@ -70,7 +70,13 @@ class InspectorPanel extends ConsumerWidget {
                 .where((l) => l.name.toLowerCase().contains('background'))
                 .firstOrNull;
             if (bgLayer != null) {
-              ref.read(editorProvider.notifier).updateLayer(bgLayer.copyWith(shapeColor: newColor));
+              ref.read(editorProvider.notifier).updateLayer(
+                bgLayer.copyWith(
+                  shapeColor: newColor,
+                  borderColor: Colors.transparent,
+                  borderWidth: 0,
+                ),
+              );
             }
           },
           allowTransparent: false,

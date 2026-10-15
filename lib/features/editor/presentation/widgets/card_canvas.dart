@@ -42,18 +42,18 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
         scale: editorState.zoom,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(template.cornerRadius + 2),
+            borderRadius: BorderRadius.circular(template.cornerRadius),
             boxShadow: [
               BoxShadow(
-                color: GrimoireTheme.accentPurple.withValues(alpha: 0.18),
+                color: Colors.black.withValues(alpha: 0.65),
                 blurRadius: 30,
-                spreadRadius: 2,
-                offset: const Offset(0, 10),
+                spreadRadius: 1,
+                offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.7),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -66,10 +66,6 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
               decoration: BoxDecoration(
                 color: template.getBackgroundColor(editorState.currentSide),
                 borderRadius: BorderRadius.circular(template.cornerRadius),
-                border: Border.all(
-                  color: GrimoireTheme.borderStrong,
-                  width: 1.5,
-                ),
               ),
               child: Stack(
                 children: [
@@ -274,14 +270,20 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
           }
         }
 
+        // Background frame shape layers should not overlay an artificial border line
+        final isBgShape = layer.name.toLowerCase().contains('background') && layer.isLocked;
+        final effectiveBorderWidth = (isBgShape && (layer.borderWidth <= 2.0 || layer.borderColor == const Color(0xFF23283E)))
+            ? 0.0
+            : layer.borderWidth;
+
         return Container(
           width: layer.width,
           height: layer.height,
           decoration: BoxDecoration(
             color: effectiveColor,
             borderRadius: BorderRadius.circular(layer.borderRadius),
-            border: layer.borderWidth > 0
-                ? Border.all(color: borderColor, width: layer.borderWidth)
+            border: effectiveBorderWidth > 0
+                ? Border.all(color: borderColor, width: effectiveBorderWidth)
                 : null,
           ),
           child: content,
