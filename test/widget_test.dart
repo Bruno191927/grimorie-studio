@@ -94,4 +94,43 @@ void main() {
     // Verify Flame Dress is deleted from gallery
     expect(find.text('"Flame Dress"'), findsNothing);
   });
+
+  testWidgets('Delete game button confirms and removes board game and its cards', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: GrimoireApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Reino Arcano (Fantasy) header and cards exist initially
+    expect(find.text('Reino Arcano (Fantasy)'), findsWidgets);
+    expect(find.text('"Celestial Kitsune"'), findsOneWidget);
+
+    // Find the Eliminar Juego button for Reino Arcano
+    final deleteGameButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
+    expect(deleteGameButtons, findsWidgets);
+
+    // Tap the second delete game button (corresponding to Reino Arcano)
+    await tester.tap(deleteGameButtons.at(1));
+    await tester.pumpAndSettle();
+
+    // Verify Confirmation Dialog appears
+    expect(find.text('¿Eliminar Juego de Mesa?'), findsOneWidget);
+    expect(find.textContaining('Reino Arcano (Fantasy)'), findsWidgets);
+
+    // Tap confirm delete in dialog
+    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, 'Eliminar Juego');
+    await tester.tap(confirmDeleteBtn);
+    await tester.pumpAndSettle();
+
+    // Verify Reino Arcano (Fantasy) and Celestial Kitsune are removed
+    expect(find.text('"Celestial Kitsune"'), findsNothing);
+    expect(find.text('Juego de mesa eliminado con éxito: "Reino Arcano (Fantasy)"'), findsOneWidget);
+  });
 }
+

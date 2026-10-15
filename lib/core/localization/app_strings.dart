@@ -108,6 +108,10 @@ class AppStrings {
       'confirm_delete_card_title': '¿Eliminar Carta?',
       'confirm_delete_card_desc': '¿Estás seguro de que deseas eliminar permanentemente esta carta del mazo?',
       'card_deleted': 'Carta eliminada con éxito',
+      'delete_game': 'Eliminar Juego',
+      'confirm_delete_game_title': '¿Eliminar Juego de Mesa?',
+      'confirm_delete_game_desc': '¿Estás seguro de que deseas eliminar este juego y todas las cartas que contiene? Esta acción no se puede deshacer.',
+      'game_deleted': 'Juego de mesa eliminado con éxito',
 
       // Grouping & Board Games
       'group_by': 'Agrupar por:',
@@ -261,6 +265,10 @@ class AppStrings {
       'confirm_delete_card_title': 'Delete Card?',
       'confirm_delete_card_desc': 'Are you sure you want to permanently delete this card from the deck?',
       'card_deleted': 'Card successfully deleted',
+      'delete_game': 'Delete Game',
+      'confirm_delete_game_title': 'Delete Board Game?',
+      'confirm_delete_game_desc': 'Are you sure you want to delete this board game and all cards in it? This action cannot be undone.',
+      'game_deleted': 'Board game successfully deleted',
 
       // Grouping & Board Games
       'group_by': 'Group by:',

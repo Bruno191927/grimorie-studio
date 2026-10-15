@@ -30,10 +30,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final allGamesSet = <String>{};
     for (final r in allRows) {
       final g = r['game']?.toString().trim();
-      if (g != null && g.isNotEmpty) allGamesSet.add(g);
+      if (g != null && g.isNotEmpty && !editorState.deletedGames.contains(g)) {
+        allGamesSet.add(g);
+      }
     }
-    if (!allGamesSet.contains('Cyber Arena TCG')) allGamesSet.add('Cyber Arena TCG');
-    if (!allGamesSet.contains('Reino Arcano (Fantasy)')) allGamesSet.add('Reino Arcano (Fantasy)');
+    if (!editorState.deletedGames.contains('Cyber Arena TCG') && !allGamesSet.contains('Cyber Arena TCG')) {
+      allGamesSet.add('Cyber Arena TCG');
+    }
+    if (!editorState.deletedGames.contains('Reino Arcano (Fantasy)') && !allGamesSet.contains('Reino Arcano (Fantasy)')) {
+      allGamesSet.add('Reino Arcano (Fantasy)');
+    }
     final allGames = allGamesSet.toList();
 
     // Filter rows based on search, mana, board game, and category
@@ -430,6 +436,22 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                               ),
                             );
                           },
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: GrimoireTheme.accentPink.withValues(alpha: 0.5)),
+                            backgroundColor: const Color(0xFF1E1420),
+                            foregroundColor: const Color(0xFFFECDD3),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.delete_sweep_outlined, size: 14, color: GrimoireTheme.accentPink),
+                          label: Text(
+                            ref.tr('delete_game'),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: () => _confirmDeleteGame(entry.key, entry.value.length),
                         ),
                       ],
                     ),
@@ -1233,6 +1255,109 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 SnackBar(
                   backgroundColor: GrimoireTheme.accentPink,
                   content: Text('${ref.tr('card_deleted')}: "$cardName"'),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Dialog: Delete Board Game Confirmation ---
+  void _confirmDeleteGame(String gameName, int cardCount) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GrimoireTheme.surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: GrimoireTheme.borderSubtle),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.accentPink.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: GrimoireTheme.accentPink.withValues(alpha: 0.4)),
+              ),
+              child: const Icon(Icons.delete_sweep_outlined, color: GrimoireTheme.accentPink, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                ref.tr('confirm_delete_game_title'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              ref.tr('confirm_delete_game_desc'),
+              style: const TextStyle(fontSize: 13, color: GrimoireTheme.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10121E),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: GrimoireTheme.borderSubtle),
+              ),
+              child: Row(
+                children: [
+                  Icon(_getGameIcon(gameName), color: GrimoireTheme.accentPink, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          gameName,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        Text(
+                          '$cardCount cartas',
+                          style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GrimoireTheme.accentPink,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+            label: Text(ref.tr('delete_game'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(editorProvider.notifier).deleteGame(gameName);
+              if (_selectedGame.toLowerCase() == gameName.toLowerCase()) {
+                setState(() => _selectedGame = 'All');
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: GrimoireTheme.accentPink,
+                  content: Text('${ref.tr('game_deleted')}: "$gameName"'),
                 ),
               );
             },

@@ -13,6 +13,7 @@ class EditorState {
   final bool showSnapping;
   final bool isGeneratingAi;
   final CardSide currentSide;
+  final Set<String> deletedGames;
 
   const EditorState({
     required this.project,
@@ -22,6 +23,7 @@ class EditorState {
     this.showSnapping = true,
     this.isGeneratingAi = false,
     this.currentSide = CardSide.front,
+    this.deletedGames = const {},
   });
 
   LayerItem? get selectedLayer {
@@ -40,6 +42,7 @@ class EditorState {
     bool? showSnapping,
     bool? isGeneratingAi,
     CardSide? currentSide,
+    Set<String>? deletedGames,
   }) {
     return EditorState(
       project: project ?? this.project,
@@ -49,6 +52,7 @@ class EditorState {
       showSnapping: showSnapping ?? this.showSnapping,
       isGeneratingAi: isGeneratingAi ?? this.isGeneratingAi,
       currentSide: currentSide ?? this.currentSide,
+      deletedGames: deletedGames ?? this.deletedGames,
     );
   }
 }
@@ -545,6 +549,11 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void addCardToGame(String gameName, {String? cardName, String? type, String? icon, String? category}) {
+    if (state.deletedGames.contains(gameName)) {
+      final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
+      state = state.copyWith(deletedGames: updatedDeleted);
+    }
+
     final newCard = {
       'card_name': cardName ?? 'Nueva Carta ($gameName)',
       'cost': '3',
@@ -562,6 +571,24 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'category': category ?? 'cat_art_creature',
     };
     addRow(newCard);
+  }
+
+  void deleteGame(String gameName) {
+    final rows = state.project.rows
+        .where((r) => (r['game'] ?? '').toString().toLowerCase() != gameName.toLowerCase())
+        .toList();
+    final newIndex = state.project.activeRowIndex >= rows.length
+        ? (rows.isEmpty ? 0 : rows.length - 1)
+        : state.project.activeRowIndex;
+    final updatedDeletedGames = {...state.deletedGames, gameName};
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        rows: rows,
+        activeRowIndex: newIndex,
+      ),
+      deletedGames: updatedDeletedGames,
+    );
   }
 
   void removeRow(int index) {
