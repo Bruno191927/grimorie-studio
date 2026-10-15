@@ -95,9 +95,9 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: GrimoireTheme.accentPurple.withOpacity(0.15),
+                                    color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: GrimoireTheme.accentPurple.withOpacity(0.4)),
+                                    border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
                                   ),
                                   child: const Text(
                                     'Deck Sync OK',
@@ -168,10 +168,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 )
                               : GridView.builder(
                                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent: 250,
+                                    maxCrossAxisExtent: 260,
                                     crossAxisSpacing: 16,
                                     mainAxisSpacing: 16,
-                                    childAspectRatio: 0.65,
+                                    childAspectRatio: 0.72,
                                   ),
                                   itemCount: filteredRows.length,
                                   itemBuilder: (context, index) {
@@ -346,78 +346,91 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           border: Border.all(color: GrimoireTheme.borderSubtle),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withValues(alpha: 0.4),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Creator info header
             Row(
               children: [
                 CircleAvatar(
-                  radius: 11,
-                  backgroundColor: GrimoireTheme.accentPurple.withOpacity(0.3),
-                  child: Text(creator.substring(0, 1), style: const TextStyle(fontSize: 10, color: Colors.white)),
+                  radius: 12,
+                  backgroundColor: GrimoireTheme.accentPurple.withValues(alpha: 0.3),
+                  child: Text(creator.substring(0, 1), style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Creator', style: TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
-                      Text(creator, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
+                      Text(creator, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
                     color: GrimoireTheme.surfaceElevated,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.favorite_border, size: 10, color: GrimoireTheme.accentPink),
+                      Icon(Icons.favorite_border, size: 11, color: GrimoireTheme.accentPink),
                       SizedBox(width: 3),
-                      Text('100', style: TextStyle(fontSize: 9, color: Colors.white)),
+                      Text('100', style: TextStyle(fontSize: 10, color: Colors.white)),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             // Artwork Area with Timer Pill
             Expanded(
               child: Container(
+                width: double.infinity,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: artColor,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Text(icon, style: const TextStyle(fontSize: 52)),
+                    Center(
+                      child: Text(icon, style: const TextStyle(fontSize: 54)),
+                    ),
                     Positioned(
                       bottom: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131622).withOpacity(0.85),
+                          color: const Color(0xFF131622).withValues(alpha: 0.88),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.local_fire_department, size: 12, color: GrimoireTheme.accentPurple),
                             SizedBox(width: 4),
-                            Text('5 : 23 : 26 : 22', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.white)),
+                            Text(
+                              '5 : 23 : 26 : 22',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'monospace',
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -426,7 +439,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             // Title
             Text(
