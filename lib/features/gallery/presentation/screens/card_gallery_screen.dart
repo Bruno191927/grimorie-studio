@@ -1261,14 +1261,20 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
   // --- Card Tile ---
   Widget _buildGalleryCardTile(Map<String, dynamic> row, int index) {
     final name = row['card_name']?.toString() ?? 'Card';
-    final creator = row['creator']?.toString() ?? 'Tyler Covington';
-    final bid = row['bid']?.toString() ?? '4.89 ETH';
-    final chain = row['chain']?.toString() ?? 'BSC';
-    final icon = row['icon']?.toString() ?? '🤖';
+    final icon = row['icon']?.toString() ?? '🃏';
     final artColor = Color(row['art_color'] is int ? row['art_color'] as int : 0xFFF59E0B);
     final game = row['game']?.toString() ?? 'General';
     final cost = row['cost']?.toString() ?? '0';
     final category = row['category']?.toString() ?? '';
+    final type = row['type']?.toString() ?? '';
+    final rarity = row['rarity']?.toString() ?? 'Común';
+    final attack = row['attack']?.toString() ?? '0';
+    final defense = row['defense']?.toString() ?? '0';
+    final hasCombatStats = (attack != '0' || defense != '0') ||
+        type.toLowerCase().contains('criatura') ||
+        type.toLowerCase().contains('creature') ||
+        type.toLowerCase().contains('unicorn');
+    final rarityColor = _getRarityColor(rarity);
     final artFile = GameFolderService.resolveCardImageFile(game, row['art_url']?.toString());
 
     return InkWell(
@@ -1300,31 +1306,42 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Creator info header with Board Game Tag & Menu
+            // Top Header: Card Type / Archetype Tag & Menu
             Row(
               children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: GrimoireTheme.accentPurple.withValues(alpha: 0.3),
-                  child: Text(
-                    creator.isNotEmpty ? creator.substring(0, 1) : 'C',
-                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(ref.tr('creator_label'), style: const TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
-                      Text(
-                        creator,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                        overflow: TextOverflow.ellipsis,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(icon, style: const TextStyle(fontSize: 11)),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              type.isNotEmpty ? type : (category.isNotEmpty ? category : game),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFE9D5FF),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 4),
 
                 // Card Context Menu (Move to Game, Edit, Delete)
                 PopupMenuButton<String>(
@@ -1390,7 +1407,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Artwork Area with Timer Pill
+            // Artwork Area (Clean, no countdown timers)
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -1399,57 +1416,22 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   color: artColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (artFile != null)
-                      Positioned.fill(
-                        child: Image.file(
-                          artFile,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
-                            child: Text(icon, style: const TextStyle(fontSize: 50)),
-                          ),
+                child: artFile != null
+                    ? Image.file(
+                        artFile,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stack) => Center(
+                          child: Text(icon, style: const TextStyle(fontSize: 50)),
                         ),
                       )
-                    else
-                      Center(
+                    : Center(
                         child: Text(icon, style: const TextStyle(fontSize: 50)),
                       ),
-                    Positioned(
-                      bottom: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF131622).withValues(alpha: 0.88),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.local_fire_department, size: 12, color: GrimoireTheme.accentPurple),
-                            SizedBox(width: 4),
-                            Text(
-                              '5 : 23 : 26 : 22',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontFamily: 'monospace',
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(height: 8),
 
-            // Title & Board Game Badge
+            // Title & Cost Badge
             Row(
               children: [
                 Expanded(
@@ -1524,27 +1506,92 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             ),
             const SizedBox(height: 6),
 
-            // Current Bid & Chain Tag
+            // Tabletop Card Stats: Rarity Chip & ATK/DEF / Effect badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Rarity indicator
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(ref.tr('current_bid'), style: const TextStyle(fontSize: 8, color: GrimoireTheme.textMuted)),
-                      Text(bid, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: rarityColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          rarity,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: rarityColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: GrimoireTheme.tagBsc,
-                    borderRadius: BorderRadius.circular(4),
+                const SizedBox(width: 6),
+
+                // Combat Stats (⚔️ ATK / 🛡️ DEF) or Card Archetype
+                if (hasCombatStats)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E2235),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: GrimoireTheme.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('⚔️ ', style: TextStyle(fontSize: 8.5)),
+                        Text(
+                          attack,
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const Text('  🛡️ ', style: TextStyle(fontSize: 8.5)),
+                        Text(
+                          defense,
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E2235),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: GrimoireTheme.borderSubtle),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.auto_stories, size: 9, color: GrimoireTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              type.isNotEmpty ? type : 'Efecto',
+                              style: const TextStyle(fontSize: 8.5, color: GrimoireTheme.textMuted, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Text(chain, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
               ],
             ),
           ],
@@ -1907,15 +1954,6 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         ],
       ),
     );
-  }
-
-  String _findGameForCategory(String catName, EditorState state) {
-    for (final entry in state.gameCategories.entries) {
-      if (entry.value.any((c) => c.name == catName)) {
-        return entry.key;
-      }
-    }
-    return _selectedGame == 'All' ? 'Unstable Unicorns' : _selectedGame;
   }
 
   // --- Dialog: Delete Category Confirmation ---
@@ -2780,6 +2818,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         ],
       ),
     );
+  }
+
+  Color _getRarityColor(String rarity) {
+    final r = rarity.toLowerCase();
+    if (r.contains('mítica') || r.contains('mythic')) return const Color(0xFFF59E0B);
+    if (r.contains('épica') || r.contains('epic')) return const Color(0xFFEC4899);
+    if (r.contains('rara') || r.contains('rare')) return const Color(0xFFA855F7);
+    if (r.contains('poco') || r.contains('uncommon')) return const Color(0xFF38BDF8);
+    if (r.contains('inicial') || r.contains('starter')) return const Color(0xFF34D399);
+    return const Color(0xFF94A3B8);
   }
 
   IconData _getGameIcon(String game) {

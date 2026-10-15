@@ -21,7 +21,6 @@ class GrimoireTheme {
   static const Color accentAmber = Color(0xFFF59E0B);
   static const Color accentEmerald = Color(0xFF10B981);
   static const Color accentCyan = Color(0xFF06B6D4);
-  static const Color tagBsc = Color(0xFF5538EE);
 
   // Text Colors
   static const Color textPrimary = Color(0xFFF8FAFC);
