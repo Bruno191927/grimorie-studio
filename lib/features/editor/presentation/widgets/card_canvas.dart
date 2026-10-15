@@ -63,7 +63,7 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
               height: cardHeight,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: template.backgroundColor,
+                color: template.getBackgroundColor(editorState.currentSide),
                 borderRadius: BorderRadius.circular(template.cornerRadius),
                 border: Border.all(
                   color: GrimoireTheme.borderStrong,
@@ -79,8 +79,8 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
                       painter: _CanvasGridPainter(),
                     ),
 
-                  // Render Layers in Order
-                  for (final layer in template.layers)
+                  // Render Layers in Order for active side
+                  for (final layer in template.getLayers(editorState.currentSide))
                     if (layer.isVisible)
                       _buildLayerWidget(
                         context,

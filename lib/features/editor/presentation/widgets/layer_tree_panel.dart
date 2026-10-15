@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/layer_item.dart';
+import '../../models/card_template.dart';
 import '../providers/editor_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
@@ -12,7 +13,7 @@ class LayerTreePanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final editorState = ref.watch(editorProvider);
-    final layers = editorState.project.activeTemplate.layers;
+    final layers = editorState.project.activeTemplate.getLayers(editorState.currentSide);
     final selectedId = editorState.selectedLayerId;
 
     return Container(
@@ -28,19 +29,23 @@ class LayerTreePanel extends ConsumerWidget {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  ref.tr('layers_and_hierarchy'),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.3,
+                Expanded(
+                  child: Text(
+                    ref.tr('layers_and_hierarchy'),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 PopupMenuButton<LayerType>(
                   tooltip: ref.tr('add_layer'),
                   color: GrimoireTheme.surfaceElevated,
@@ -86,6 +91,109 @@ class LayerTreePanel extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+
+          // Face Switcher Tabs (Anverso / Reverso)
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F111D),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: GrimoireTheme.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => ref.read(editorProvider.notifier).switchSide(CardSide.front),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: editorState.currentSide == CardSide.front
+                            ? GrimoireTheme.accentPurple
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.flip_to_front,
+                            size: 13,
+                            color: editorState.currentSide == CardSide.front
+                                ? Colors.white
+                                : GrimoireTheme.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              ref.tr('card_side_front'),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: editorState.currentSide == CardSide.front
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: editorState.currentSide == CardSide.front
+                                    ? Colors.white
+                                    : GrimoireTheme.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => ref.read(editorProvider.notifier).switchSide(CardSide.back),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: editorState.currentSide == CardSide.back
+                            ? GrimoireTheme.accentIndigo
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.flip_to_back,
+                            size: 13,
+                            color: editorState.currentSide == CardSide.back
+                                ? Colors.white
+                                : GrimoireTheme.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              ref.tr('card_side_back'),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: editorState.currentSide == CardSide.back
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: editorState.currentSide == CardSide.back
+                                    ? Colors.white
+                                    : GrimoireTheme.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

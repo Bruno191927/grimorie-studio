@@ -12,6 +12,7 @@ class EditorState {
   final bool showGrid;
   final bool showSnapping;
   final bool isGeneratingAi;
+  final CardSide currentSide;
 
   const EditorState({
     required this.project,
@@ -20,11 +21,12 @@ class EditorState {
     this.showGrid = true,
     this.showSnapping = true,
     this.isGeneratingAi = false,
+    this.currentSide = CardSide.front,
   });
 
   LayerItem? get selectedLayer {
     if (selectedLayerId == null) return null;
-    final layers = project.activeTemplate.layers;
+    final layers = project.activeTemplate.getLayers(currentSide);
     final index = layers.indexWhere((l) => l.id == selectedLayerId);
     return index != -1 ? layers[index] : null;
   }
@@ -37,6 +39,7 @@ class EditorState {
     bool? showGrid,
     bool? showSnapping,
     bool? isGeneratingAi,
+    CardSide? currentSide,
   }) {
     return EditorState(
       project: project ?? this.project,
@@ -45,6 +48,7 @@ class EditorState {
       showGrid: showGrid ?? this.showGrid,
       showSnapping: showSnapping ?? this.showSnapping,
       isGeneratingAi: isGeneratingAi ?? this.isGeneratingAi,
+      currentSide: currentSide ?? this.currentSide,
     );
   }
 }
@@ -163,10 +167,102 @@ class EditorNotifier extends StateNotifier<EditorState> {
       ),
     ];
 
+    // Default Back Template layers (Classic tabletop / TCG card back)
+    final defaultBackLayers = [
+      // 1. Back Outer Frame
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Back Outer Frame',
+        type: LayerType.shape,
+        x: 0,
+        y: 0,
+        width: 254,
+        height: 355.6,
+        shapeColor: const Color(0xFF0C0E17),
+        borderColor: const Color(0xFF7C3AED),
+        borderWidth: 3,
+        borderRadius: 16,
+        isLocked: true,
+      ),
+      // 2. Back Inner Decorative Border
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Inner Rune Border',
+        type: LayerType.shape,
+        x: 14,
+        y: 14,
+        width: 226,
+        height: 327.6,
+        shapeColor: const Color(0xFF141828),
+        borderColor: const Color(0xFF4C1D95),
+        borderWidth: 1.5,
+        borderRadius: 12,
+        isLocked: true,
+      ),
+      // 3. Central Medallion
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Central Medallion',
+        type: LayerType.shape,
+        x: 67,
+        y: 100,
+        width: 120,
+        height: 120,
+        shapeColor: const Color(0xFF1E1B4B),
+        borderColor: const Color(0xFFA855F7),
+        borderWidth: 2,
+        borderRadius: 60,
+      ),
+      // 4. Medallion Emblem
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Medallion Emblem',
+        type: LayerType.text,
+        x: 67,
+        y: 130,
+        width: 120,
+        height: 60,
+        text: '🔮',
+        fontSize: 42,
+        textAlign: TextAlign.center,
+      ),
+      // 5. Back Logo Title
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Back Title',
+        type: LayerType.text,
+        x: 20,
+        y: 245,
+        width: 214,
+        height: 30,
+        text: 'GRIMOIRE',
+        fontSize: 18,
+        isBold: true,
+        fontColor: const Color(0xFFE9D5FF),
+        textAlign: TextAlign.center,
+      ),
+      // 6. Back Subtitle
+      LayerItem(
+        id: uuid.v4(),
+        name: 'Back Subtitle',
+        type: LayerType.text,
+        x: 20,
+        y: 275,
+        width: 214,
+        height: 20,
+        text: 'TABLETOP DECK',
+        fontSize: 10,
+        isBold: true,
+        fontColor: const Color(0xFF94A3B8),
+        textAlign: TextAlign.center,
+      ),
+    ];
+
     final defaultTemplate = CardTemplate(
       id: 'template-main',
       name: 'Standard Creature Frame',
       layers: defaultLayers,
+      backLayers: defaultBackLayers,
     );
 
     // Sample data rows inspired by the reference image
@@ -327,7 +423,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void updateLayerPosition(String id, double x, double y) {
     final template = state.project.activeTemplate;
-    final updatedLayers = template.layers.map((l) {
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
       if (l.id == id && !l.isLocked) {
         return l.copyWith(x: x, y: y);
       }
@@ -339,7 +436,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void updateLayer(LayerItem updated) {
     final template = state.project.activeTemplate;
-    final updatedLayers = template.layers.map((l) {
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
       if (l.id == updated.id) return updated;
       return l;
     }).toList();
@@ -349,14 +447,16 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void addLayer(LayerItem layer) {
     final template = state.project.activeTemplate;
-    final updatedLayers = [...template.layers, layer];
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = [...layers, layer];
     _updateTemplateLayers(updatedLayers);
     state = state.copyWith(selectedLayerId: layer.id);
   }
 
   void removeLayer(String id) {
     final template = state.project.activeTemplate;
-    final updatedLayers = template.layers.where((l) => l.id != id).toList();
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.where((l) => l.id != id).toList();
     _updateTemplateLayers(updatedLayers);
     if (state.selectedLayerId == id) {
       state = state.copyWith(clearSelectedLayer: true);
@@ -365,7 +465,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void toggleLayerVisibility(String id) {
     final template = state.project.activeTemplate;
-    final updatedLayers = template.layers.map((l) {
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
       if (l.id == id) return l.copyWith(isVisible: !l.isVisible);
       return l;
     }).toList();
@@ -374,7 +475,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void toggleLayerLock(String id) {
     final template = state.project.activeTemplate;
-    final updatedLayers = template.layers.map((l) {
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
       if (l.id == id) return l.copyWith(isLocked: !l.isLocked);
       return l;
     }).toList();
@@ -383,7 +485,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void reorderLayers(int oldIndex, int newIndex) {
     final template = state.project.activeTemplate;
-    final layers = List<LayerItem>.from(template.layers);
+    final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
@@ -394,7 +496,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void reorderLayersDirect(int oldIndex, int newIndex) {
     final template = state.project.activeTemplate;
-    final layers = List<LayerItem>.from(template.layers);
+    final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
     final item = layers.removeAt(oldIndex);
     layers.insert(newIndex, item);
     _updateTemplateLayers(layers);
@@ -495,9 +597,36 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void _updateTemplateLayers(List<LayerItem> layers) {
-    final template = state.project.activeTemplate.copyWith(layers: layers);
+    final currentTemplate = state.project.activeTemplate;
+    final updatedTemplate = state.currentSide == CardSide.front
+        ? currentTemplate.copyWith(layers: layers)
+        : currentTemplate.copyWith(backLayers: layers);
     final templates = List<CardTemplate>.from(state.project.templates);
-    templates[state.project.activeTemplateIndex] = template;
+    templates[state.project.activeTemplateIndex] = updatedTemplate;
+
+    state = state.copyWith(
+      project: state.project.copyWith(templates: templates),
+    );
+  }
+
+  void switchSide(CardSide side) {
+    if (state.currentSide != side) {
+      state = state.copyWith(currentSide: side, clearSelectedLayer: true);
+    }
+  }
+
+  void toggleSide() {
+    final nextSide = state.currentSide == CardSide.front ? CardSide.back : CardSide.front;
+    switchSide(nextSide);
+  }
+
+  void updateBackgroundColor(Color color) {
+    final currentTemplate = state.project.activeTemplate;
+    final updatedTemplate = state.currentSide == CardSide.front
+        ? currentTemplate.copyWith(backgroundColor: color)
+        : currentTemplate.copyWith(backBackgroundColor: color);
+    final templates = List<CardTemplate>.from(state.project.templates);
+    templates[state.project.activeTemplateIndex] = updatedTemplate;
 
     state = state.copyWith(
       project: state.project.copyWith(templates: templates),

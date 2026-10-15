@@ -7,9 +7,9 @@ import 'features/gallery/presentation/screens/card_gallery_screen.dart';
 import 'features/database/presentation/widgets/data_table_view.dart';
 import 'features/playtest/presentation/screens/playtest_screen.dart';
 import 'features/editor/presentation/providers/editor_provider.dart';
-import 'features/export/services/export_service.dart';
 import 'core/localization/locale_provider.dart';
 import 'core/localization/language_selector.dart';
+import 'features/export/presentation/dialogs/export_options_dialog.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +44,6 @@ class GrimoireMainShell extends ConsumerStatefulWidget {
 class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   int _currentTab = 0; // 0: Gallery, 1: Editor, 2: Database, 3: Playtest
   final GlobalKey _repaintBoundaryKey = GlobalKey();
-  bool _isBatchExporting = false;
 
   void _showAiEngineStatusDialog() {
     showDialog(
@@ -97,50 +96,18 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   }
 
   Future<void> _handleBatchExport() async {
-    setState(() => _isBatchExporting = true);
-
     final project = ref.read(editorProvider).project;
-    final rows = project.rows;
-
-    if (rows.isEmpty) {
+    if (project.rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No cards available to export.')),
       );
-      setState(() => _isBatchExporting = false);
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: GrimoireTheme.accentIndigo,
-        content: Text('Starting 300 DPI batch export for ${rows.length} cards...'),
-      ),
+    await ExportOptionsDialog.show(
+      context,
+      repaintBoundaryKey: _repaintBoundaryKey,
     );
-
-    // Capture active card as high-res 300 DPI image
-    final sampleImage = await ExportService.captureBoundaryToImage(_repaintBoundaryKey);
-
-    if (sampleImage != null) {
-      final zip = await ExportService.exportCardsToZip(
-        cardImages: List.generate(rows.length, (_) => sampleImage),
-        cardNames: rows.map((r) => r['card_name']?.toString() ?? 'card').toList(),
-        zipName: 'grimoire_cards_300dpi',
-      );
-
-      if (mounted) {
-        setState(() => _isBatchExporting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: GrimoireTheme.accentEmerald,
-            content: Text('300 DPI Batch Export complete: ${zip.path}'),
-          ),
-        );
-      }
-    } else {
-      if (mounted) {
-        setState(() => _isBatchExporting = false);
-      }
-    }
   }
 
   @override
@@ -260,15 +227,9 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               ),
-                              icon: _isBatchExporting
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Icon(Icons.archive_outlined, size: 16),
-                              label: Text(_isBatchExporting ? ref.tr('exporting') : ref.tr('btn_batch_export')),
-                              onPressed: _isBatchExporting ? null : _handleBatchExport,
+                              icon: const Icon(Icons.archive_outlined, size: 16),
+                              label: Text(ref.tr('btn_batch_export')),
+                              onPressed: _handleBatchExport,
                             ),
                           ],
                         ),

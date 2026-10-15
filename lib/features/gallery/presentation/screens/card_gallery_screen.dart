@@ -407,6 +407,30 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             );
                           },
                         ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.5)),
+                            backgroundColor: const Color(0xFF16182E),
+                            foregroundColor: const Color(0xFFE0E7FF),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.file_download_outlined, size: 14, color: GrimoireTheme.accentIndigo),
+                          label: Text(
+                            ref.tr('export_game'),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: () {
+                            widget.onOpenEditor();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: GrimoireTheme.accentIndigo,
+                                content: Text('Abriendo editor para exportar "${entry.key}"...'),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ],
