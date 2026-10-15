@@ -58,16 +58,31 @@ class ComfyUiNotifier extends StateNotifier<ComfyUiState> {
   }
 
   Future<void> init() async {
-    refreshWorkflows();
+    await refreshWorkflows();
     await checkConnection();
   }
 
-  void refreshWorkflows() {
-    final workflows = _service.scanWorkflows();
-    final currentTarget = workflows.firstWhere(
-      (w) => w.name.toLowerCase() == 'image',
-      orElse: () => workflows.isNotEmpty ? workflows.first : state.activeWorkflow,
+  Future<void> refreshWorkflows() async {
+    final workflows = await _service.fetchAllWorkflows(state.serverUrl);
+    
+    // Preserve current selection if exists, otherwise prefer Image, otherwise first available
+    ComfyWorkflowItem currentTarget = state.activeWorkflow;
+    final foundCurrent = workflows.where(
+      (w) =>
+          w.filePath.toLowerCase() == state.activeWorkflow.filePath.toLowerCase() ||
+          w.name.toLowerCase() == state.activeWorkflow.name.toLowerCase(),
     );
+
+    if (foundCurrent.isNotEmpty) {
+      currentTarget = foundCurrent.first;
+    } else {
+      final imageWf = workflows.where((w) => w.name.toLowerCase() == 'image');
+      if (imageWf.isNotEmpty) {
+        currentTarget = imageWf.first;
+      } else if (workflows.isNotEmpty) {
+        currentTarget = workflows.first;
+      }
+    }
 
     _service.targetWorkflowName = currentTarget.name;
     _service.targetWorkflowPath = currentTarget.filePath;
@@ -90,6 +105,14 @@ class ComfyUiNotifier extends StateNotifier<ComfyUiState> {
     _service.targetWorkflowName = item.name;
     _service.targetWorkflowPath = item.filePath;
     state = state.copyWith(activeWorkflow: item);
+  }
+
+  void selectWorkflowByName(String name) {
+    final found = state.availableWorkflows.firstWhere(
+      (w) => w.name.toLowerCase() == name.toLowerCase(),
+      orElse: () => state.activeWorkflow,
+    );
+    selectWorkflow(found);
   }
 
   void setCustomWorkflowPath(String path) {
@@ -117,9 +140,35 @@ class ComfyUiNotifier extends StateNotifier<ComfyUiState> {
   Future<void> checkConnection() async {
     state = state.copyWith(isChecking: true, statusNote: 'Verificando conexión...');
     final info = await _service.checkConnection(state.serverUrl);
+    
+    // Refresh workflows from server / disk
+    final workflows = await _service.fetchAllWorkflows(state.serverUrl);
+    
+    ComfyWorkflowItem currentTarget = state.activeWorkflow;
+    final foundCurrent = workflows.where(
+      (w) =>
+          w.filePath.toLowerCase() == state.activeWorkflow.filePath.toLowerCase() ||
+          w.name.toLowerCase() == state.activeWorkflow.name.toLowerCase(),
+    );
+    if (foundCurrent.isNotEmpty) {
+      currentTarget = foundCurrent.first;
+    } else {
+      final img = workflows.where((w) => w.name.toLowerCase() == 'image');
+      if (img.isNotEmpty) {
+        currentTarget = img.first;
+      } else if (workflows.isNotEmpty) {
+        currentTarget = workflows.first;
+      }
+    }
+
+    _service.targetWorkflowName = currentTarget.name;
+    _service.targetWorkflowPath = currentTarget.filePath;
+
     state = state.copyWith(
       isChecking: false,
       serverInfo: info,
+      availableWorkflows: workflows,
+      activeWorkflow: currentTarget,
       statusNote: info.isOnline
           ? 'Conectado a ${info.gpuName ?? "ComfyUI"}'
           : (info.errorMessage ?? 'Servidor ComfyUI desconectado'),

@@ -11,6 +11,7 @@ import 'core/localization/locale_provider.dart';
 import 'core/localization/language_selector.dart';
 import 'features/export/presentation/dialogs/export_options_dialog.dart';
 import 'features/ai_generator/presentation/widgets/comfy_ui_connection_dialog.dart';
+import 'features/ai_generator/presentation/providers/comfy_ui_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -160,17 +161,57 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                             const SizedBox(width: 12),
 
                             // Action: Connect AI Engine Button (Styled like "Wallet Connect" in the reference image)
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.6)),
-                                backgroundColor: const Color(0xFF16172B),
-                                foregroundColor: const Color(0xFFE9D5FF),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              ),
-                              icon: const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
-                              label: Text(ref.tr('btn_connect_ai'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                              onPressed: _showAiEngineStatusDialog,
+                            Builder(
+                              builder: (context) {
+                                final comfyState = ref.watch(comfyUiProvider);
+                                final isComfyOnline = comfyState.serverInfo.isOnline;
+                                final activeWfName = comfyState.activeWorkflow.name;
+
+                                return OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: isComfyOnline
+                                          ? GrimoireTheme.accentEmerald
+                                          : GrimoireTheme.accentPurple.withValues(alpha: 0.6),
+                                      width: isComfyOnline ? 1.5 : 1,
+                                    ),
+                                    backgroundColor: isComfyOnline
+                                        ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+                                        : const Color(0xFF16172B),
+                                    foregroundColor: isComfyOnline ? Colors.white : const Color(0xFFE9D5FF),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  ),
+                                  icon: isComfyOnline
+                                      ? Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: GrimoireTheme.accentEmerald,
+                                          ),
+                                        )
+                                      : const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        isComfyOnline ? 'ComfyUI: $activeWfName' : ref.tr('btn_connect_ai'),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isComfyOnline ? FontWeight.bold : FontWeight.w600,
+                                          color: isComfyOnline ? const Color(0xFFD1FAE5) : const Color(0xFFE9D5FF),
+                                        ),
+                                      ),
+                                      if (isComfyOnline) ...[
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.textMuted),
+                                      ],
+                                    ],
+                                  ),
+                                  onPressed: _showAiEngineStatusDialog,
+                                );
+                              },
                             ),
                             const SizedBox(width: 12),
 

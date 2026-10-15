@@ -122,6 +122,73 @@ class ComfyUiService {
     return workflows;
   }
 
+  /// Fetches workflows from both disk and ComfyUI server API /userdata?dir=workflows
+  Future<List<ComfyWorkflowItem>> fetchAllWorkflows([String? urlOverride]) async {
+    final workflows = <ComfyWorkflowItem>[];
+    final seenNames = <String>{};
+
+    // 1. Scan standard local filesystem
+    final localList = scanWorkflows();
+    for (final item in localList) {
+      if (seenNames.add(item.name.toLowerCase())) {
+        workflows.add(item);
+      }
+    }
+
+    // 2. Query running ComfyUI server API (/userdata?dir=workflows)
+    final url = urlOverride ?? serverUrl;
+    try {
+      final res = await http
+          .get(Uri.parse('$url/userdata?dir=workflows'))
+          .timeout(const Duration(seconds: 3));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is List) {
+          final standardDir = getStandardComfyWorkflowsDir();
+          for (final item in decoded) {
+            final fileName = item.toString();
+            final baseName = fileName.replaceAll(RegExp(r'\.json$', caseSensitive: false), '');
+            if (seenNames.add(baseName.toLowerCase())) {
+              final localFile = File('${standardDir.path}\\$fileName');
+              final isImage = baseName.toLowerCase() == 'image';
+              workflows.add(
+                ComfyWorkflowItem(
+                  name: baseName,
+                  filePath: localFile.existsSync()
+                      ? localFile.path
+                      : '$url/userdata/workflows%2F$fileName',
+                  description: isImage
+                      ? 'Anima Base v1.0 (Text to Image Subgraph)'
+                      : 'Workflow en servidor ComfyUI',
+                  isDefaultTarget: isImage,
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Server not accessible or offline, local workflows remain
+    }
+
+    // Always guarantee 'Image' is in the list
+    if (!workflows.any((w) => w.name.toLowerCase() == 'image')) {
+      final defaultImagePath = '${getStandardComfyWorkflowsDir().path}\\Image.json';
+      workflows.insert(
+        0,
+        ComfyWorkflowItem(
+          name: 'Image',
+          filePath: defaultImagePath,
+          description: 'Anima Base v1.0 (Text to Image Subgraph)',
+          isDefaultTarget: true,
+        ),
+      );
+    }
+
+    return workflows;
+  }
+
   /// Pings ComfyUI /system_stats to retrieve live server, GPU and VRAM metrics
   Future<ComfyUiServerInfo> checkConnection([String? urlOverride]) async {
     final url = urlOverride ?? serverUrl;
@@ -311,6 +378,77 @@ class ComfyUiService {
     };
   }
 
+  /// Builds execution prompt dictionary dynamically based on the active target workflow
+  Future<Map<String, dynamic>> buildWorkflowPromptForTarget({
+    required String positivePrompt,
+    String? negativePrompt,
+    int? seed,
+  }) async {
+    // If target is Image (Anima Base v1.0), use the verified optimized prompt
+    if (targetWorkflowName.toLowerCase() == 'image' || targetWorkflowPath == null) {
+      return buildAnimaWorkflowPrompt(
+        positivePrompt: positivePrompt,
+        negativePrompt: negativePrompt,
+        seed: seed,
+      );
+    }
+
+    // Try reading custom workflow from disk if path exists
+    try {
+      final file = File(targetWorkflowPath!);
+      if (file.existsSync()) {
+        final content = await file.readAsString();
+        final dynamic decoded = jsonDecode(content);
+        if (decoded is Map<String, dynamic>) {
+          // If in ComfyUI API format (map of node IDs with class_type & inputs)
+          final isApiFormat = decoded.values.any((v) => v is Map && v.containsKey('class_type'));
+          if (isApiFormat) {
+            final Map<String, dynamic> promptMap = Map<String, dynamic>.from(decoded);
+            final effectiveSeed = seed ?? (math.Random().nextInt(900000000) + 100000000);
+
+            final textNodes = promptMap.entries.where((e) {
+              final val = e.value;
+              return val is Map && val['class_type'] == 'CLIPTextEncode';
+            }).toList();
+
+            if (textNodes.length == 1) {
+              textNodes[0].value['inputs']['text'] = positivePrompt;
+            } else if (textNodes.length >= 2) {
+              textNodes[0].value['inputs']['text'] = positivePrompt;
+              textNodes[1].value['inputs']['text'] =
+                  negativePrompt ?? 'worst quality, low quality, blurry, bad anatomy';
+            }
+
+            for (final entry in promptMap.entries) {
+              final val = entry.value;
+              if (val is Map &&
+                  (val['class_type'] == 'KSampler' || val['class_type'] == 'KSamplerAdvanced')) {
+                if (val['inputs'] is Map && val['inputs'].containsKey('seed')) {
+                  val['inputs']['seed'] = effectiveSeed;
+                }
+              }
+              if (val is Map && val['class_type'] == 'SaveImage') {
+                if (val['inputs'] is Map) {
+                  val['inputs']['filename_prefix'] = 'Grimoire';
+                }
+              }
+            }
+
+            return promptMap;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Fallback to Anima prompt due to error adapting custom workflow: $e');
+    }
+
+    return buildAnimaWorkflowPrompt(
+      positivePrompt: positivePrompt,
+      negativePrompt: negativePrompt,
+      seed: seed,
+    );
+  }
+
   /// Sends a generation prompt to ComfyUI, waits for the output, and saves the image to game assets
   Future<AiGenerationResult> generateArtworkWithComfyUi({
     required String prompt,
@@ -329,7 +467,7 @@ class ComfyUiService {
       }
 
       onProgress?.call('Preparando workflow "$targetWorkflowName"...');
-      final promptDict = buildAnimaWorkflowPrompt(
+      final promptDict = await buildWorkflowPromptForTarget(
         positivePrompt: prompt,
         negativePrompt: negativePrompt,
       );

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../editor/presentation/providers/editor_provider.dart';
@@ -229,7 +230,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
               ),
               const SizedBox(height: 12),
 
-              // Targeted Workflow Card for ComfyUI
+              // Interactive Workflow Selector for ComfyUI
               if (_selectedProvider == AiProviderType.comfyUiLocal) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -238,59 +239,151 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.35)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: GrimoireTheme.accentPurple.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(Icons.tune, size: 16, color: GrimoireTheme.accentPurple),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Text(
-                                  'Workflow Vinculado:',
-                                  style: TextStyle(fontSize: 10.5, color: GrimoireTheme.textMuted),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.tune, size: 14, color: GrimoireTheme.accentPurple),
+                              SizedBox(width: 6),
+                              Text(
+                                'Workflow de ComfyUI:',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFE9D5FF),
                                 ),
-                                const SizedBox(width: 5),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: GrimoireTheme.accentPurple,
-                                    borderRadius: BorderRadius.circular(4),
+                              ),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () => ComfyUiConnectionDialog.show(context),
+                            borderRadius: BorderRadius.circular(4),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.settings, size: 12, color: GrimoireTheme.accentEmerald),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Ajustes de Servidor',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: GrimoireTheme.accentEmerald,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  child: Text(
-                                    activeWorkflow.name,
-                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              activeWorkflow.description ?? 'Anima Base v1.0',
-                              style: const TextStyle(fontSize: 10, color: GrimoireTheme.textSecondary),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          visualDensity: VisualDensity.compact,
-                          foregroundColor: GrimoireTheme.accentEmerald,
-                        ),
-                        icon: const Icon(Icons.settings, size: 14),
-                        label: const Text('Configurar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        onPressed: () => ComfyUiConnectionDialog.show(context),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 38,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1D33),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: GrimoireTheme.borderSubtle),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: comfyState.availableWorkflows
+                                          .any((w) => w.name == activeWorkflow.name)
+                                      ? activeWorkflow.name
+                                      : (comfyState.availableWorkflows.isNotEmpty
+                                          ? comfyState.availableWorkflows.first.name
+                                          : null),
+                                  dropdownColor: const Color(0xFF1A1D33),
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.arrow_drop_down, color: GrimoireTheme.accentPurple),
+                                  items: comfyState.availableWorkflows.map((item) {
+                                    final isImg = item.name.toLowerCase() == 'image';
+                                    return DropdownMenuItem<String>(
+                                      value: item.name,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isImg ? Icons.auto_awesome : Icons.account_tree_outlined,
+                                            size: 14,
+                                            color: GrimoireTheme.accentPurple,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              item.name,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isImg)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: GrimoireTheme.accentPurple.withValues(alpha: 0.3),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Text('Recomendado',
+                                                  style: TextStyle(fontSize: 9, color: Color(0xFFE9D5FF))),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      ref.read(comfyUiProvider.notifier).selectWorkflowByName(val);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Examinar archivo de workflow (.json) desde tu PC',
+                            child: IconButton(
+                              icon: const Icon(Icons.folder_open, size: 18, color: GrimoireTheme.accentEmerald),
+                              style: IconButton.styleFrom(
+                                backgroundColor: const Color(0xFF1A1D33),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                                ),
+                              ),
+                              onPressed: () async {
+                                try {
+                                  final res = await FilePicker.pickFiles(
+                                    dialogTitle: 'Selecciona tu archivo de workflow ComfyUI (.json)',
+                                    type: FileType.custom,
+                                    allowedExtensions: ['json'],
+                                  );
+                                  if (res.isNotEmpty && res.first.path != null) {
+                                    ref.read(comfyUiProvider.notifier).setCustomWorkflowPath(res.first.path!);
+                                  }
+                                } catch (_) {}
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        activeWorkflow.description ?? 'Workflow de generación de imagen para ComfyUI',
+                        style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
