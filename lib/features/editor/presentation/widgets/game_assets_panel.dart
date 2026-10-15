@@ -262,7 +262,7 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
 
     // Expanded Assets Panel
     return Container(
-      width: 280,
+      width: 300,
       decoration: const BoxDecoration(
         color: Color(0xFF0F111D),
         border: Border(
@@ -475,28 +475,42 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
             ),
             const SizedBox(height: 14),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: GrimoireTheme.accentEmerald,
-                    side: const BorderSide(color: GrimoireTheme.accentEmerald),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: GrimoireTheme.accentEmerald,
+                      side: const BorderSide(color: GrimoireTheme.accentEmerald),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.upload_file, size: 14),
+                    label: Text(
+                      ref.tr('upload_asset'),
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () => _handleUpload(gameName),
                   ),
-                  icon: const Icon(Icons.upload_file, size: 14),
-                  label: Text(ref.tr('upload_asset'), style: const TextStyle(fontSize: 11)),
-                  onPressed: () => _handleUpload(gameName),
                 ),
                 const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GrimoireTheme.accentPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GrimoireTheme.accentPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.auto_awesome, size: 14),
+                    label: Text(
+                      ref.tr('generate_ai_asset'),
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () => _handleAiGenerate(gameName),
                   ),
-                  icon: const Icon(Icons.auto_awesome, size: 14),
-                  label: Text(ref.tr('generate_ai_asset'), style: const TextStyle(fontSize: 11)),
-                  onPressed: () => _handleAiGenerate(gameName),
                 ),
               ],
             ),
