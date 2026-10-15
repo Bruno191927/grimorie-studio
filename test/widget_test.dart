@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/main.dart';
@@ -54,5 +53,45 @@ void main() {
     expect(find.text('Connect AI Engine'), findsOneWidget);
     expect(find.text('All Games'), findsOneWidget);
     expect(find.text('Board Game'), findsWidgets);
+  });
+
+  testWidgets('Card tile three-dots menu contains Eliminar option and deletes card', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: GrimoireApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify card Flame Dress exists initially
+    expect(find.text('"Flame Dress"'), findsOneWidget);
+
+    // Find the first three dots button and tap it
+    final moreVertButton = find.byIcon(Icons.more_vert).first;
+    await tester.tap(moreVertButton);
+    await tester.pumpAndSettle();
+
+    // Verify popup menu displays Eliminar Carta
+    final deleteOption = find.text('Eliminar Carta');
+    expect(deleteOption, findsOneWidget);
+
+    // Tap Eliminar Carta
+    await tester.tap(deleteOption);
+    await tester.pumpAndSettle();
+
+    // Verify Confirmation Dialog appears
+    expect(find.text('¿Eliminar Carta?'), findsOneWidget);
+
+    // Tap confirm delete in dialog
+    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, 'Eliminar Carta');
+    await tester.tap(confirmDeleteBtn);
+    await tester.pumpAndSettle();
+
+    // Verify Flame Dress is deleted from gallery
+    expect(find.text('"Flame Dress"'), findsNothing);
   });
 }

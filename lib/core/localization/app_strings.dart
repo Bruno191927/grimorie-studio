@@ -104,6 +104,10 @@ class AppStrings {
       'btn_start_export': 'Iniciar Exportación',
       'export_success': '¡Exportación completada con éxito!',
       'export_failed': 'Error durante la exportación.',
+      'delete_card': 'Eliminar Carta',
+      'confirm_delete_card_title': '¿Eliminar Carta?',
+      'confirm_delete_card_desc': '¿Estás seguro de que deseas eliminar permanentemente esta carta del mazo?',
+      'card_deleted': 'Carta eliminada con éxito',
 
       // Grouping & Board Games
       'group_by': 'Agrupar por:',
@@ -253,6 +257,10 @@ class AppStrings {
       'btn_start_export': 'Start Export',
       'export_success': 'Export completed successfully!',
       'export_failed': 'Export operation failed.',
+      'delete_card': 'Delete Card',
+      'confirm_delete_card_title': 'Delete Card?',
+      'confirm_delete_card_desc': 'Are you sure you want to permanently delete this card from the deck?',
+      'card_deleted': 'Card successfully deleted',
 
       // Grouping & Board Games
       'group_by': 'Group by:',
