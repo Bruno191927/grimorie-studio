@@ -40,6 +40,9 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     if (!editorState.deletedGames.contains('Reino Arcano (Fantasy)') && !allGamesSet.contains('Reino Arcano (Fantasy)')) {
       allGamesSet.add('Reino Arcano (Fantasy)');
     }
+    if (!editorState.deletedGames.contains('Unstable Unicorns') && !allGamesSet.contains('Unstable Unicorns')) {
+      allGamesSet.add('Unstable Unicorns');
+    }
     final allGames = allGamesSet.toList();
 
     // Filter rows based on search, mana, board game, and category
@@ -779,6 +782,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     return InkWell(
       onTap: () {
         ref.read(editorProvider.notifier).setActiveRow(index);
+        final cardGame = (row['game'] ?? '').toString().toLowerCase();
+        if (cardGame.contains('unicorn') || cardGame.contains('unstable')) {
+          ref.read(editorProvider.notifier).setActiveTemplate(1);
+        } else {
+          ref.read(editorProvider.notifier).setActiveTemplate(0);
+        }
         widget.onOpenEditor();
       },
       borderRadius: BorderRadius.circular(16),
@@ -834,6 +843,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   onSelected: (val) {
                     if (val == 'edit') {
                       ref.read(editorProvider.notifier).setActiveRow(index);
+                      final cardGame = (row['game'] ?? '').toString().toLowerCase();
+                      if (cardGame.contains('unicorn') || cardGame.contains('unstable')) {
+                        ref.read(editorProvider.notifier).setActiveTemplate(1);
+                      } else {
+                        ref.read(editorProvider.notifier).setActiveTemplate(0);
+                      }
                       widget.onOpenEditor();
                     } else if (val == 'move') {
                       _showMoveCardDialog(index, name, game);
@@ -1371,6 +1386,8 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final g = game.toLowerCase();
     if (g.contains('cyber') || g.contains('arena') || g.contains('mech')) {
       return Icons.smart_toy_outlined;
+    } else if (g.contains('unicorn') || g.contains('unstable') || g.contains('inestable')) {
+      return Icons.auto_awesome;
     } else if (g.contains('arcano') || g.contains('fantasy') || g.contains('magic') || g.contains('reino')) {
       return Icons.castle_outlined;
     } else if (g.contains('star') || g.contains('odyssey') || g.contains('sci-fi') || g.contains('space')) {

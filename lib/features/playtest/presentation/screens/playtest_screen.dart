@@ -30,27 +30,48 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
   final List<Map<String, dynamic>> _hand = [];
   int _playerLife = 20;
   int _turn = 1;
+  String _selectedGame = 'Unstable Unicorns';
 
   @override
   void initState() {
     super.initState();
-    // Initialize hand from project rows
+    // Initialize hand from selected game rows
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final rows = ref.read(editorProvider).project.rows;
-      if (rows.isNotEmpty) {
+      final deck = _getGameCards();
+      if (deck.isNotEmpty) {
         setState(() {
-          _hand.addAll(rows.take(5));
+          _hand.addAll(deck.take(5));
         });
       }
     });
   }
 
-  void _drawCard() {
+  List<Map<String, dynamic>> _getGameCards() {
     final rows = ref.read(editorProvider).project.rows;
-    if (rows.isNotEmpty) {
-      final nextIndex = (_hand.length + _battlefield.length) % rows.length;
+    if (_selectedGame == 'All') return rows;
+    final filtered = rows.where((r) => (r['game'] ?? '').toString() == _selectedGame).toList();
+    return filtered.isNotEmpty ? filtered : rows;
+  }
+
+  void _resetHandForGame(String game) {
+    setState(() {
+      _selectedGame = game;
+      _hand.clear();
+      _battlefield.clear();
+      _turn = 1;
+      final deck = _getGameCards();
+      if (deck.isNotEmpty) {
+        _hand.addAll(deck.take(5));
+      }
+    });
+  }
+
+  void _drawCard() {
+    final deck = _getGameCards();
+    if (deck.isNotEmpty) {
+      final nextIndex = (_hand.length + _battlefield.length) % deck.length;
       setState(() {
-        _hand.add(rows[nextIndex]);
+        _hand.add(deck[nextIndex]);
       });
     }
   }
@@ -70,6 +91,13 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allRows = ref.watch(editorProvider).project.rows;
+    final availableGames = <String>{'All'};
+    for (final r in allRows) {
+      final g = (r['game'] ?? '').toString().trim();
+      if (g.isNotEmpty) availableGames.add(g);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D111A),
       appBar: AppBar(
@@ -80,6 +108,51 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
             const Icon(Icons.casino_outlined, color: GrimoireTheme.accentPurple, size: 22),
             const SizedBox(width: 8),
             Text(ref.tr('playtest_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+
+            // Deck / Game selector
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: GrimoireTheme.borderSubtle),
+              ),
+              child: DropdownButton<String>(
+                value: availableGames.contains(_selectedGame) ? _selectedGame : 'All',
+                dropdownColor: GrimoireTheme.surfaceElevated,
+                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+                underline: const SizedBox.shrink(),
+                icon: const Icon(Icons.arrow_drop_down, color: GrimoireTheme.accentPurple, size: 18),
+                items: [
+                  for (final g in availableGames)
+                    DropdownMenuItem(
+                      value: g,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            g.toLowerCase().contains('unicorn')
+                                ? Icons.auto_awesome
+                                : (g.toLowerCase().contains('cyber') ? Icons.smart_toy_outlined : Icons.style_outlined),
+                            size: 14,
+                            color: g.toLowerCase().contains('unicorn') ? GrimoireTheme.accentPink : GrimoireTheme.accentPurple,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(g == 'All' ? ref.tr('all_games') : g),
+                        ],
+                      ),
+                    ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    _resetHandForGame(val);
+                  }
+                },
+              ),
+            ),
             const Spacer(),
             // Life counter
             Container(
@@ -274,53 +347,76 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
   Widget _buildMiniCard(Map<String, dynamic> data, {bool isTapped = false, double elevation = 2}) {
     final name = data['card_name']?.toString() ?? 'Card';
+    final type = data['type']?.toString() ?? '';
     final cost = data['cost']?.toString() ?? '1';
     final atk = data['attack']?.toString() ?? '1';
     final def = data['defense']?.toString() ?? '1';
     final icon = data['icon']?.toString() ?? '🃏';
+    final rules = data['rules_text']?.toString() ?? '';
 
-    return Container(
-      width: 85,
-      height: 120,
-      padding: const EdgeInsets.all(6),
+    final tooltipMsg = rules.isNotEmpty
+        ? '$name • $type ($cost Maná)\n\n$rules'
+        : '$name • $type ($cost Maná)';
+
+    return Tooltip(
+      message: tooltipMsg,
+      waitDuration: const Duration(milliseconds: 300),
+      textStyle: const TextStyle(fontSize: 11, color: Colors.white, height: 1.3),
       decoration: BoxDecoration(
-        color: GrimoireTheme.surfaceCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isTapped ? GrimoireTheme.accentAmber : GrimoireTheme.borderStrong,
-          width: 1.5,
-        ),
+        color: const Color(0xFF1E1428),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: GrimoireTheme.accentPink.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: elevation * 2,
-            offset: Offset(0, elevation),
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('🔥$cost', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GrimoireTheme.accentAmber)),
-              Text(atk.isNotEmpty ? '$atk/$def' : '', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
-            ],
+      child: Container(
+        width: 85,
+        height: 120,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: GrimoireTheme.surfaceCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isTapped ? GrimoireTheme.accentAmber : GrimoireTheme.borderStrong,
+            width: 1.5,
           ),
-          const Spacer(),
-          Center(
-            child: Text(icon, style: const TextStyle(fontSize: 26)),
-          ),
-          const Spacer(),
-          Text(
-            name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: elevation * 2,
+              offset: Offset(0, elevation),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('✨$cost', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GrimoireTheme.accentAmber)),
+                Text(atk.isNotEmpty && atk != '0' ? '$atk/$def' : '', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+            const Spacer(),
+            Center(
+              child: Text(icon, style: const TextStyle(fontSize: 26)),
+            ),
+            const Spacer(),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

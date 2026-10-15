@@ -49,26 +49,64 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 // Active Card Selector from Database Rows
                 Text(ref.tr('active_card'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
                 const SizedBox(width: 8),
-                DropdownButton<int>(
-                  value: activeRowIndex,
-                  dropdownColor: GrimoireTheme.surfaceElevated,
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
-                  underline: const SizedBox.shrink(),
-                  items: [
-                    for (int i = 0; i < rows.length; i++)
-                      DropdownMenuItem(
-                        value: i,
-                        child: Text(
-                          '#${i + 1} - ${rows[i]['card_name'] ?? "Card"} (${rows[i]['cost'] ?? "?"} ${ref.tr('mana')})',
-                          style: const TextStyle(fontSize: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: DropdownButton<int>(
+                    value: activeRowIndex,
+                    isExpanded: true,
+                    dropdownColor: GrimoireTheme.surfaceElevated,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (int i = 0; i < rows.length; i++)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text(
+                            '#${i + 1} - ${rows[i]['card_name'] ?? "Card"} (${rows[i]['cost'] ?? "?"} ${ref.tr('mana')})',
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref.read(editorProvider.notifier).setActiveRow(val);
-                    }
-                  },
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        ref.read(editorProvider.notifier).setActiveRow(val);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const VerticalDivider(width: 1),
+                const SizedBox(width: 14),
+
+                // Active Template Selector
+                Text(ref.tr('active_template'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: DropdownButton<int>(
+                    value: editorState.project.activeTemplateIndex.clamp(0, editorState.project.templates.length - 1),
+                    isExpanded: true,
+                    dropdownColor: GrimoireTheme.surfaceElevated,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (int i = 0; i < editorState.project.templates.length; i++)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text(
+                            editorState.project.templates[i].name,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        ref.read(editorProvider.notifier).setActiveTemplate(val);
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(width: 16),
                 const VerticalDivider(width: 1),
