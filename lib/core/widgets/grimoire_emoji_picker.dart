@@ -511,9 +511,8 @@ class _GrimoireEmojiPickerState extends State<GrimoireEmojiPicker> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GrimoireTheme.accentPurple,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: const Size(0, 36),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
@@ -522,7 +521,7 @@ class _GrimoireEmojiPickerState extends State<GrimoireEmojiPicker> {
                     widget.onEmojiSelected(text);
                   }
                 },
-                child: const Text('Usar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                child: const Text('Usar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

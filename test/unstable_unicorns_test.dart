@@ -98,6 +98,8 @@ void main() {
     expect(find.text('Cartas de ¡Neigh! (Relincho)'), findsWidgets);
 
     // 3. Tap on "Unicornio Seductor" to open Canvas Editor
+    await tester.ensureVisible(find.text('"Unicornio Seductor"'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('"Unicornio Seductor"'));
     await tester.pumpAndSettle();
 

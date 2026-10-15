@@ -110,10 +110,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
                       backgroundColor: GrimoireTheme.accentPurple.withValues(alpha: 0.1),
                       foregroundColor: const Color(0xFFE9D5FF),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      minimumSize: const Size(0, 36),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
-                    icon: const Icon(Icons.add_circle_outline, size: 14, color: GrimoireTheme.accentPurple),
+                    icon: const Icon(Icons.add_circle_outline, size: 15, color: GrimoireTheme.accentPurple),
                     label: Text(
                       ref.tr('new_game_btn'),
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -404,7 +405,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             side: const BorderSide(color: GrimoireTheme.borderSubtle),
                           ),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                             decoration: BoxDecoration(
                               color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
@@ -413,7 +414,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.add, size: 14, color: GrimoireTheme.accentPurple),
+                                const Icon(Icons.add, size: 16, color: GrimoireTheme.accentPurple),
                                 const SizedBox(width: 4),
                                 Text(
                                   ref.tr('add_row'),
@@ -497,9 +498,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                         TextButton.icon(
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFFC7D2FE),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                            minimumSize: const Size(0, 36),
                           ),
-                          icon: const Icon(Icons.settings_outlined, size: 14, color: GrimoireTheme.accentIndigo),
+                          icon: const Icon(Icons.settings_outlined, size: 15, color: GrimoireTheme.accentIndigo),
                           label: Text(
                             ref.tr('manage_categories'),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -512,10 +514,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             side: BorderSide(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.5)),
                             backgroundColor: const Color(0xFF16182E),
                             foregroundColor: const Color(0xFFE0E7FF),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            minimumSize: const Size(0, 36),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          icon: const Icon(Icons.file_download_outlined, size: 14, color: GrimoireTheme.accentIndigo),
+                          icon: const Icon(Icons.file_download_outlined, size: 15, color: GrimoireTheme.accentIndigo),
                           label: Text(
                             ref.tr('export_game'),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -536,10 +539,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             side: BorderSide(color: GrimoireTheme.accentPink.withValues(alpha: 0.5)),
                             backgroundColor: const Color(0xFF1E1420),
                             foregroundColor: const Color(0xFFFECDD3),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            minimumSize: const Size(0, 36),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          icon: const Icon(Icons.delete_sweep_outlined, size: 14, color: GrimoireTheme.accentPink),
+                          icon: const Icon(Icons.delete_sweep_outlined, size: 15, color: GrimoireTheme.accentPink),
                           label: Text(
                             ref.tr('delete_game'),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -690,7 +694,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8.5),
         decoration: BoxDecoration(
           color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.22) : GrimoireTheme.surfaceElevated,
           borderRadius: BorderRadius.circular(20),
@@ -989,19 +993,18 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       side: BorderSide(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
                       backgroundColor: showDefaultModels ? GrimoireTheme.accentPurple.withValues(alpha: 0.18) : const Color(0xFF131522),
                       foregroundColor: const Color(0xFFE9D5FF),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      minimumSize: const Size(0, 38),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: Icon(
                       showDefaultModels ? Icons.visibility_off_outlined : Icons.auto_awesome,
-                      size: 14,
+                      size: 16,
                       color: GrimoireTheme.accentPurple,
                     ),
                     label: Text(
                       showDefaultModels ? ref.tr('hide_default_models') : ref.tr('view_default_models'),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () => setState(() => _showDefaultModelsForGame[gameName] = !showDefaultModels),
                   ),
@@ -1012,13 +1015,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       side: BorderSide(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.5)),
                       backgroundColor: GrimoireTheme.accentEmerald.withValues(alpha: 0.12),
                       foregroundColor: const Color(0xFFA7F3D0),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      minimumSize: const Size(0, 38),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.folder_open_outlined, size: 14, color: GrimoireTheme.accentEmerald),
-                    label: Text(ref.tr('game_folder'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.folder_open_outlined, size: 16, color: GrimoireTheme.accentEmerald),
+                    label: Text(ref.tr('game_folder'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     onPressed: () => _showGameFolderDialog(gameName, allGameCards),
                   ),
 
@@ -1027,13 +1029,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: GrimoireTheme.accentPurple,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      minimumSize: const Size(0, 38),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.add, size: 14),
-                    label: Text(ref.tr('new_category_btn'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: Text(ref.tr('new_category_btn'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     onPressed: () => _showCategoryModelDialog(gameName),
                   ),
                 ],
@@ -1239,7 +1240,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
             onTap: onTap,
             borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
             child: Padding(
-              padding: const EdgeInsets.only(left: 14, right: 8, top: 7, bottom: 7),
+              padding: const EdgeInsets.only(left: 14, right: 8, top: 8, bottom: 8),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1283,13 +1284,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: catColor.withValues(alpha: 0.35),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  minimumSize: const Size(0, 32),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   side: BorderSide(color: catColor.withValues(alpha: 0.7)),
                 ),
-                icon: const Icon(Icons.flash_on, size: 12, color: Colors.white),
+                icon: const Icon(Icons.flash_on, size: 13, color: Colors.white),
                 label: Text(
                   ref.tr('quick_generate'),
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
@@ -1504,12 +1504,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GrimoireTheme.accentPurple,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                    minimumSize: const Size(0, 36),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  icon: const Icon(Icons.flash_on, size: 12),
+                  icon: const Icon(Icons.flash_on, size: 13),
                   label: const Text('Usar Modelo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: () => _generateCardFromModel(gameName, cat),
                 ),
@@ -1517,15 +1516,15 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
               const SizedBox(width: 4),
               IconButton(
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                icon: const Icon(Icons.tune, size: 15, color: GrimoireTheme.accentIndigo),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.tune, size: 16, color: GrimoireTheme.accentIndigo),
                 tooltip: 'Editar Modelo',
                 onPressed: () => _showCategoryModelDialog(gameName, existingCategory: cat),
               ),
               IconButton(
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                icon: const Icon(Icons.delete_outline, size: 15, color: GrimoireTheme.accentPink),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.delete_outline, size: 16, color: GrimoireTheme.accentPink),
                 tooltip: 'Eliminar Categoría',
                 onPressed: () => _confirmDeleteCategory(gameName, cat.name),
               ),
@@ -2512,11 +2511,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: GrimoireTheme.accentPurple,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                  minimumSize: const Size(0, 36),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                 ),
-                                icon: const Icon(Icons.add, size: 12),
-                                label: const Text('Carta', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                icon: const Icon(Icons.add, size: 14),
+                                label: const Text('Carta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 onPressed: () {
                                   Navigator.pop(ctx);
                                   _generateCardFromModel(gameName, cat);
@@ -2947,11 +2947,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             ),
                             TextButton.icon(
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                minimumSize: const Size(0, 30),
                               ),
-                              icon: Icon(showAddCustom ? Icons.close : Icons.add, size: 13, color: GrimoireTheme.accentPurple),
+                              icon: Icon(showAddCustom ? Icons.close : Icons.add, size: 14, color: GrimoireTheme.accentPurple),
                               label: Text(
                                 ref.tr('add_custom_field'),
                                 style: const TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.bold),
@@ -3021,9 +3020,8 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: GrimoireTheme.accentPurple,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  minimumSize: const Size(0, 36),
                                 ),
                                 onPressed: () {
                                   final k = customKeyCtrl.text.trim();

@@ -184,7 +184,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => ref.read(editorProvider.notifier).toggleSide(),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: editorState.currentSide == CardSide.front
                           ? GrimoireTheme.accentPurple.withValues(alpha: 0.15)
@@ -302,7 +302,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             side: const BorderSide(color: GrimoireTheme.borderSubtle),
           ),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
             decoration: BoxDecoration(
               color: catColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
