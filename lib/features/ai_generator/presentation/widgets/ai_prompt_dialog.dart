@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/grimoire_theme.dart';
@@ -6,9 +7,10 @@ import '../../../editor/presentation/providers/editor_provider.dart';
 import '../../services/ai_service.dart';
 
 class AiPromptDialog extends ConsumerStatefulWidget {
-  final String layerId;
+  final String? layerId;
+  final String? gameName;
 
-  const AiPromptDialog({super.key, required this.layerId});
+  const AiPromptDialog({super.key, this.layerId, this.gameName});
 
   @override
   ConsumerState<AiPromptDialog> createState() => _AiPromptDialogState();
@@ -43,8 +45,13 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
       _statusMessage = 'Connecting to ${_getProviderName(_selectedProvider)}...';
     });
 
+    final editorState = ref.read(editorProvider);
+    final activeRow = editorState.project.activeRow;
+    final game = widget.gameName ?? (activeRow['game'] ?? 'Magic').toString();
+
     final result = await _aiService.generateArtwork(
       prompt: _promptController.text.trim(),
+      gameName: game,
       provider: _selectedProvider,
     );
 
@@ -53,27 +60,26 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
         _isLoading = false;
       });
 
-      if (result.success) {
-        // Update layer with image path
-        final editorState = ref.read(editorProvider);
-        final layer = editorState.selectedLayer;
-        if (layer != null) {
-          ref.read(editorProvider.notifier).updateLayer(
-                layer.copyWith(imagePath: result.localFilePath),
-              );
-        }
+      if (result.success && result.localFilePath != null) {
+        final fileName = File(result.localFilePath!).uri.pathSegments.last;
+        final relativeUrl = 'assets/$fileName';
+        await ref.read(editorProvider.notifier).assignAssetToActiveCard(relativeUrl);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: GrimoireTheme.accentEmerald,
-            content: Text('Artwork generated and saved to ${result.localFilePath ?? "assets/generated/"}'),
-          ),
-        );
-        Navigator.of(context).pop();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: GrimoireTheme.accentEmerald,
+              content: Text('Arte generado y guardado en $relativeUrl'),
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       } else {
-        setState(() {
-          _statusMessage = result.errorMessage ?? 'Generation failed.';
-        });
+        if (mounted) {
+          setState(() {
+            _statusMessage = result.errorMessage ?? 'Generation failed.';
+          });
+        }
       }
     }
   }

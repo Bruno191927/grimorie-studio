@@ -7,6 +7,7 @@ import '../providers/editor_provider.dart';
 import '../widgets/card_canvas.dart';
 import '../widgets/layer_tree_panel.dart';
 import '../widgets/inspector_panel.dart';
+import '../widgets/game_assets_panel.dart';
 import '../../../export/presentation/dialogs/export_options_dialog.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
 
@@ -47,8 +48,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
             child: Row(
               children: [
-                // Active Card Selector from Database Rows
-                Text(ref.tr('active_card'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Active Card Selector from Database Rows
+                        Text(ref.tr('active_card'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
@@ -220,7 +227,54 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(width: 8),
+                const VerticalDivider(width: 1),
+                const SizedBox(width: 8),
+
+                // Collapsible Assets Panel Toggle Pill
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => ref.read(editorProvider.notifier).toggleAssetsPanel(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: editorState.showAssetsPanel
+                          ? GrimoireTheme.accentPurple.withValues(alpha: 0.2)
+                          : const Color(0xFF161928),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: editorState.showAssetsPanel
+                            ? GrimoireTheme.accentPurple
+                            : GrimoireTheme.borderSubtle,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          editorState.showAssetsPanel ? Icons.photo_library : Icons.photo_library_outlined,
+                          size: 15,
+                          color: editorState.showAssetsPanel ? const Color(0xFFE9D5FF) : GrimoireTheme.textMuted,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          ref.tr('game_assets'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: editorState.showAssetsPanel ? Colors.white : GrimoireTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 12),
 
                 // 300 DPI Export Button
                 ElevatedButton.icon(
@@ -238,7 +292,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
           ),
 
-          // Three-Panel Area
+          // Multi-Panel Area: Tree | Canvas | Collapsible Assets | Inspector
           Expanded(
             child: Row(
               children: [
@@ -252,6 +306,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     child: CardCanvas(repaintBoundaryKey: widget.repaintBoundaryKey),
                   ),
                 ),
+
+                // Center-Right: Collapsible Assets Panel
+                const GameAssetsCollapsiblePanel(),
 
                 // Right: Inspector Panel
                 const InspectorPanel(),

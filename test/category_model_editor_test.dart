@@ -195,6 +195,54 @@ void main() {
       // Badge should now show 24.0 px
       expect(find.text('24.0 px'), findsOneWidget);
     });
+
+    testWidgets('EditorScreen displays GameAssetsCollapsiblePanel with assets, upload, and AI generation', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: EditorScreen(repaintBoundaryKey: GlobalKey()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Verify Assets panel is present between canvas and inspector
+      expect(find.text('Assets del Juego'), findsWidgets);
+      expect(find.text('Subir Imagen'), findsWidgets);
+      expect(find.text('Generar con IA'), findsWidgets);
+
+      // 2. Verify sample Magic assets are displayed (e.g. black_lotus.png)
+      expect(find.text('black_lotus.png'), findsOneWidget);
+
+      // 3. Tap on black_lotus.png to assign it to the active card
+      await tester.tap(find.text('black_lotus.png'));
+      await tester.pumpAndSettle();
+
+      // Active badge should be visible on the card
+      expect(find.text('ACTIVA'), findsWidgets);
+
+      // 4. Test collapsing the panel via the chevron button
+      final collapseBtn = find.byTooltip('Plegar panel de assets');
+      expect(collapseBtn, findsWidgets);
+      await tester.tap(collapseBtn.first);
+      await tester.pumpAndSettle();
+
+      // Panel should now be collapsed showing the vertical label ASSETS
+      expect(find.textContaining('ASSETS'), findsWidgets);
+
+      // 5. Expand it back by tapping the collapsed rail
+      final expandBtn = find.byTooltip('Desplegar panel de assets');
+      expect(expandBtn, findsWidgets);
+      await tester.tap(expandBtn.first);
+      await tester.pumpAndSettle();
+
+      // Title should be visible again
+      expect(find.text('Assets del Juego'), findsWidgets);
+    });
   });
 }
 

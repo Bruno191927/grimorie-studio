@@ -18,6 +18,7 @@ class EditorState {
   final CardSide currentSide;
   final Set<String> deletedGames;
   final Map<String, List<GameCategory>> gameCategories;
+  final bool showAssetsPanel;
 
   const EditorState({
     required this.project,
@@ -29,6 +30,7 @@ class EditorState {
     this.currentSide = CardSide.front,
     this.deletedGames = const {},
     this.gameCategories = const {},
+    this.showAssetsPanel = true,
   });
 
   LayerItem? get selectedLayer {
@@ -49,6 +51,7 @@ class EditorState {
     CardSide? currentSide,
     Set<String>? deletedGames,
     Map<String, List<GameCategory>>? gameCategories,
+    bool? showAssetsPanel,
   }) {
     return EditorState(
       project: project ?? this.project,
@@ -60,6 +63,7 @@ class EditorState {
       currentSide: currentSide ?? this.currentSide,
       deletedGames: deletedGames ?? this.deletedGames,
       gameCategories: gameCategories ?? this.gameCategories,
+      showAssetsPanel: showAssetsPanel ?? this.showAssetsPanel,
     );
   }
 }
@@ -1567,6 +1571,14 @@ class EditorNotifier extends StateNotifier<EditorState> {
       ));
     }
     await syncGameDataCsv(gameName);
+  }
+
+  void toggleAssetsPanel() {
+    state = state.copyWith(showAssetsPanel: !state.showAssetsPanel);
+  }
+
+  void setAssetsPanelOpen(bool open) {
+    state = state.copyWith(showAssetsPanel: open);
   }
 }
 

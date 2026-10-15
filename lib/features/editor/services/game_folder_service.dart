@@ -243,4 +243,21 @@ class GameFolderService {
     }
     return false;
   }
+
+  /// Deletes an asset image file from `games/<gameName>/assets/<fileName>`
+  static bool deleteGameAsset(String gameName, String fileName) {
+    try {
+      final assetsDir = getGameAssetsDir(gameName);
+      final sanitized = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final target = File('${assetsDir.path}/$sanitized');
+      if (target.existsSync()) {
+        target.deleteSync();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error deleting game asset: $e');
+    }
+    return false;
+  }
 }
+
