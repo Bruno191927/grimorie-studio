@@ -96,6 +96,62 @@ class NvidiaService {
     '9:16',
   ];
 
+  /// Returns all recommended presets combining reasoning/chat and image models
+  static List<NvidiaModelOption> get allPresetModels => [
+        ...availableTextModels,
+        ...availableImageModels,
+      ];
+
+  /// Returns true if the model is a Chat/Reasoning/LLM model rather than a direct image diffusion model
+  static bool isChatModel(String modelId) {
+    final lower = modelId.toLowerCase();
+    return lower.contains('nemotron') ||
+        lower.contains('llama') ||
+        lower.contains('instruct') ||
+        lower.contains('chat') ||
+        lower.contains('gemma') ||
+        lower.contains('mistral') ||
+        lower.contains('mixtral') ||
+        lower.contains('deepseek') ||
+        lower.contains('qwen') ||
+        lower.contains('yi-') ||
+        lower.contains('granite') ||
+        lower.contains('vision') ||
+        lower.contains('fuyu') ||
+        lower.contains('phi-') ||
+        lower.contains('starcoder');
+  }
+
+  /// Fetches the live list of models available to this API key from NVIDIA NIM
+  Future<List<String>> fetchRemoteModels([String? testKey]) async {
+    final key = (testKey ?? _apiKey).trim();
+    if (key.isEmpty) return [];
+
+    try {
+      final url = Uri.parse('${AppConstants.defaultNvidiaBaseUrl}/models');
+      final res = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $key',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body is Map && body['data'] is List) {
+          final list = (body['data'] as List)
+              .map((item) => item is Map ? item['id']?.toString() ?? '' : '')
+              .where((id) => id.isNotEmpty)
+              .toList();
+          list.sort();
+          return list;
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
   /// Masks API key for safe UI display (e.g. nvapi-••••••••1234)
   static String maskApiKey(String key) {
     final trimmed = key.trim();
@@ -435,10 +491,29 @@ class NvidiaService {
       );
     }
 
-    final model = customModel ?? _selectedModel;
+    final model = (customModel ?? _selectedModel).trim();
     final ratio = customAspectRatio ?? _aspectRatio;
 
-    onProgress?.call('Conectando con NVIDIA NIM ($model)...');
+    String effectivePrompt = prompt;
+    String targetImageModel = model;
+
+    // If the model is a Chat/Reasoning/Vision model (e.g. Nemotron 3.5), use it to reason and enhance the prompt!
+    if (isChatModel(model)) {
+      onProgress?.call('Razonando concepto visual con $model...');
+      try {
+        final enhanced = await enhancePromptWithNemotron(
+          basicPrompt: prompt,
+          customKey: key,
+        );
+        if (enhanced != null && enhanced.trim().isNotEmpty) {
+          effectivePrompt = enhanced.trim();
+        }
+      } catch (_) {}
+      targetImageModel = AppConstants.defaultNvidiaImageModel;
+      onProgress?.call('Generando ilustración con motor visual ($targetImageModel)...');
+    } else {
+      onProgress?.call('Conectando con NVIDIA NIM ($model)...');
+    }
 
     try {
       // Determine target destination file in game's assets folder
@@ -458,10 +533,10 @@ class NvidiaService {
       final fileName = 'art_nvidia_$timestamp.jpg';
       final file = File('${targetDir.path}/$fileName');
 
-      onProgress?.call('Generando arte con $model...');
+      onProgress?.call('Generando arte con $targetImageModel...');
 
       // 1. Primary endpoint: NVIDIA GenAI NIM route
-      final genAiUrl = Uri.parse('${AppConstants.defaultNvidiaGenAiUrl}/$model');
+      final genAiUrl = Uri.parse('${AppConstants.defaultNvidiaGenAiUrl}/$targetImageModel');
       
       http.Response response;
       try {
@@ -473,7 +548,7 @@ class NvidiaService {
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'prompt': prompt,
+            'prompt': effectivePrompt,
             if (negativePrompt != null && negativePrompt.trim().isNotEmpty)
               'negative_prompt': negativePrompt.trim(),
             'aspect_ratio': ratio,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/theme/grimoire_theme.dart';
@@ -673,13 +674,30 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                         decoration: InputDecoration(
                           hintText: 'nvapi-...',
                           prefixIcon: const Icon(Icons.vpn_key, size: 16, color: Color(0xFF76B900)),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureNvidiaKey ? Icons.visibility_off : Icons.visibility,
-                              size: 16,
-                              color: GrimoireTheme.textMuted,
-                            ),
-                            onPressed: () => setState(() => _obscureNvidiaKey = !_obscureNvidiaKey),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Pegar clave del portapapeles',
+                                icon: const Icon(Icons.content_paste, size: 16, color: Color(0xFF76B900)),
+                                onPressed: () async {
+                                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                  if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                                    _nvidiaKeyController.text = data.text!.trim();
+                                    await ref.read(nvidiaProvider.notifier).saveApiKey(data.text!.trim());
+                                    if (mounted) setState(() {});
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  _obscureNvidiaKey ? Icons.visibility_off : Icons.visibility,
+                                  size: 16,
+                                  color: GrimoireTheme.textMuted,
+                                ),
+                                onPressed: () => setState(() => _obscureNvidiaKey = !_obscureNvidiaKey),
+                              ),
+                            ],
                           ),
                           filled: true,
                           fillColor: const Color(0xFF151C17),
@@ -877,6 +895,36 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                   );
                 },
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('O modelo personalizado:', style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 32,
+                      child: TextField(
+                        controller: TextEditingController(text: nvidiaState.selectedModel)
+                          ..selection = TextSelection.collapsed(offset: nvidiaState.selectedModel.length),
+                        style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'monospace'),
+                        decoration: InputDecoration(
+                          hintText: 'ej: stabilityai/stable-diffusion-3-medium',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                          filled: true,
+                          fillColor: const Color(0xFF151922),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: GrimoireTheme.borderSubtle)),
+                        ),
+                        onSubmitted: (val) {
+                          if (val.trim().isNotEmpty) {
+                            ref.read(nvidiaProvider.notifier).setModel(val.trim());
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
 
               // Aspect Ratio row
@@ -1017,6 +1065,36 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                     ),
                   );
                 },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('O modelo personalizado:', style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 32,
+                      child: TextField(
+                        controller: TextEditingController(text: nvidiaState.textModel)
+                          ..selection = TextSelection.collapsed(offset: nvidiaState.textModel.length),
+                        style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'monospace'),
+                        decoration: InputDecoration(
+                          hintText: 'ej: nvidia/nemotron-3.5-super-vl-120b-a12b',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                          filled: true,
+                          fillColor: const Color(0xFF151922),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: GrimoireTheme.borderSubtle)),
+                        ),
+                        onSubmitted: (val) {
+                          if (val.trim().isNotEmpty) {
+                            ref.read(nvidiaProvider.notifier).setTextModel(val.trim());
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

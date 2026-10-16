@@ -9,6 +9,8 @@ class NvidiaState {
   final bool isTesting;
   final bool? testSuccess;
   final String? statusMessage;
+  final List<String> remoteModels;
+  final bool isLoadingModels;
 
   const NvidiaState({
     required this.apiKey,
@@ -18,6 +20,8 @@ class NvidiaState {
     this.isTesting = false,
     this.testSuccess,
     this.statusMessage,
+    this.remoteModels = const [],
+    this.isLoadingModels = false,
   });
 
   bool get isConfigured => apiKey.trim().isNotEmpty;
@@ -31,6 +35,8 @@ class NvidiaState {
     bool? isTesting,
     bool? testSuccess,
     String? statusMessage,
+    List<String>? remoteModels,
+    bool? isLoadingModels,
   }) {
     return NvidiaState(
       apiKey: apiKey ?? this.apiKey,
@@ -40,6 +46,8 @@ class NvidiaState {
       isTesting: isTesting ?? this.isTesting,
       testSuccess: testSuccess ?? this.testSuccess,
       statusMessage: statusMessage ?? this.statusMessage,
+      remoteModels: remoteModels ?? this.remoteModels,
+      isLoadingModels: isLoadingModels ?? this.isLoadingModels,
     );
   }
 }
@@ -95,6 +103,15 @@ class NvidiaNotifier extends StateNotifier<NvidiaState> {
     );
 
     return success;
+  }
+
+  Future<void> fetchRemoteModels([String? key]) async {
+    state = state.copyWith(isLoadingModels: true);
+    final models = await _service.fetchRemoteModels(key ?? state.apiKey);
+    state = state.copyWith(
+      isLoadingModels: false,
+      remoteModels: models,
+    );
   }
 }
 
