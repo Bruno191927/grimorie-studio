@@ -141,7 +141,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
       case AiProviderType.comfyUiLocal:
         return 'Local ComfyUI (127.0.0.1:8188)';
       case AiProviderType.nvidiaCloud:
-        return 'NVIDIA NIM Cloud (SD3 Medium / Llama 3.1)';
+        return 'NVIDIA NIM Cloud (Nemotron 3.5 / SD3)';
       case AiProviderType.ollamaLocal:
         return 'Local Ollama / LM Studio (127.0.0.1:11434)';
       case AiProviderType.cloudApi:
@@ -837,7 +837,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                             } else {
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('Configura tu API Key de NVIDIA para usar el optimizador Llama 3.1.'),
+                                  content: Text('Configura tu API Key de NVIDIA para usar el optimizador Nemotron 3.5.'),
                                 ),
                               );
                             }

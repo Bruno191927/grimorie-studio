@@ -587,7 +587,7 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         Text(
-                          'Modelos en la nube: Stable Diffusion 3 Medium, FLUX.1 y Meta Llama 3.1',
+                          'Modelos en la nube: Nemotron 3.5 Super VL (120B), Stable Diffusion 3 y FLUX.1',
                           style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                         ),
                       ],
@@ -833,7 +833,10 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
                                   children: [
                                     Text(
                                       model.name,
@@ -905,6 +908,115 @@ class _ComfyUiConnectionDialogState extends ConsumerState<ComfyUiConnectionDialo
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Text & Reasoning Model Selector
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161929),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: GrimoireTheme.borderSubtle),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.psychology, size: 14, color: Color(0xFF76B900)),
+                  SizedBox(width: 6),
+                  Text(
+                    'MODELO DE RAZONAMIENTO Y VISIÓN (TEXT & VISION AI)',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.textSecondary, letterSpacing: 0.8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: NvidiaService.availableTextModels.length,
+                separatorBuilder: (ctx, i) => const SizedBox(height: 6),
+                itemBuilder: (ctx, i) {
+                  final model = NvidiaService.availableTextModels[i];
+                  final isSelected = model.id == nvidiaState.textModel;
+
+                  return InkWell(
+                    onTap: () {
+                      ref.read(nvidiaProvider.notifier).setTextModel(model.id);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF76B900).withValues(alpha: 0.12)
+                            : const Color(0xFF141727),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF76B900) : GrimoireTheme.borderSubtle,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                            size: 15,
+                            color: isSelected ? const Color(0xFF76B900) : GrimoireTheme.textMuted,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      model.name,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+                                      ),
+                                    ),
+                                    if (model.isDefault) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF76B900).withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFF76B900).withValues(alpha: 0.4)),
+                                        ),
+                                        child: const Text(
+                                          'Thinking + Vision',
+                                          style: TextStyle(fontSize: 9, color: Color(0xFF76B900), fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  model.description,
+                                  style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

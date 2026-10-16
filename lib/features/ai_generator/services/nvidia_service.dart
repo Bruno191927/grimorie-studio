@@ -65,6 +65,30 @@ class NvidiaService {
     ),
   ];
 
+  static const List<NvidiaModelOption> availableTextModels = [
+    NvidiaModelOption(
+      id: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      name: 'Nemotron 3.5 Super VL 120B (NVIDIA)',
+      description: 'Modelo de razonamiento profundo (Thinking) y visión multimodal para análisis y generación.',
+      isDefault: true,
+    ),
+    NvidiaModelOption(
+      id: 'nvidia/llama-3.1-nemotron-70b-instruct',
+      name: 'Nemotron 70B Instruct (NVIDIA)',
+      description: 'Alta precisión y seguimiento de instrucciones para mecánicas y reglas de juego.',
+    ),
+    NvidiaModelOption(
+      id: 'meta/llama-3.2-90b-vision-instruct',
+      name: 'Llama 3.2 90B Vision (Meta)',
+      description: 'Análisis detallado de imágenes e ilustraciones de cartas.',
+    ),
+    NvidiaModelOption(
+      id: 'meta/llama-3.2-11b-vision-instruct',
+      name: 'Llama 3.2 11B Vision (Meta)',
+      description: 'Modelo ligero y rápido para lore y visión multimodal.',
+    ),
+  ];
+
   static const List<String> availableAspectRatios = [
     '1:1',
     '2:3',
@@ -102,7 +126,16 @@ class NvidiaService {
         _apiKey = (json['nvidia_api_key'] ?? '').toString();
         _selectedModel = (json['nvidia_model'] ?? AppConstants.defaultNvidiaImageModel).toString();
         _aspectRatio = (json['nvidia_aspect_ratio'] ?? '1:1').toString();
-        _textModel = (json['nvidia_text_model'] ?? AppConstants.defaultNvidiaTextModel).toString();
+        final rawTextModel = (json['nvidia_text_model'] ?? '').toString();
+        if (rawTextModel.isNotEmpty && !rawTextModel.contains('llama-3.1-70b') && !rawTextModel.contains('llama-3.1-8b')) {
+          _textModel = rawTextModel;
+        } else {
+          _textModel = AppConstants.defaultNvidiaTextModel;
+        }
+      } else {
+        // Pre-configure the active NVIDIA API key if no config exists yet
+        _apiKey = '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';
+        _textModel = AppConstants.defaultNvidiaTextModel;
       }
     } catch (_) {}
   }
@@ -148,7 +181,7 @@ class NvidiaService {
     }
 
     try {
-      // Test with chat completions with 1 token to verify key validity
+      // Test with chat completions using 1 token to verify key validity
       final url = Uri.parse('${AppConstants.defaultNvidiaBaseUrl}/chat/completions');
       final response = await http.post(
         url,
@@ -158,18 +191,19 @@ class NvidiaService {
           'Accept': 'application/json',
         },
         body: jsonEncode({
-          'model': 'meta/llama-3.1-8b-instruct',
+          'model': 'nvidia/nemotron-3.5-super-vl-120b-a12b',
           'messages': [
             {'role': 'user', 'content': 'hi'}
           ],
           'max_tokens': 1,
+          'stream': false,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': 'Conexión verificada con éxito con NVIDIA NIM.',
+          'message': 'Conexión verificada con éxito con NVIDIA NIM (Nemotron 3.5 Super VL 120B).',
         };
       } else if (response.statusCode == 401) {
         return {
@@ -195,54 +229,193 @@ class NvidiaService {
     }
   }
 
-  /// Enhances a user concept prompt using NVIDIA's Meta Llama 3.1 70B model
-  Future<String?> enhancePromptWithLlama({
-    required String basicPrompt,
+  /// Invokes NVIDIA NIM Chat Completions supporting Nemotron 3.5 Super VL 120B,
+  /// streaming SSE, reasoning tokens, vision image_url, and thinking template kwargs.
+  Future<String?> invokeChatCompletion({
+    required List<Map<String, dynamic>> messages,
+    String? model,
+    double temperature = 1.0,
+    double topP = 0.95,
+    int maxTokens = 16384,
+    int seed = 42,
+    bool enableThinking = true,
+    bool stream = true,
     String? customKey,
+    void Function(String token)? onToken,
+    void Function(String reasoningToken)? onReasoning,
   }) async {
     final key = customKey ?? _apiKey;
     if (key.trim().isEmpty) return null;
 
-    try {
-      final url = Uri.parse('${AppConstants.defaultNvidiaBaseUrl}/chat/completions');
-      final response = await http.post(
-        url,
-        headers: {
-          'Authorization': 'Bearer $key',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({
-          'model': _textModel,
-          'messages': [
-            {
-              'role': 'system',
-              'content':
-                  'You are a master concept artist and prompt engineer for tabletop collectible card games (TCG/CCG). '
-                  'Transform the user card concept into a single vivid, highly visual art prompt suitable for AI diffusion generation. '
-                  'Include art style, dramatic lighting, color palette, creature details, and composition. '
-                  'Reply ONLY with the prompt itself, without quotes or introductory text.',
-            },
-            {
-              'role': 'user',
-              'content': basicPrompt,
-            }
-          ],
-          'temperature': 0.7,
-          'max_tokens': 140,
-        }),
-      ).timeout(const Duration(seconds: 15));
+    final targetModel = model ?? _textModel;
+    final uri = Uri.parse('${AppConstants.defaultNvidiaBaseUrl}/chat/completions');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final enhanced = data['choices']?[0]?['message']?['content']?.toString().trim();
-        if (enhanced != null && enhanced.isNotEmpty) {
-          return enhanced;
+    final payload = <String, dynamic>{
+      'model': targetModel,
+      'messages': messages,
+      'temperature': temperature,
+      'top_p': topP,
+      'max_tokens': maxTokens,
+      'parallel_tool_calls': true,
+      'seed': seed,
+      'chat_template_kwargs': {'enable_thinking': enableThinking},
+      'stream': stream,
+    };
+
+    try {
+      final client = HttpClient();
+      final req = await client.postUrl(uri);
+      req.headers.set('Authorization', 'Bearer $key');
+      req.headers.set('Accept', 'application/json');
+      req.headers.set('Content-Type', 'application/json');
+
+      final jsonBytes = utf8.encode(jsonEncode(payload));
+      req.add(jsonBytes);
+
+      final res = await req.close();
+      if (res.statusCode != 200) {
+        client.close();
+        return null;
+      }
+
+      final contentBuffer = StringBuffer();
+      final reasoningBuffer = StringBuffer();
+
+      if (stream) {
+        await for (final line in res.transform(utf8.decoder).transform(const LineSplitter())) {
+          if (line.startsWith('data: ')) {
+            final dataStr = line.substring(6).trim();
+            if (dataStr == '[DONE]') break;
+            try {
+              final json = jsonDecode(dataStr);
+              final delta = json['choices']?[0]?['delta'];
+              if (delta != null) {
+                final reasoning = delta['reasoning_content']?.toString();
+                final content = delta['content']?.toString();
+                if (reasoning != null && reasoning.isNotEmpty) {
+                  reasoningBuffer.write(reasoning);
+                  onReasoning?.call(reasoning);
+                }
+                if (content != null && content.isNotEmpty) {
+                  contentBuffer.write(content);
+                  onToken?.call(content);
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      } else {
+        final rawBody = await utf8.decodeStream(res);
+        final json = jsonDecode(rawBody);
+        final msg = json['choices']?[0]?['message'];
+        if (msg != null) {
+          final content = msg['content']?.toString();
+          if (content != null) contentBuffer.write(content);
         }
       }
+
+      client.close();
+
+      final result = contentBuffer.toString().trim();
+      if (result.isNotEmpty) return result;
+      if (reasoningBuffer.isNotEmpty) return reasoningBuffer.toString().trim();
     } catch (_) {}
 
     return null;
+  }
+
+  /// Enhances a prompt using Nemotron 3.5 Super VL 120B reasoning model
+  Future<String?> enhancePromptWithNemotron({
+    required String basicPrompt,
+    String? customKey,
+    void Function(String token)? onToken,
+  }) async {
+    final messages = [
+      {
+        'role': 'user',
+        'content': [
+          {
+            'type': 'text',
+            'text':
+                'You are a master concept artist and prompt engineer for tabletop collectible card games (TCG/CCG). '
+                'Transform this concept into a single vivid, highly visual art prompt for image generation: "$basicPrompt". '
+                'Include visual style, dramatic lighting, rich color palette, anatomy/creature details, and composition. '
+                'Reply ONLY with the prompt itself, without quotes or introductory commentary.',
+          }
+        ]
+      }
+    ];
+
+    return invokeChatCompletion(
+      messages: messages,
+      model: _textModel,
+      temperature: 1.0,
+      topP: 0.95,
+      maxTokens: 2048,
+      seed: 42,
+      enableThinking: true,
+      stream: true,
+      customKey: customKey,
+      onToken: onToken,
+    );
+  }
+
+  /// Enhances a prompt (backward-compatible alias)
+  Future<String?> enhancePromptWithLlama({
+    required String basicPrompt,
+    String? customKey,
+  }) async {
+    return enhancePromptWithNemotron(basicPrompt: basicPrompt, customKey: customKey);
+  }
+
+  /// Multimodal vision query using Nemotron 3.5 Super VL 120B
+  Future<String?> analyzeImageWithNemotron({
+    required String prompt,
+    String? imageUrl,
+    String? localImagePath,
+    String? customKey,
+    void Function(String token)? onToken,
+  }) async {
+    final contentList = <Map<String, dynamic>>[];
+    contentList.add({'type': 'text', 'text': prompt});
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      contentList.add({
+        'type': 'image_url',
+        'image_url': {'url': imageUrl},
+      });
+    } else if (localImagePath != null && localImagePath.isNotEmpty) {
+      final file = File(localImagePath);
+      if (file.existsSync()) {
+        final bytes = file.readAsBytesSync();
+        final b64 = base64Encode(bytes);
+        final ext = localImagePath.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+        contentList.add({
+          'type': 'image_url',
+          'image_url': {'url': 'data:image/$ext;base64,$b64'},
+        });
+      }
+    }
+
+    final messages = [
+      {
+        'role': 'user',
+        'content': contentList,
+      }
+    ];
+
+    return invokeChatCompletion(
+      messages: messages,
+      model: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      temperature: 1.0,
+      topP: 0.95,
+      maxTokens: 4096,
+      seed: 42,
+      enableThinking: true,
+      stream: true,
+      customKey: customKey,
+      onToken: onToken,
+    );
   }
 
   /// Generates artwork for a card layer via NVIDIA NIM

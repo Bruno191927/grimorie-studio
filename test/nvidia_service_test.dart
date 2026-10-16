@@ -99,6 +99,11 @@ void main() {
       // Without key, returns descriptive result or fallback
       expect(result.success, isNotNull);
     });
+    test('NvidiaService provides Nemotron 3.5 Super VL 120B as primary reasoning model', () {
+      final models = NvidiaService.availableTextModels;
+      expect(models.any((m) => m.id == 'nvidia/nemotron-3.5-super-vl-120b-a12b'), isTrue);
+      expect(NvidiaService().textModel, equals('nvidia/nemotron-3.5-super-vl-120b-a12b'));
+    });
   });
 
   group('NVIDIA UI Integration in Dialogs', () {
@@ -137,7 +142,7 @@ void main() {
       await tester.tap(dropdown);
       await tester.pumpAndSettle();
 
-      final nvidiaItem = find.text('NVIDIA NIM Cloud (SD3 Medium / Llama 3.1)').last;
+      final nvidiaItem = find.text('NVIDIA NIM Cloud (Nemotron 3.5 / SD3)').last;
       await tester.tap(nvidiaItem);
       await tester.pumpAndSettle();
 
@@ -145,7 +150,7 @@ void main() {
       expect(find.text('NVIDIA NIM & AI Foundation'), findsOneWidget);
       expect(find.text('API Key Requerida'), findsWidgets);
       expect(find.text('Guardar Clave'), findsOneWidget);
-      expect(find.text('Mejorar con Llama 3.1'), findsOneWidget);
+      expect(find.text('Mejorar con Nemotron 3.5 (120B)'), findsOneWidget);
 
       // Type an API key and click save
       final keyField = find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == 'nvapi-...');
@@ -182,6 +187,7 @@ void main() {
       expect(find.text('NVIDIA NIM Cloud & AI Foundation'), findsOneWidget);
       expect(find.text('CLAVE DE ACCESO NVIDIA API (NVAPI-...)'), findsOneWidget);
       expect(find.text('SD3 Medium (Stability AI)'), findsOneWidget);
+      expect(find.text('Nemotron 3.5 Super VL 120B (NVIDIA)'), findsOneWidget);
       expect(find.text('Guardar Clave'), findsOneWidget);
       expect(find.text('Probar'), findsOneWidget);
     });

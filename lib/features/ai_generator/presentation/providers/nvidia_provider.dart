@@ -5,6 +5,7 @@ class NvidiaState {
   final String apiKey;
   final String selectedModel;
   final String aspectRatio;
+  final String textModel;
   final bool isTesting;
   final bool? testSuccess;
   final String? statusMessage;
@@ -13,6 +14,7 @@ class NvidiaState {
     required this.apiKey,
     required this.selectedModel,
     required this.aspectRatio,
+    required this.textModel,
     this.isTesting = false,
     this.testSuccess,
     this.statusMessage,
@@ -25,6 +27,7 @@ class NvidiaState {
     String? apiKey,
     String? selectedModel,
     String? aspectRatio,
+    String? textModel,
     bool? isTesting,
     bool? testSuccess,
     String? statusMessage,
@@ -33,6 +36,7 @@ class NvidiaState {
       apiKey: apiKey ?? this.apiKey,
       selectedModel: selectedModel ?? this.selectedModel,
       aspectRatio: aspectRatio ?? this.aspectRatio,
+      textModel: textModel ?? this.textModel,
       isTesting: isTesting ?? this.isTesting,
       testSuccess: testSuccess ?? this.testSuccess,
       statusMessage: statusMessage ?? this.statusMessage,
@@ -49,6 +53,7 @@ class NvidiaNotifier extends StateNotifier<NvidiaState> {
             apiKey: NvidiaService().apiKey,
             selectedModel: NvidiaService().selectedModel,
             aspectRatio: NvidiaService().aspectRatio,
+            textModel: NvidiaService().textModel,
           ),
         );
 
@@ -70,6 +75,11 @@ class NvidiaNotifier extends StateNotifier<NvidiaState> {
   Future<void> setAspectRatio(String ratio) async {
     await _service.saveSettings(aspectRatio: ratio);
     state = state.copyWith(aspectRatio: ratio);
+  }
+
+  Future<void> setTextModel(String textModel) async {
+    await _service.saveSettings(textModel: textModel);
+    state = state.copyWith(textModel: textModel);
   }
 
   Future<bool> testConnection([String? candidateKey]) async {

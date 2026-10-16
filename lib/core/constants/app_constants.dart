@@ -35,5 +35,5 @@ class AppConstants {
   static const String defaultNvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
   static const String defaultNvidiaGenAiUrl = 'https://ai.api.nvidia.com/v1/genai';
   static const String defaultNvidiaImageModel = 'stabilityai/stable-diffusion-3-medium';
-  static const String defaultNvidiaTextModel = 'meta/llama-3.1-70b-instruct';
+  static const String defaultNvidiaTextModel = 'nvidia/nemotron-3.5-super-vl-120b-a12b';
 }
