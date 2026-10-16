@@ -12,6 +12,7 @@ import 'core/localization/language_selector.dart';
 import 'features/export/presentation/dialogs/export_options_dialog.dart';
 import 'features/ai_generator/presentation/widgets/comfy_ui_connection_dialog.dart';
 import 'features/ai_generator/presentation/providers/comfy_ui_provider.dart';
+import 'features/ai_generator/presentation/providers/nvidia_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -160,35 +161,58 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                             const LanguageSelector(),
                             const SizedBox(width: 12),
 
-                            // Action: Connect AI Engine Button (Styled like "Wallet Connect" in the reference image)
+                            // Action: Connect AI Engine Button (Supports ComfyUI & NVIDIA NIM Cloud)
                             Builder(
                               builder: (context) {
                                 final comfyState = ref.watch(comfyUiProvider);
+                                final nvidiaState = ref.watch(nvidiaProvider);
                                 final isComfyOnline = comfyState.serverInfo.isOnline;
+                                final isNvidiaConfigured = nvidiaState.isConfigured;
                                 final activeWfName = comfyState.activeWorkflow.name;
+
+                                final isAnyOnline = isComfyOnline || isNvidiaConfigured;
+                                final borderColor = isComfyOnline
+                                    ? GrimoireTheme.accentEmerald
+                                    : (isNvidiaConfigured
+                                        ? const Color(0xFF76B900)
+                                        : GrimoireTheme.accentPurple.withValues(alpha: 0.6));
+                                final bgColor = isComfyOnline
+                                    ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+                                    : (isNvidiaConfigured
+                                        ? const Color(0xFF101713)
+                                        : const Color(0xFF16172B));
+                                final dotColor = isComfyOnline
+                                    ? GrimoireTheme.accentEmerald
+                                    : const Color(0xFF76B900);
+
+                                String buttonText;
+                                if (isComfyOnline) {
+                                  buttonText = 'ComfyUI: $activeWfName';
+                                } else if (isNvidiaConfigured) {
+                                  final shortModel = nvidiaState.selectedModel.split('/').last;
+                                  buttonText = 'NVIDIA: $shortModel';
+                                } else {
+                                  buttonText = ref.tr('btn_connect_ai');
+                                }
 
                                 return OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
-                                      color: isComfyOnline
-                                          ? GrimoireTheme.accentEmerald
-                                          : GrimoireTheme.accentPurple.withValues(alpha: 0.6),
-                                      width: isComfyOnline ? 1.5 : 1,
+                                      color: borderColor,
+                                      width: isAnyOnline ? 1.5 : 1,
                                     ),
-                                    backgroundColor: isComfyOnline
-                                        ? const Color(0xFF064E3B).withValues(alpha: 0.3)
-                                        : const Color(0xFF16172B),
-                                    foregroundColor: isComfyOnline ? Colors.white : const Color(0xFFE9D5FF),
+                                    backgroundColor: bgColor,
+                                    foregroundColor: isAnyOnline ? Colors.white : const Color(0xFFE9D5FF),
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                   ),
-                                  icon: isComfyOnline
+                                  icon: isAnyOnline
                                       ? Container(
                                           width: 8,
                                           height: 8,
-                                          decoration: const BoxDecoration(
+                                          decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: GrimoireTheme.accentEmerald,
+                                            color: dotColor,
                                           ),
                                         )
                                       : const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
@@ -196,14 +220,18 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        isComfyOnline ? 'ComfyUI: $activeWfName' : ref.tr('btn_connect_ai'),
+                                        buttonText,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: isComfyOnline ? FontWeight.bold : FontWeight.w600,
-                                          color: isComfyOnline ? const Color(0xFFD1FAE5) : const Color(0xFFE9D5FF),
+                                          fontWeight: isAnyOnline ? FontWeight.bold : FontWeight.w600,
+                                          color: isComfyOnline
+                                              ? const Color(0xFFD1FAE5)
+                                              : (isNvidiaConfigured
+                                                  ? const Color(0xFFD9F99D)
+                                                  : const Color(0xFFE9D5FF)),
                                         ),
                                       ),
-                                      if (isComfyOnline) ...[
+                                      if (isAnyOnline) ...[
                                         const SizedBox(width: 4),
                                         const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.textMuted),
                                       ],

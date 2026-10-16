@@ -7,9 +7,11 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'comfy_ui_service.dart';
+import 'nvidia_service.dart';
 
 enum AiProviderType {
   comfyUiLocal,
+  nvidiaCloud,
   ollamaLocal,
   cloudApi,
 }
@@ -73,6 +75,15 @@ class AiService {
 
       if (provider == AiProviderType.comfyUiLocal) {
         await _generateViaComfyUi(prompt, file);
+      } else if (provider == AiProviderType.nvidiaCloud) {
+        final nRes = await NvidiaService().generateArtwork(
+          prompt: prompt,
+          gameName: gameName,
+          negativePrompt: negativePrompt,
+        );
+        if (nRes.success && nRes.localFilePath != null) {
+          return nRes;
+        }
       } else if (provider == AiProviderType.cloudApi) {
         await _generateViaCloud(prompt, file);
       } else {

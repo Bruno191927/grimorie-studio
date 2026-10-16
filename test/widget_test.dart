@@ -59,7 +59,10 @@ void main() {
 
     // Verify UI switched to English
     expect(find.text('Card Gallery'), findsOneWidget);
-    expect(find.text('Connect AI Engine'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is Text && (w.data == 'Connect AI Engine' || (w.data?.startsWith('NVIDIA:') ?? false))),
+      findsOneWidget,
+    );
     expect(find.text('All Games'), findsOneWidget);
     expect(find.text('Board Game'), findsWidgets);
   });

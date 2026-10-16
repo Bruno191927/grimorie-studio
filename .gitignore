@@ -45,4 +45,6 @@ app.*.map.json
 /android/app/release
 
 .samples_backup/
+.grimoire_ai_config.json
+*.local.json
 
