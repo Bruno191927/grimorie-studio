@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/main.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
 import 'package:grimoire_studio/core/localization/app_strings.dart';
+import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
+import 'package:grimoire_studio/features/editor/models/game_category.dart';
 
 void main() {
   testWidgets('Grimoire Studio smoke test and language selector test', (WidgetTester tester) async {
@@ -59,10 +61,7 @@ void main() {
 
     // Verify UI switched to English
     expect(find.text('Card Gallery'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate((w) => w is Text && (w.data == 'Connect AI Engine' || (w.data?.startsWith('NVIDIA:') ?? false))),
-      findsOneWidget,
-    );
+    expect(find.text('Batch 300 DPI'), findsOneWidget);
     expect(find.text('All Games'), findsOneWidget);
     expect(find.text('Board Game'), findsWidgets);
   });
@@ -182,5 +181,34 @@ void main() {
     expect(find.text('Unstable Unicorns'), findsWidgets);
     expect(find.text('"Black Lotus"'), findsOneWidget);
   });
+
+  testWidgets('When games exist but cards count is 0, Todos los Juegos displays "Aún no tienes cartas creadas" and NOT "Ninguna carta coincide con los filtros"', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(editorProvider.notifier);
+    notifier.addCategoryToGame('policritics', const GameCategory(id: 'c1', name: 'General', icon: '🃏'));
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const GrimoireApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify "Ninguna carta coincide con los filtros" is NOT shown
+    expect(find.text('Ninguna carta coincide con los filtros.'), findsNothing);
+    expect(find.text('Restablecer'), findsNothing);
+
+    // Verify "Aún no tienes cartas creadas" empty state is shown
+    expect(find.text('Aún no tienes cartas creadas'), findsOneWidget);
+    expect(find.text('Añadir Primera Carta a "policritics"'), findsOneWidget);
+    expect(find.text('+ Modelo Preset'), findsWidgets);
+  });
 }
+
 

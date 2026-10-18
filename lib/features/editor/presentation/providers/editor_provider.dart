@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
@@ -7,31 +9,58 @@ import '../../models/card_template.dart';
 import '../../models/layer_item.dart';
 import '../../models/game_category.dart';
 import '../../services/game_folder_service.dart';
+import '../../../export/services/export_service.dart';
+
+enum LayerAlignment {
+  left,
+  centerHorizontal,
+  right,
+  top,
+  centerVertical,
+  bottom,
+  distributeHorizontal,
+  distributeVertical,
+}
 
 class EditorState {
   final CardProject project;
   final String? selectedLayerId;
+  final Set<String> selectedLayerIds;
   final double zoom;
   final bool showGrid;
   final bool showSnapping;
+  final bool showBleedGuides;
   final bool isGeneratingAi;
   final CardSide currentSide;
   final Set<String> deletedGames;
   final Map<String, List<GameCategory>> gameCategories;
   final bool showAssetsPanel;
+  final String? selectedAssetPath;
+  final int undoCount;
+  final int redoCount;
+  final bool hasClipboardLayers;
 
   const EditorState({
     required this.project,
     this.selectedLayerId,
+    this.selectedLayerIds = const {},
     this.zoom = 1.0,
     this.showGrid = true,
     this.showSnapping = true,
+    this.showBleedGuides = false,
     this.isGeneratingAi = false,
     this.currentSide = CardSide.front,
     this.deletedGames = const {},
     this.gameCategories = const {},
     this.showAssetsPanel = true,
+    this.selectedAssetPath,
+    this.undoCount = 0,
+    this.redoCount = 0,
+    this.hasClipboardLayers = false,
   });
+
+  bool get canUndo => undoCount > 0;
+  bool get canRedo => redoCount > 0;
 
   LayerItem? get selectedLayer {
     if (selectedLayerId == null) return null;
@@ -40,38 +69,82 @@ class EditorState {
     return index != -1 ? layers[index] : null;
   }
 
+  List<LayerItem> get selectedLayers {
+    final layers = project.activeTemplate.getLayers(currentSide);
+    if (selectedLayerIds.isNotEmpty) {
+      return layers.where((l) => selectedLayerIds.contains(l.id)).toList();
+    }
+    if (selectedLayerId != null) {
+      final l = selectedLayer;
+      return l != null ? [l] : const [];
+    }
+    return const [];
+  }
+
   EditorState copyWith({
     CardProject? project,
     String? selectedLayerId,
     bool clearSelectedLayer = false,
+    Set<String>? selectedLayerIds,
     double? zoom,
     bool? showGrid,
     bool? showSnapping,
+    bool? showBleedGuides,
     bool? isGeneratingAi,
     CardSide? currentSide,
     Set<String>? deletedGames,
     Map<String, List<GameCategory>>? gameCategories,
     bool? showAssetsPanel,
+    String? selectedAssetPath,
+    bool clearSelectedAsset = false,
+    int? undoCount,
+    int? redoCount,
+    bool? hasClipboardLayers,
   }) {
     return EditorState(
       project: project ?? this.project,
       selectedLayerId: clearSelectedLayer ? null : (selectedLayerId ?? this.selectedLayerId),
+      selectedLayerIds: clearSelectedLayer
+          ? const {}
+          : (selectedLayerIds ?? (selectedLayerId != null ? {selectedLayerId} : this.selectedLayerIds)),
       zoom: zoom ?? this.zoom,
       showGrid: showGrid ?? this.showGrid,
       showSnapping: showSnapping ?? this.showSnapping,
+      showBleedGuides: showBleedGuides ?? this.showBleedGuides,
       isGeneratingAi: isGeneratingAi ?? this.isGeneratingAi,
       currentSide: currentSide ?? this.currentSide,
       deletedGames: deletedGames ?? this.deletedGames,
       gameCategories: gameCategories ?? this.gameCategories,
       showAssetsPanel: showAssetsPanel ?? this.showAssetsPanel,
+      selectedAssetPath: clearSelectedAsset ? null : (selectedAssetPath ?? this.selectedAssetPath),
+      undoCount: undoCount ?? this.undoCount,
+      redoCount: redoCount ?? this.redoCount,
+      hasClipboardLayers: hasClipboardLayers ?? this.hasClipboardLayers,
     );
   }
 }
 
 class EditorNotifier extends StateNotifier<EditorState> {
-  EditorNotifier() : super(_createInitialState());
+  final bool enableDiskPersistence;
+  final Directory? customPersistenceDir;
 
-  static EditorState _createInitialState() {
+  EditorNotifier({
+    bool? enableDiskPersistence,
+    this.customPersistenceDir,
+  })  : enableDiskPersistence =
+            enableDiskPersistence ?? !Platform.environment.containsKey('FLUTTER_TEST'),
+        super(
+          _createInitialState(
+            enableDiskPersistence:
+                enableDiskPersistence ?? !Platform.environment.containsKey('FLUTTER_TEST'),
+            customPersistenceDir: customPersistenceDir,
+          ),
+        );
+
+  static EditorState _createInitialState({
+    bool enableDiskPersistence = false,
+    Directory? customPersistenceDir,
+  }) {
     const uuid = Uuid();
 
     // Default template with realistic tabletop layers
@@ -80,12 +153,14 @@ class EditorNotifier extends StateNotifier<EditorState> {
       LayerItem(
         id: uuid.v4(),
         name: 'Card Background',
-        type: LayerType.shape,
+        type: LayerType.background,
         x: 0,
         y: 0,
         width: 254, // in canvas units (~63.5mm * 4)
         height: 355.6, // in canvas units (~88.9mm * 4)
+        fillMode: LayerFillMode.solid,
         shapeColor: const Color(0xFF131622),
+        gradientEndColor: const Color(0xFF2E1065),
         borderColor: Colors.transparent,
         borderWidth: 0,
         borderRadius: 16,
@@ -1016,6 +1091,71 @@ class EditorNotifier extends StateNotifier<EditorState> {
       (k, v) => MapEntry(k, List<GameCategory>.from(v)),
     );
 
+    if (enableDiskPersistence) {
+      final persisted = GameFolderService.loadWorkspaceStateSync(
+        customRootDir: customPersistenceDir,
+      );
+      if (persisted != null) {
+        final baseProject = persisted.project ?? initialProject;
+        final templates = baseProject.templates.isNotEmpty
+            ? baseProject.templates
+            : initialProject.templates;
+        final combinedRows = [
+          ...baseProject.rows.map((r) => GameFolderService.normalizeCardRow(r)),
+          ...persisted.discoveredRows.map((r) => GameFolderService.normalizeCardRow(r)),
+        ];
+        final clampedRowIndex = combinedRows.isEmpty
+            ? 0
+            : baseProject.activeRowIndex.clamp(0, combinedRows.length - 1);
+        int clampedTemplateIndex = templates.isEmpty
+            ? 0
+            : baseProject.activeTemplateIndex.clamp(0, templates.length - 1);
+
+        if (combinedRows.isNotEmpty && clampedRowIndex >= 0 && clampedRowIndex < combinedRows.length) {
+          final activeRow = combinedRows[clampedRowIndex];
+          final tplId = (activeRow['template_id'] ?? '').toString().trim();
+          if (tplId.isNotEmpty) {
+            final matchIdx = templates.indexWhere((t) => t.id == tplId || t.name.toLowerCase() == tplId.toLowerCase());
+            if (matchIdx != -1) {
+              clampedTemplateIndex = matchIdx;
+            }
+          } else {
+            final game = (activeRow['game'] ?? '').toString().trim();
+            final category = (activeRow['category'] ?? '').toString().trim();
+            if (game.isNotEmpty && category.isNotEmpty) {
+              final safeGame = game.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+              final safeCat = category.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+              final catTplId = 'tpl_${safeGame}_$safeCat';
+              final matchIdx = templates.indexWhere((t) => t.id == catTplId);
+              if (matchIdx != -1) {
+                clampedTemplateIndex = matchIdx;
+              }
+            }
+          }
+        }
+
+        final mergedProject = baseProject.copyWith(
+          templates: templates,
+          activeTemplateIndex: clampedTemplateIndex,
+          rows: combinedRows,
+          activeRowIndex: clampedRowIndex,
+        );
+
+        GameFolderService.saveWorkspaceStateSync(
+          project: mergedProject,
+          gameCategories: persisted.gameCategories,
+          deletedGames: persisted.deletedGames,
+          customRootDir: customPersistenceDir,
+        );
+
+        return EditorState(
+          project: mergedProject,
+          gameCategories: persisted.gameCategories,
+          deletedGames: persisted.deletedGames,
+        );
+      }
+    }
+
     return EditorState(
       project: initialProject,
       gameCategories: const {},
@@ -1031,11 +1171,304 @@ class EditorNotifier extends StateNotifier<EditorState> {
   static Map<String, List<GameCategory>> getInitialSampleCategories() =>
       _cachedSampleGameCategories?.map((k, v) => MapEntry(k, List<GameCategory>.from(v))) ?? {};
 
-  void selectLayer(String? id) {
-    state = state.copyWith(selectedLayerId: id, clearSelectedLayer: id == null);
+  final List<CardProject> _undoStack = [];
+  final List<CardProject> _redoStack = [];
+  DateTime _lastHistoryPushTime = DateTime.fromMillisecondsSinceEpoch(0);
+  String? _lastContinuousMutationTag;
+  final List<LayerItem> _clipboardLayers = [];
+  bool get hasClipboardLayers => _clipboardLayers.isNotEmpty;
+  List<LayerItem> get clipboardLayers => List.unmodifiable(_clipboardLayers);
+
+  void _recordHistory({String? continuousTag}) {
+    final now = DateTime.now();
+    if (continuousTag != null &&
+        continuousTag == _lastContinuousMutationTag &&
+        now.difference(_lastHistoryPushTime).inMilliseconds < 550) {
+      _lastHistoryPushTime = now;
+      return;
+    }
+    _lastContinuousMutationTag = continuousTag;
+    _lastHistoryPushTime = now;
+
+    // Deep clone via JSON serialization to avoid shared map mutations
+    final snapshot = CardProject.fromJson(state.project.toJson());
+    _undoStack.add(snapshot);
+    if (_undoStack.length > 40) {
+      _undoStack.removeAt(0);
+    }
+    _redoStack.clear();
+  }
+
+  void undo() {
+    if (_undoStack.isEmpty) return;
+    final currentSnapshot = CardProject.fromJson(state.project.toJson());
+    _redoStack.add(currentSnapshot);
+    final previousProject = _undoStack.removeLast();
+
+    state = state.copyWith(
+      project: previousProject,
+      undoCount: _undoStack.length,
+      redoCount: _redoStack.length,
+    );
+    _persistWorkspace();
+  }
+
+  void redo() {
+    if (_redoStack.isEmpty) return;
+    final currentSnapshot = CardProject.fromJson(state.project.toJson());
+    _undoStack.add(currentSnapshot);
+    final nextProject = _redoStack.removeLast();
+
+    state = state.copyWith(
+      project: nextProject,
+      undoCount: _undoStack.length,
+      redoCount: _redoStack.length,
+    );
+    _persistWorkspace();
+  }
+
+  void _syncHistoryCounts() {
+    if (state.undoCount != _undoStack.length || state.redoCount != _redoStack.length) {
+      state = state.copyWith(
+        undoCount: _undoStack.length,
+        redoCount: _redoStack.length,
+      );
+    }
+  }
+
+  void _persistWorkspace({String? syncGameName}) {
+    _syncHistoryCounts();
+    if (!enableDiskPersistence) return;
+    GameFolderService.saveWorkspaceStateSync(
+      project: state.project,
+      gameCategories: state.gameCategories,
+      deletedGames: state.deletedGames,
+      customRootDir: customPersistenceDir,
+    );
+    if (syncGameName != null && syncGameName.trim().isNotEmpty) {
+      final gameCards = state.project.rows
+          .where((r) => (r['game'] ?? '').toString().toLowerCase() == syncGameName.toLowerCase())
+          .toList();
+      GameFolderService.saveGameDataCsvSync(
+        syncGameName,
+        gameCards,
+        customRootDir: customPersistenceDir,
+      );
+    }
+  }
+
+  void selectLayer(String? id, {bool multiSelect = false}) {
+    if (id == null) {
+      state = state.copyWith(selectedLayerId: null, clearSelectedLayer: true, selectedLayerIds: const {});
+      return;
+    }
+
+    if (multiSelect) {
+      final current = Set<String>.from(state.selectedLayerIds);
+      if (state.selectedLayerId != null) current.add(state.selectedLayerId!);
+      if (current.contains(id)) {
+        current.remove(id);
+      } else {
+        current.add(id);
+      }
+      state = state.copyWith(
+        selectedLayerId: current.isNotEmpty ? current.last : null,
+        clearSelectedLayer: current.isEmpty,
+        selectedLayerIds: current,
+        clearSelectedAsset: true,
+      );
+    } else {
+      state = state.copyWith(
+        selectedLayerId: id,
+        clearSelectedLayer: false,
+        selectedLayerIds: {id},
+        clearSelectedAsset: true,
+      );
+    }
+  }
+
+  void selectAsset(String? assetPath) {
+    if (assetPath != null && assetPath.trim().isNotEmpty) {
+      state = state.copyWith(
+        selectedAssetPath: assetPath.trim(),
+        selectedLayerId: null,
+        clearSelectedLayer: true,
+        selectedLayerIds: const {},
+      );
+    } else {
+      state = state.copyWith(
+        clearSelectedAsset: true,
+      );
+    }
+  }
+
+  bool renameAsset({
+    required String gameName,
+    required String oldFileName,
+    required String newFileName,
+  }) {
+    final renamed = GameFolderService.renameGameAsset(gameName, oldFileName, newFileName);
+    if (renamed == null) return false;
+
+    final actualNewName = renamed.uri.pathSegments.last;
+    final oldRelative = 'assets/$oldFileName';
+    final newRelative = 'assets/$actualNewName';
+
+    _recordHistory();
+
+    // 1. Update project rows referencing the old asset
+    final updatedRows = state.project.rows.map((row) {
+      final art = (row['art_url'] ?? '').toString();
+      if (art == oldRelative || art == oldFileName || art.endsWith('/$oldFileName')) {
+        final newRow = Map<String, dynamic>.from(row);
+        newRow['art_url'] = newRelative;
+        return newRow;
+      }
+      return row;
+    }).toList();
+
+    // 2. Update template layers referencing the old asset
+    final updatedTemplates = state.project.templates.map((tpl) {
+      final updatedFront = tpl.layers.map((l) {
+        if (l.imagePath == oldRelative || l.imagePath == oldFileName) {
+          return l.copyWith(imagePath: newRelative);
+        }
+        return l;
+      }).toList();
+      final updatedBack = tpl.backLayers.map((l) {
+        if (l.imagePath == oldRelative || l.imagePath == oldFileName) {
+          return l.copyWith(imagePath: newRelative);
+        }
+        return l;
+      }).toList();
+      return tpl.copyWith(layers: updatedFront, backLayers: updatedBack);
+    }).toList();
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        rows: updatedRows,
+        templates: updatedTemplates,
+      ),
+      selectedAssetPath: newRelative,
+    );
+
+    _persistWorkspace(syncGameName: gameName);
+    return true;
+  }
+
+  bool moveAsset({
+    required String gameName,
+    required String relativeOrFileName,
+    required String? targetSubfolder,
+  }) {
+    final targetFile = GameFolderService.resolveCardImageFile(gameName, relativeOrFileName);
+    if (targetFile == null) return false;
+
+    final oldRelative = GameFolderService.getRelativeAssetPath(gameName, targetFile);
+    final moved = GameFolderService.moveAssetToFolder(gameName, targetFile, targetSubfolder);
+    if (moved == null) return false;
+
+    final newRelative = GameFolderService.getRelativeAssetPath(gameName, moved);
+
+    _recordHistory();
+
+    final oldFileName = targetFile.uri.pathSegments.last;
+
+    // 1. Update project rows referencing the old asset
+    final updatedRows = state.project.rows.map((row) {
+      final art = (row['art_url'] ?? '').toString();
+      if (art == oldRelative || art == relativeOrFileName || art.endsWith(oldFileName)) {
+        final newRow = Map<String, dynamic>.from(row);
+        newRow['art_url'] = newRelative;
+        return newRow;
+      }
+      return row;
+    }).toList();
+
+    // 2. Update template layers referencing the old asset
+    final oldPathClean = targetFile.path.replaceAll('\\', '/');
+    final updatedTemplates = state.project.templates.map((tpl) {
+      final updatedFront = tpl.layers.map((l) {
+        final lPathClean = l.imagePath?.replaceAll('\\', '/');
+        if (lPathClean == oldRelative ||
+            lPathClean == oldPathClean ||
+            (lPathClean != null && (lPathClean.endsWith('/$oldFileName') || lPathClean == oldFileName))) {
+          return l.copyWith(imagePath: moved.path);
+        }
+        return l;
+      }).toList();
+      final updatedBack = tpl.backLayers.map((l) {
+        final lPathClean = l.imagePath?.replaceAll('\\', '/');
+        if (lPathClean == oldRelative ||
+            lPathClean == oldPathClean ||
+            (lPathClean != null && (lPathClean.endsWith('/$oldFileName') || lPathClean == oldFileName))) {
+          return l.copyWith(imagePath: moved.path);
+        }
+        return l;
+      }).toList();
+      return tpl.copyWith(layers: updatedFront, backLayers: updatedBack);
+    }).toList();
+
+    final selectedClean = state.selectedAssetPath?.replaceAll('\\', '/');
+    final isSelectedTarget = selectedClean != null &&
+        (selectedClean == oldRelative ||
+            selectedClean == oldPathClean ||
+            selectedClean == relativeOrFileName.replaceAll('\\', '/') ||
+            selectedClean.endsWith(oldFileName));
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        rows: updatedRows,
+        templates: updatedTemplates,
+      ),
+      selectedAssetPath: isSelectedTarget ? newRelative : state.selectedAssetPath,
+    );
+
+    _persistWorkspace(syncGameName: gameName);
+    return true;
+  }
+
+  void moveSelectedLayers(double deltaX, double deltaY) {
+    final ids = state.selectedLayerIds.isNotEmpty
+        ? state.selectedLayerIds
+        : (state.selectedLayerId != null ? {state.selectedLayerId!} : <String>{});
+    if (ids.isEmpty) return;
+
+    _recordHistory(continuousTag: 'move_multi');
+    final template = state.project.activeTemplate;
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
+      if (ids.contains(l.id) && !l.isLocked && l.type != LayerType.background) {
+        return l.copyWith(x: l.x + deltaX, y: l.y + deltaY);
+      }
+      return l;
+    }).toList();
+
+    _updateTemplateLayers(updatedLayers);
+  }
+
+  void removeSelectedLayers() {
+    final ids = state.selectedLayerIds.isNotEmpty
+        ? state.selectedLayerIds
+        : (state.selectedLayerId != null ? {state.selectedLayerId!} : <String>{});
+    if (ids.isEmpty) return;
+
+    _recordHistory();
+    final template = state.project.activeTemplate;
+    final layers = template.getLayers(state.currentSide);
+    final remainingLayers = layers.where((l) => !ids.contains(l.id) || l.type == LayerType.background).toList();
+
+    _updateTemplateLayers(remainingLayers);
+    state = state.copyWith(
+      selectedLayerId: null,
+      clearSelectedLayer: true,
+      selectedLayerIds: const {},
+    );
+    _persistWorkspace();
   }
 
   void updateLayerPosition(String id, double x, double y) {
+    _recordHistory(continuousTag: 'pos_$id');
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
     final updatedLayers = layers.map((l) {
@@ -1048,7 +1481,272 @@ class EditorNotifier extends StateNotifier<EditorState> {
     _updateTemplateLayers(updatedLayers);
   }
 
+  void nudgeSelectedLayer(double dx, double dy) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final layer = state.selectedLayer;
+    if (layer == null || layer.isLocked || layer.type == LayerType.background) return;
+    updateLayerPosition(id, layer.x + dx, layer.y + dy);
+  }
+
+  void duplicateLayer(String id) {
+    final template = state.project.activeTemplate;
+    final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
+    final idx = layers.indexWhere((l) => l.id == id);
+    if (idx == -1) return;
+    final original = layers[idx];
+    if (original.type == LayerType.background) return;
+
+    _recordHistory();
+    const uuid = Uuid();
+    final copy = original.copyWith(
+      id: uuid.v4(),
+      name: '${original.name} (Copy)',
+      x: original.x + 10,
+      y: original.y + 10,
+      isLocked: false,
+    );
+    layers.insert(idx + 1, copy);
+    _updateTemplateLayers(layers);
+    state = state.copyWith(selectedLayerId: copy.id);
+    _persistWorkspace();
+  }
+
+  int copySelectedLayers() {
+    final targets = state.selectedLayers
+        .where((l) => l.type != LayerType.background)
+        .toList();
+    if (targets.isEmpty) return 0;
+    _clipboardLayers.clear();
+    _clipboardLayers.addAll(targets.map((l) => l.copyWith()));
+    state = state.copyWith(hasClipboardLayers: true);
+    return _clipboardLayers.length;
+  }
+
+  void pasteLayers() {
+    if (_clipboardLayers.isEmpty) return;
+    _recordHistory();
+    const uuid = Uuid();
+    final template = state.project.activeTemplate;
+    final currentLayers = List<LayerItem>.from(template.getLayers(state.currentSide));
+    final newLayers = <LayerItem>[];
+    final updatedClipboard = <LayerItem>[];
+
+    for (final layer in _clipboardLayers) {
+      final copy = layer.copyWith(
+        id: uuid.v4(),
+        x: layer.x + 12.0,
+        y: layer.y + 12.0,
+        isLocked: false,
+      );
+      newLayers.add(copy);
+      // Advance position for sequential cascading paste
+      updatedClipboard.add(copy);
+    }
+    _clipboardLayers.clear();
+    _clipboardLayers.addAll(updatedClipboard);
+
+    currentLayers.addAll(newLayers);
+    _updateTemplateLayers(currentLayers);
+
+    state = state.copyWith(
+      selectedLayerId: newLayers.first.id,
+      selectedLayerIds: newLayers.map((l) => l.id).toSet(),
+      hasClipboardLayers: true,
+    );
+    _persistWorkspace();
+  }
+
+  void duplicateSelectedLayers() {
+    final targets = state.selectedLayers
+        .where((l) => l.type != LayerType.background)
+        .toList();
+    if (targets.isEmpty) return;
+
+    if (targets.length == 1) {
+      duplicateLayer(targets.first.id);
+      return;
+    }
+
+    _recordHistory();
+    const uuid = Uuid();
+    final template = state.project.activeTemplate;
+    final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
+    final newDuplicates = <LayerItem>[];
+
+    for (final target in targets) {
+      final copy = target.copyWith(
+        id: uuid.v4(),
+        name: '${target.name} (Copy)',
+        x: target.x + 10.0,
+        y: target.y + 10.0,
+        isLocked: false,
+      );
+      newDuplicates.add(copy);
+      final idx = layers.indexWhere((l) => l.id == target.id);
+      if (idx != -1) {
+        layers.insert(idx + 1, copy);
+      } else {
+        layers.add(copy);
+      }
+    }
+
+    _updateTemplateLayers(layers);
+    state = state.copyWith(
+      selectedLayerId: newDuplicates.first.id,
+      selectedLayerIds: newDuplicates.map((l) => l.id).toSet(),
+    );
+    _persistWorkspace();
+  }
+
+  void alignSelectedLayers(LayerAlignment alignment) {
+    final targets = state.selectedLayers
+        .where((l) => !l.isLocked && l.type != LayerType.background)
+        .toList();
+    if (targets.isEmpty) return;
+
+    _recordHistory();
+    final cardW = state.project.widthMm * 4.0;
+    final cardH = state.project.heightMm * 4.0;
+    final Map<String, LayerItem> modified = {};
+
+    if (targets.length == 1) {
+      final layer = targets.first;
+      double newX = layer.x;
+      double newY = layer.y;
+
+      switch (alignment) {
+        case LayerAlignment.left:
+          newX = 0;
+          break;
+        case LayerAlignment.centerHorizontal:
+          newX = (cardW - layer.width) / 2.0;
+          break;
+        case LayerAlignment.right:
+          newX = cardW - layer.width;
+          break;
+        case LayerAlignment.top:
+          newY = 0;
+          break;
+        case LayerAlignment.centerVertical:
+          newY = (cardH - layer.height) / 2.0;
+          break;
+        case LayerAlignment.bottom:
+          newY = cardH - layer.height;
+          break;
+        case LayerAlignment.distributeHorizontal:
+        case LayerAlignment.distributeVertical:
+          return;
+      }
+      modified[layer.id] = layer.copyWith(x: newX, y: newY);
+    } else {
+      final minX = targets.map((l) => l.x).reduce(math.min);
+      final maxX = targets.map((l) => l.x + l.width).reduce(math.max);
+      final minY = targets.map((l) => l.y).reduce(math.min);
+      final maxY = targets.map((l) => l.y + l.height).reduce(math.max);
+      final centerX = (minX + maxX) / 2.0;
+      final centerY = (minY + maxY) / 2.0;
+
+      switch (alignment) {
+        case LayerAlignment.left:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(x: minX);
+          }
+          break;
+        case LayerAlignment.centerHorizontal:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(x: centerX - l.width / 2.0);
+          }
+          break;
+        case LayerAlignment.right:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(x: maxX - l.width);
+          }
+          break;
+        case LayerAlignment.top:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(y: minY);
+          }
+          break;
+        case LayerAlignment.centerVertical:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(y: centerY - l.height / 2.0);
+          }
+          break;
+        case LayerAlignment.bottom:
+          for (final l in targets) {
+            modified[l.id] = l.copyWith(y: maxY - l.height);
+          }
+          break;
+        case LayerAlignment.distributeHorizontal:
+          if (targets.length >= 3) {
+            final sorted = List<LayerItem>.from(targets)
+              ..sort((a, b) => a.x.compareTo(b.x));
+            final totalWidths = sorted.fold<double>(0.0, (sum, l) => sum + l.width);
+            final span = maxX - minX;
+            final spacing = (span - totalWidths) / (sorted.length - 1);
+            double curX = minX;
+            for (final l in sorted) {
+              modified[l.id] = l.copyWith(x: curX);
+              curX += l.width + spacing;
+            }
+          }
+          break;
+        case LayerAlignment.distributeVertical:
+          if (targets.length >= 3) {
+            final sorted = List<LayerItem>.from(targets)
+              ..sort((a, b) => a.y.compareTo(b.y));
+            final totalHeights = sorted.fold<double>(0.0, (sum, l) => sum + l.height);
+            final span = maxY - minY;
+            final spacing = (span - totalHeights) / (sorted.length - 1);
+            double curY = minY;
+            for (final l in sorted) {
+              modified[l.id] = l.copyWith(y: curY);
+              curY += l.height + spacing;
+            }
+          }
+          break;
+      }
+    }
+
+    if (modified.isEmpty) return;
+
+    final template = state.project.activeTemplate;
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) => modified[l.id] ?? l).toList();
+    _updateTemplateLayers(updatedLayers);
+    _persistWorkspace();
+  }
+
+  void updateLayerGeometry(
+    String id, {
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? fontSize,
+  }) {
+    _recordHistory(continuousTag: 'geom_$id');
+    final template = state.project.activeTemplate;
+    final layers = template.getLayers(state.currentSide);
+    final updatedLayers = layers.map((l) {
+      if (l.id == id && !l.isLocked && l.type != LayerType.background) {
+        return l.copyWith(
+          x: x ?? l.x,
+          y: y ?? l.y,
+          width: width ?? l.width,
+          height: height ?? l.height,
+          fontSize: fontSize ?? l.fontSize,
+        );
+      }
+      return l;
+    }).toList();
+
+    _updateTemplateLayers(updatedLayers);
+  }
+
   void updateLayer(LayerItem updated) {
+    _recordHistory(continuousTag: 'upd_${updated.id}');
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
     final updatedLayers = layers.map((l) {
@@ -1060,14 +1758,19 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void addLayer(LayerItem layer) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
-    final updatedLayers = [...layers, layer];
+    final updatedLayers = layer.type == LayerType.background
+        ? [layer, ...layers]
+        : [...layers, layer];
     _updateTemplateLayers(updatedLayers);
     state = state.copyWith(selectedLayerId: layer.id);
+    _persistWorkspace();
   }
 
   void removeLayer(String id) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
     final updatedLayers = layers.where((l) => l.id != id).toList();
@@ -1075,9 +1778,11 @@ class EditorNotifier extends StateNotifier<EditorState> {
     if (state.selectedLayerId == id) {
       state = state.copyWith(clearSelectedLayer: true);
     }
+    _persistWorkspace();
   }
 
   void toggleLayerVisibility(String id) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
     final updatedLayers = layers.map((l) {
@@ -1088,6 +1793,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void toggleLayerLock(String id) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = template.getLayers(state.currentSide);
     final updatedLayers = layers.map((l) {
@@ -1098,6 +1804,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void reorderLayers(int oldIndex, int newIndex) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
     if (oldIndex < newIndex) {
@@ -1109,6 +1816,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void reorderLayersDirect(int oldIndex, int newIndex) {
+    _recordHistory();
     final template = state.project.activeTemplate;
     final layers = List<LayerItem>.from(template.getLayers(state.currentSide));
     final item = layers.removeAt(oldIndex);
@@ -1117,22 +1825,53 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void setActiveRow(int index) {
-    if (index >= 0 && index < state.project.rows.length) {
+    if (index == -1 || (index >= 0 && index < state.project.rows.length)) {
+      int targetTemplateIdx = state.project.activeTemplateIndex;
+      if (index >= 0 && index < state.project.rows.length) {
+        final row = state.project.rows[index];
+        final resolvedTpl = resolveTemplateForRow(row);
+        final foundIdx = state.project.templates.indexWhere((t) => t.id == resolvedTpl.id);
+        if (foundIdx != -1) {
+          targetTemplateIdx = foundIdx;
+        }
+      }
       state = state.copyWith(
-        project: state.project.copyWith(activeRowIndex: index),
+        project: state.project.copyWith(
+          activeRowIndex: index,
+          activeTemplateIndex: targetTemplateIdx,
+        ),
       );
+      _persistWorkspace();
+    }
+  }
+
+  void syncActiveTemplateWithActiveRow() {
+    if (state.project.rows.isEmpty) return;
+    final activeIdx = state.project.activeRowIndex;
+    if (activeIdx >= 0 && activeIdx < state.project.rows.length) {
+      final row = state.project.rows[activeIdx];
+      final resolvedTpl = resolveTemplateForRow(row);
+      final foundIdx = state.project.templates.indexWhere((t) => t.id == resolvedTpl.id);
+      if (foundIdx != -1 && foundIdx != state.project.activeTemplateIndex) {
+        state = state.copyWith(
+          project: state.project.copyWith(activeTemplateIndex: foundIdx),
+        );
+        _persistWorkspace();
+      }
     }
   }
 
   void updateActiveRowData(String key, dynamic value) {
     final rows = List<Map<String, dynamic>>.from(state.project.rows);
-    if (state.project.activeRowIndex < rows.length) {
+    if (state.project.activeRowIndex >= 0 && state.project.activeRowIndex < rows.length) {
       final updatedRow = Map<String, dynamic>.from(rows[state.project.activeRowIndex]);
       updatedRow[key] = value;
       rows[state.project.activeRowIndex] = updatedRow;
       state = state.copyWith(
         project: state.project.copyWith(rows: rows),
       );
+      final game = (updatedRow['game'] ?? '').toString();
+      _persistWorkspace(syncGameName: game);
     }
   }
 
@@ -1143,51 +1882,115 @@ class EditorNotifier extends StateNotifier<EditorState> {
       state = state.copyWith(
         project: state.project.copyWith(rows: rows),
       );
+      final game = (row['game'] ?? '').toString();
+      _persistWorkspace(syncGameName: game);
     }
   }
 
   void addRow(Map<String, dynamic> row) {
-    final rows = [...state.project.rows, row];
+    final normalized = GameFolderService.normalizeCardRow(row, defaultGame: (row['game'] ?? '').toString());
+    final rows = [...state.project.rows, normalized];
+    final resolvedTpl = resolveTemplateForRow(normalized);
+    final tplIdx = state.project.templates.indexWhere((t) => t.id == resolvedTpl.id);
     state = state.copyWith(
       project: state.project.copyWith(
         rows: rows,
         activeRowIndex: rows.length - 1,
+        activeTemplateIndex: tplIdx != -1 ? tplIdx : state.project.activeTemplateIndex,
       ),
     );
+    final game = (normalized['game'] ?? '').toString();
+    _persistWorkspace(syncGameName: game);
   }
 
   void assignCardToGame(int rowIndex, String gameName) {
     final rows = List<Map<String, dynamic>>.from(state.project.rows);
     if (rowIndex >= 0 && rowIndex < rows.length) {
+      final oldGame = (rows[rowIndex]['game'] ?? '').toString();
       final updatedRow = Map<String, dynamic>.from(rows[rowIndex]);
       updatedRow['game'] = gameName;
       rows[rowIndex] = updatedRow;
       state = state.copyWith(
         project: state.project.copyWith(rows: rows),
       );
+      if (oldGame.isNotEmpty) {
+        _persistWorkspace(syncGameName: oldGame);
+      }
+      _persistWorkspace(syncGameName: gameName);
     }
   }
 
   List<GameCategory> getCategoriesForGame(String gameName) {
-    if (state.gameCategories.containsKey(gameName)) {
-      return state.gameCategories[gameName]!;
-    }
-    // Auto-discover unique categories from existing card rows
-    final existingCategories = state.project.rows
-        .where((r) => (r['game'] ?? '').toString().toLowerCase() == gameName.toLowerCase())
-        .map((r) => (r['category'] ?? '').toString())
-        .where((c) => c.isNotEmpty)
-        .toSet();
+    final cleanGame = gameName.trim();
+    final normKey = cleanGame.toLowerCase().replaceAll(RegExp(r'[\s\-_]+'), '');
 
-    return existingCategories.map((c) => GameCategory(
-      id: 'cat-${c.hashCode}',
-      name: c,
-      icon: '🃏',
-      defaultType: 'Criatura',
-    )).toList();
+    // 1. Look up in state.gameCategories (direct match or normalized match)
+    List<GameCategory>? existing = state.gameCategories[cleanGame];
+    if (existing == null || existing.isEmpty) {
+      for (final entry in state.gameCategories.entries) {
+        final entryNorm = entry.key.toLowerCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+        if (entryNorm == normKey && entry.value.isNotEmpty) {
+          existing = entry.value;
+          break;
+        }
+      }
+    }
+
+    final result = <GameCategory>[...(existing ?? [])];
+    final seen = result.map((c) => c.name.toLowerCase().trim()).toSet();
+
+    // 2. Auto-discover unique categories from existing card rows
+    final gameCards = state.project.rows.where((r) {
+      final g = (r['game'] ?? '').toString().trim();
+      final gNorm = g.toLowerCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+      return gNorm == normKey || g.toLowerCase() == cleanGame.toLowerCase();
+    }).toList();
+
+    for (final r in gameCards) {
+      final c = (r['category'] ?? '').toString().trim();
+      if (c.isEmpty || seen.contains(c.toLowerCase())) continue;
+      seen.add(c.toLowerCase());
+      final atk = (r['attack']?.toString() ?? '').trim();
+      final def = (r['defense']?.toString() ?? '').trim();
+      final cost = (r['cost']?.toString() ?? '').trim();
+      final rarity = (r['rarity']?.toString() ?? '').trim();
+      final rules = (r['rules_text'] ?? r['rules'] ?? '').toString().trim();
+
+      int parsedColor = 0xFF7C3AED;
+      final artColor = r['art_color'];
+      if (artColor is int) {
+        parsedColor = artColor;
+      } else if (artColor != null) {
+        parsedColor = int.tryParse(artColor.toString()) ?? 0xFF7C3AED;
+      }
+
+      result.add(
+        GameCategory(
+          id: 'cat-${c.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}',
+          name: c,
+          icon: (r['icon'] ?? '🃏').toString(),
+          defaultType: (r['type'] ?? c).toString(),
+          defaultColor: parsedColor,
+          hasCost: cost.isNotEmpty,
+          defaultCost: cost,
+          hasCombatStats: atk.isNotEmpty || def.isNotEmpty,
+          defaultAttack: atk,
+          defaultDefense: def,
+          hasRarity: rarity.isNotEmpty,
+          defaultRarity: rarity,
+          hasRules: rules.isNotEmpty,
+          defaultRules: rules,
+        ),
+      );
+    }
+    return result;
   }
 
-  void addCategoryToGame(String gameName, GameCategory category) {
+  void addCategoryToGame(
+    String gameName,
+    GameCategory category, {
+    bool createDefaultCard = false,
+  }) {
     final currentList = List<GameCategory>.from(state.gameCategories[gameName] ?? []);
     final existingIdx = currentList.indexWhere((c) => c.name.toLowerCase() == category.name.toLowerCase());
     if (existingIdx != -1) {
@@ -1198,6 +2001,16 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories);
     updatedCategories[gameName] = currentList;
     state = state.copyWith(gameCategories: updatedCategories);
+    _persistWorkspace();
+
+    if (createDefaultCard) {
+      createCardFromCategory(
+        gameName,
+        category,
+        cardName: '${category.name} (Modelo)',
+        isCategoryDefault: true,
+      );
+    }
   }
 
   void deleteCategoryFromGame(String gameName, String categoryName) {
@@ -1206,51 +2019,138 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories);
     updatedCategories[gameName] = currentList;
     state = state.copyWith(gameCategories: updatedCategories);
+    _persistWorkspace();
   }
 
-  void createCardFromCategory(String gameName, GameCategory category, {String? cardName}) {
+  GameCategory duplicateCategory(
+    String gameName,
+    GameCategory sourceCategory, {
+    String? newName,
+    bool createPresetCard = true,
+  }) {
+    final currentList = List<GameCategory>.from(state.gameCategories[gameName] ?? []);
+    final baseName = newName ?? 'Copia de ${sourceCategory.name}';
+    String finalName = baseName;
+    int counter = 2;
+    while (currentList.any((c) => c.name.toLowerCase() == finalName.toLowerCase())) {
+      finalName = '$baseName $counter';
+      counter++;
+    }
+
+    final newCat = sourceCategory.copyWith(
+      id: 'cat_${DateTime.now().millisecondsSinceEpoch}',
+      name: finalName,
+    );
+    addCategoryToGame(gameName, newCat, createDefaultCard: false);
+
+    if (createPresetCard) {
+      createCardFromCategory(gameName, newCat, cardName: '$finalName (Preset)', isCategoryDefault: true);
+    }
+
+    return newCat;
+  }
+
+  void createCardFromCategory(
+    String gameName,
+    GameCategory category, {
+    String? cardName,
+    bool isCategoryDefault = false,
+    Map<String, dynamic>? baseCard,
+  }) {
     if (state.deletedGames.contains(gameName)) {
       final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
       state = state.copyWith(deletedGames: updatedDeleted);
     }
 
+    String assignedTemplateId;
+    if (isCategoryDefault) {
+      const uuid = Uuid();
+      final sourceTpl = baseCard != null
+          ? resolveTemplateForRow(baseCard)
+          : state.project.activeTemplate;
+      final clonedFront = sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList();
+      final clonedBack = sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList();
+      final safeGame = gameName.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final safeCat = category.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final newTemplate = CardTemplate(
+        id: 'tpl_cat_${safeGame}_${safeCat}_${uuid.v4().substring(0, 8)}',
+        name: '${category.name} Template',
+        layers: clonedFront,
+        backLayers: clonedBack,
+        backgroundColor: sourceTpl.backgroundColor,
+        backBackgroundColor: sourceTpl.backBackgroundColor,
+        cornerRadius: sourceTpl.cornerRadius,
+      );
+      assignedTemplateId = newTemplate.id;
+      final updatedTemplates = [...state.project.templates, newTemplate];
+      state = state.copyWith(
+        project: state.project.copyWith(
+          templates: updatedTemplates,
+          activeTemplateIndex: updatedTemplates.length - 1,
+        ),
+      );
+    } else {
+      final modelCard = getCategoryDefaultCard(gameName, category.name);
+      final sourceTpl = modelCard != null
+          ? resolveTemplateForRow(modelCard)
+          : resolveTemplateForRow({'game': gameName, 'category': category.name});
+      const uuid = Uuid();
+      final cardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+      final cardTpl = CardTemplate(
+        id: cardTplId,
+        name: '${cardName ?? category.name} Template',
+        layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backgroundColor: sourceTpl.backgroundColor,
+        backBackgroundColor: sourceTpl.backBackgroundColor,
+        cornerRadius: sourceTpl.cornerRadius,
+      );
+      assignedTemplateId = cardTplId;
+      final updatedTemplates = [...state.project.templates, cardTpl];
+      state = state.copyWith(
+        project: state.project.copyWith(
+          templates: updatedTemplates,
+        ),
+      );
+    }
+
+    final finalCost = category.hasCost && category.defaultCost.isNotEmpty
+        ? category.defaultCost
+        : (category.hasCost ? '1' : '');
+    final finalType = category.defaultType.isNotEmpty ? category.defaultType : 'Criatura';
+    final finalRarity = category.hasRarity && category.defaultRarity.isNotEmpty
+        ? category.defaultRarity
+        : (category.hasRarity ? 'Común' : '');
+    final finalAttack = category.hasCombatStats && category.defaultAttack.isNotEmpty
+        ? category.defaultAttack
+        : (category.hasCombatStats ? '0' : '');
+    final finalDefense = category.hasCombatStats && category.defaultDefense.isNotEmpty
+        ? category.defaultDefense
+        : (category.hasCombatStats ? '0' : '');
+    final finalRules = category.hasRules && category.defaultRules.isNotEmpty
+        ? category.defaultRules
+        : (category.hasRules ? 'Habilidad especial de ${category.name}.' : '');
+
     final newCard = <String, dynamic>{
-      'card_name': cardName ?? 'Nueva ${category.name}',
-      'type': category.defaultType,
-      'creator': 'Grimoire Studio',
-      'icon': category.icon,
-      'art_color': category.defaultColor,
+      'card_name': cardName ?? (isCategoryDefault ? '${category.name} (Modelo)' : 'Nueva ${category.name}'),
       'game': gameName,
       'category': category.name,
+      'qty': '1',
+      'cost': finalCost,
+      'type': finalType,
+      'rarity': finalRarity,
+      'attack': finalAttack,
+      'defense': finalDefense,
+      'creator': 'Grimoire Studio',
+      'icon': category.icon.isNotEmpty ? category.icon : '🃏',
+      'art_color': category.defaultColor,
+      'art_url': baseCard?['art_url'] ?? '',
+      'prompt': '',
+      'rules_text': finalRules,
+      'rules': finalRules,
+      if (assignedTemplateId.isNotEmpty) 'template_id': assignedTemplateId,
+      if (isCategoryDefault) 'is_category_default': 'true',
     };
-
-    if (category.hasCost && category.defaultCost.isNotEmpty) {
-      newCard['cost'] = category.defaultCost;
-    } else {
-      newCard['cost'] = '';
-    }
-
-    if (category.hasCombatStats) {
-      newCard['attack'] = category.defaultAttack;
-      newCard['defense'] = category.defaultDefense;
-    } else {
-      newCard['attack'] = '';
-      newCard['defense'] = '';
-    }
-
-    if (category.hasRarity && category.defaultRarity.isNotEmpty) {
-      newCard['rarity'] = category.defaultRarity;
-    } else {
-      newCard['rarity'] = '';
-    }
-
-    if (category.hasRules && category.defaultRules.isNotEmpty) {
-      newCard['rules_text'] = category.defaultRules;
-      newCard['rules'] = category.defaultRules;
-    } else {
-      newCard['rules_text'] = '';
-      newCard['rules'] = '';
-    }
 
     category.customFields.forEach((k, v) {
       newCard[k] = v;
@@ -1276,19 +2176,22 @@ class EditorNotifier extends StateNotifier<EditorState> {
       activeRow['art_color'] = match.defaultColor;
 
       if (applyModelAttributes) {
-        if (match.defaultType.isNotEmpty) activeRow['type'] = match.defaultType;
-        if (match.hasCost) {
-          activeRow['cost'] = match.defaultCost;
-        } else {
-          activeRow['cost'] = '';
-        }
-        if (match.hasCombatStats) {
-          activeRow['attack'] = match.defaultAttack;
-          activeRow['defense'] = match.defaultDefense;
-        } else {
+        if (!match.hasCombatStats || match.defaultAttack.trim().isEmpty) {
           activeRow['attack'] = '';
-          activeRow['defense'] = '';
+        } else {
+          activeRow['attack'] = match.defaultAttack;
         }
+        if (!match.hasCombatStats || match.defaultDefense.trim().isEmpty) {
+          activeRow['defense'] = '';
+        } else {
+          activeRow['defense'] = match.defaultDefense;
+        }
+        if (!match.hasCost || match.defaultCost.trim().isEmpty) {
+          activeRow['cost'] = '';
+        } else {
+          activeRow['cost'] = match.defaultCost;
+        }
+        if (match.defaultType.isNotEmpty) activeRow['type'] = match.defaultType;
         if (match.hasRarity) {
           activeRow['rarity'] = match.defaultRarity;
         } else {
@@ -1304,7 +2207,36 @@ class EditorNotifier extends StateNotifier<EditorState> {
       }
     }
 
+    // Preserve the card's current visual template and layers!
+    final currentTplId = (activeRow['template_id'] ?? '').toString().trim();
+    if (currentTplId.isEmpty) {
+      final currentTpl = resolveTemplateForRow(activeRow);
+      const uuid = Uuid();
+      final dedicatedCardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+      final clonedTpl = currentTpl.copyWith(
+        id: dedicatedCardTplId,
+        name: '${activeRow['card_name'] ?? categoryName} Template',
+        layers: currentTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backLayers: currentTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      );
+      final currentTemplates = List<CardTemplate>.from(state.project.templates);
+      currentTemplates.add(clonedTpl);
+      activeRow['template_id'] = dedicatedCardTplId;
+      state = state.copyWith(
+        project: state.project.copyWith(templates: currentTemplates),
+      );
+    }
+
     updateRow(state.project.activeRowIndex, activeRow);
+
+    final resolvedTpl = resolveTemplateForRow(activeRow);
+    final tplIdx = state.project.templates.indexWhere((t) => t.id == resolvedTpl.id);
+    if (tplIdx != -1 && tplIdx != state.project.activeTemplateIndex) {
+      state = state.copyWith(
+        project: state.project.copyWith(activeTemplateIndex: tplIdx),
+      );
+    }
+
     syncGameDataCsv(game);
   }
 
@@ -1341,8 +2273,354 @@ class EditorNotifier extends StateNotifier<EditorState> {
     });
 
     final game = (activeRow['game'] ?? 'Magic').toString();
+    final safeGame = game.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final safeCat = category.name.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final catTplId = 'tpl_${safeGame}_$safeCat';
+    final hasCatTpl = state.project.templates.any((t) => t.id == catTplId);
+
+    final catModel = getCategoryDefaultCard(game, category.name);
+    final modelTplId = (catModel?['template_id'] ?? '').toString().trim();
+
+    CardTemplate? sourceTpl;
+    if (modelTplId.isNotEmpty) {
+      sourceTpl = state.project.templates.where((t) => t.id == modelTplId).firstOrNull;
+    }
+    sourceTpl ??= hasCatTpl
+        ? state.project.templates.firstWhere((t) => t.id == catTplId)
+        : resolveTemplateForRow({'game': game, 'category': category.name});
+
+    // Clone into dedicated card template so it does not mutate model or other cards
+    const uuid = Uuid();
+    final dedicatedCardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+    final clonedTpl = sourceTpl.copyWith(
+      id: dedicatedCardTplId,
+      name: '${activeRow['card_name'] ?? category.name} Template',
+      layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+    );
+    final currentTemplates = List<CardTemplate>.from(state.project.templates);
+    currentTemplates.add(clonedTpl);
+    activeRow['template_id'] = dedicatedCardTplId;
+
+    state = state.copyWith(
+      project: state.project.copyWith(templates: currentTemplates),
+    );
+
     updateRow(state.project.activeRowIndex, activeRow);
+
+    final tplIdx = currentTemplates.length - 1;
+    state = state.copyWith(
+      project: state.project.copyWith(activeTemplateIndex: tplIdx),
+    );
+
     syncGameDataCsv(game);
+  }
+
+  bool isRowCategoryDefault(Map<String, dynamic> row) {
+    final val = (row['is_category_default'] ?? '').toString().toLowerCase().trim();
+    return val == 'true' || val == '1' || val == 'yes';
+  }
+
+  bool isRowGameDefault(Map<String, dynamic> row) {
+    final val = (row['is_game_default'] ?? '').toString().toLowerCase().trim();
+    return val == 'true' || val == '1' || val == 'yes';
+  }
+
+  Map<String, dynamic>? getCategoryDefaultCard(String gameName, String categoryName) {
+    if (categoryName.trim().isEmpty) return null;
+    return state.project.rows.where((r) {
+      final g = (r['game'] ?? '').toString().toLowerCase().trim();
+      final c = (r['category'] ?? '').toString().toLowerCase().trim();
+      return g == gameName.toLowerCase().trim() &&
+          c == categoryName.toLowerCase().trim() &&
+          isRowCategoryDefault(r);
+    }).firstOrNull;
+  }
+
+  Map<String, dynamic>? getGameDefaultCard(String gameName) {
+    return state.project.rows.where((r) {
+      final g = (r['game'] ?? '').toString().toLowerCase().trim();
+      return g == gameName.toLowerCase().trim() && isRowGameDefault(r);
+    }).firstOrNull;
+  }
+
+  void markActiveCardAsCategoryDefault() {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? '').toString().trim();
+    final categoryName = (activeRow['category'] ?? '').toString().trim();
+    if (categoryName.isEmpty || gameName.isEmpty) return;
+
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    final activeIdx = state.project.activeRowIndex.clamp(0, rows.length - 1);
+    final activeTemplate = state.project.activeTemplate;
+
+    const uuid = Uuid();
+    final safeGame = gameName.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final safeCat = categoryName.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final catTemplateId = 'tpl_${safeGame}_$safeCat';
+
+    final currentTemplates = List<CardTemplate>.from(state.project.templates);
+    final existingIdx = currentTemplates.indexWhere((t) => t.id == catTemplateId);
+
+    // Freeze and preserve the appearance of ALL other cards that were using or resolving to catTemplateId or activeTemplate
+    if (existingIdx != -1) {
+      final oldCatTemplate = currentTemplates[existingIdx];
+      for (int i = 0; i < rows.length; i++) {
+        if (i != activeIdx) {
+          final r = rows[i];
+          final rTplId = (r['template_id'] ?? '').toString().trim();
+          if (rTplId == catTemplateId || (rTplId.isEmpty && resolveTemplateForRow(r).id == catTemplateId)) {
+            final preservedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+            final preservedTpl = CardTemplate(
+              id: preservedId,
+              name: '${r['card_name'] ?? 'Carta'} Plantilla',
+              layers: oldCatTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+              backLayers: oldCatTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+              backgroundColor: oldCatTemplate.backgroundColor,
+              backBackgroundColor: oldCatTemplate.backBackgroundColor,
+              cornerRadius: oldCatTemplate.cornerRadius,
+            );
+            currentTemplates.add(preservedTpl);
+            final updatedR = Map<String, dynamic>.from(r);
+            updatedR['template_id'] = preservedId;
+            rows[i] = updatedR;
+          }
+        }
+      }
+    }
+
+    for (int i = 0; i < rows.length; i++) {
+      if (i != activeIdx) {
+        final r = rows[i];
+        final rTplId = (r['template_id'] ?? '').toString().trim();
+        if (rTplId == activeTemplate.id && activeTemplate.id != catTemplateId) {
+          final preservedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+          final preservedTpl = CardTemplate(
+            id: preservedId,
+            name: '${r['card_name'] ?? 'Carta'} Plantilla',
+            layers: activeTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backLayers: activeTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backgroundColor: activeTemplate.backgroundColor,
+            backBackgroundColor: activeTemplate.backBackgroundColor,
+            cornerRadius: activeTemplate.cornerRadius,
+          );
+          currentTemplates.add(preservedTpl);
+          final updatedR = Map<String, dynamic>.from(r);
+          updatedR['template_id'] = preservedId;
+          rows[i] = updatedR;
+        }
+      }
+    }
+
+    CardTemplate catTemplate;
+    if (existingIdx != -1) {
+      catTemplate = currentTemplates[existingIdx].copyWith(
+        layers: activeTemplate.layers.map((l) => l.copyWith()).toList(),
+        backLayers: activeTemplate.backLayers.map((l) => l.copyWith()).toList(),
+        backgroundColor: activeTemplate.backgroundColor,
+        backBackgroundColor: activeTemplate.backBackgroundColor,
+        cornerRadius: activeTemplate.cornerRadius,
+      );
+      currentTemplates[existingIdx] = catTemplate;
+    } else {
+      catTemplate = CardTemplate(
+        id: catTemplateId,
+        name: '$gameName - $categoryName Modelo',
+        layers: activeTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backLayers: activeTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backgroundColor: activeTemplate.backgroundColor,
+        backBackgroundColor: activeTemplate.backBackgroundColor,
+        cornerRadius: activeTemplate.cornerRadius,
+      );
+      currentTemplates.add(catTemplate);
+    }
+
+    final catTplIndex = currentTemplates.indexWhere((t) => t.id == catTemplateId);
+
+    for (int i = 0; i < rows.length; i++) {
+      final rGame = (rows[i]['game'] ?? '').toString().toLowerCase().trim();
+      final rCat = (rows[i]['category'] ?? '').toString().toLowerCase().trim();
+      if (rGame == gameName.toLowerCase() && rCat == categoryName.toLowerCase()) {
+        final updated = Map<String, dynamic>.from(rows[i]);
+        if (i == activeIdx) {
+          updated['is_category_default'] = 'true';
+          updated['template_id'] = catTemplateId;
+        } else {
+          updated['is_category_default'] = 'false';
+        }
+        rows[i] = updated;
+      }
+    }
+
+    final currentCats = List<GameCategory>.from(getCategoriesForGame(gameName));
+    final catIdx = currentCats.indexWhere((c) => c.name.toLowerCase() == categoryName.toLowerCase());
+    if (catIdx == -1) {
+      currentCats.add(GameCategory(
+        id: 'cat_${uuid.v4().substring(0, 8)}',
+        name: categoryName,
+        icon: (activeRow['icon'] ?? '🛑').toString(),
+        defaultColor: activeRow['art_color'] is int
+            ? activeRow['art_color'] as int
+            : (int.tryParse(activeRow['art_color']?.toString() ?? '') ?? 0xFFEF4444),
+        defaultType: (activeRow['type'] ?? categoryName).toString(),
+        defaultRules: (activeRow['rules_text'] ?? activeRow['rules'] ?? '').toString(),
+      ));
+    }
+    final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories);
+    updatedCategories[gameName] = currentCats;
+
+    state = state.copyWith(
+      gameCategories: updatedCategories,
+      project: state.project.copyWith(
+        templates: currentTemplates,
+        activeTemplateIndex: catTplIndex >= 0 ? catTplIndex : state.project.activeTemplateIndex,
+        rows: rows,
+      ),
+    );
+    _persistWorkspace(syncGameName: gameName);
+  }
+
+  void unmarkActiveCardAsCategoryDefault() {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? '').toString().trim();
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    final activeIdx = state.project.activeRowIndex.clamp(0, rows.length - 1);
+    final updated = Map<String, dynamic>.from(rows[activeIdx]);
+    updated['is_category_default'] = 'false';
+    rows[activeIdx] = updated;
+    state = state.copyWith(project: state.project.copyWith(rows: rows));
+    _persistWorkspace(syncGameName: gameName);
+  }
+
+  void markActiveCardAsGameDefault() {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? '').toString().trim();
+    if (gameName.isEmpty) return;
+
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    final activeIdx = state.project.activeRowIndex.clamp(0, rows.length - 1);
+    final activeTemplate = state.project.activeTemplate;
+
+    const uuid = Uuid();
+    final safeGame = gameName.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final gameTemplateId = 'tpl_${safeGame}_base';
+
+    final currentTemplates = List<CardTemplate>.from(state.project.templates);
+    final existingIdx = currentTemplates.indexWhere((t) => t.id == gameTemplateId);
+
+    // Freeze and preserve the appearance of ALL other cards that were using or resolving to gameTemplateId or activeTemplate
+    if (existingIdx != -1) {
+      final oldGameTemplate = currentTemplates[existingIdx];
+      for (int i = 0; i < rows.length; i++) {
+        if (i != activeIdx) {
+          final r = rows[i];
+          final rTplId = (r['template_id'] ?? '').toString().trim();
+          if (rTplId == gameTemplateId || (rTplId.isEmpty && resolveTemplateForRow(r).id == gameTemplateId)) {
+            final preservedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+            final preservedTpl = CardTemplate(
+              id: preservedId,
+              name: '${r['card_name'] ?? 'Carta'} Plantilla',
+              layers: oldGameTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+              backLayers: oldGameTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+              backgroundColor: oldGameTemplate.backgroundColor,
+              backBackgroundColor: oldGameTemplate.backBackgroundColor,
+              cornerRadius: oldGameTemplate.cornerRadius,
+            );
+            currentTemplates.add(preservedTpl);
+            final updatedR = Map<String, dynamic>.from(r);
+            updatedR['template_id'] = preservedId;
+            rows[i] = updatedR;
+          }
+        }
+      }
+    }
+
+    for (int i = 0; i < rows.length; i++) {
+      if (i != activeIdx) {
+        final r = rows[i];
+        final rTplId = (r['template_id'] ?? '').toString().trim();
+        if (rTplId == activeTemplate.id && activeTemplate.id != gameTemplateId) {
+          final preservedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+          final preservedTpl = CardTemplate(
+            id: preservedId,
+            name: '${r['card_name'] ?? 'Carta'} Plantilla',
+            layers: activeTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backLayers: activeTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backgroundColor: activeTemplate.backgroundColor,
+            backBackgroundColor: activeTemplate.backBackgroundColor,
+            cornerRadius: activeTemplate.cornerRadius,
+          );
+          currentTemplates.add(preservedTpl);
+          final updatedR = Map<String, dynamic>.from(r);
+          updatedR['template_id'] = preservedId;
+          rows[i] = updatedR;
+        }
+      }
+    }
+
+    CardTemplate gameTemplate;
+    if (existingIdx != -1) {
+      gameTemplate = currentTemplates[existingIdx].copyWith(
+        layers: activeTemplate.layers.map((l) => l.copyWith()).toList(),
+        backLayers: activeTemplate.backLayers.map((l) => l.copyWith()).toList(),
+        backgroundColor: activeTemplate.backgroundColor,
+        backBackgroundColor: activeTemplate.backBackgroundColor,
+        cornerRadius: activeTemplate.cornerRadius,
+      );
+      currentTemplates[existingIdx] = gameTemplate;
+    } else {
+      gameTemplate = CardTemplate(
+        id: gameTemplateId,
+        name: '$gameName Modelo Base',
+        layers: activeTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backLayers: activeTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backgroundColor: activeTemplate.backgroundColor,
+        backBackgroundColor: activeTemplate.backBackgroundColor,
+        cornerRadius: activeTemplate.cornerRadius,
+      );
+      currentTemplates.add(gameTemplate);
+    }
+
+    final gameTplIndex = currentTemplates.indexWhere((t) => t.id == gameTemplateId);
+
+    for (int i = 0; i < rows.length; i++) {
+      final rGame = (rows[i]['game'] ?? '').toString().toLowerCase().trim();
+      if (rGame == gameName.toLowerCase()) {
+        final updated = Map<String, dynamic>.from(rows[i]);
+        if (i == activeIdx) {
+          updated['is_game_default'] = 'true';
+          updated['template_id'] = gameTemplateId;
+        } else {
+          updated['is_game_default'] = 'false';
+        }
+        rows[i] = updated;
+      }
+    }
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: currentTemplates,
+        activeTemplateIndex: gameTplIndex >= 0 ? gameTplIndex : state.project.activeTemplateIndex,
+        rows: rows,
+      ),
+    );
+    _persistWorkspace(syncGameName: gameName);
+  }
+
+  void unmarkActiveCardAsGameDefault() {
+    if (state.project.rows.isEmpty) return;
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? '').toString().trim();
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    final activeIdx = state.project.activeRowIndex.clamp(0, rows.length - 1);
+    final updated = Map<String, dynamic>.from(rows[activeIdx]);
+    updated['is_game_default'] = 'false';
+    rows[activeIdx] = updated;
+    state = state.copyWith(project: state.project.copyWith(rows: rows));
+    _persistWorkspace(syncGameName: gameName);
   }
 
   void addCardToGame(
@@ -1359,38 +2637,194 @@ class EditorNotifier extends StateNotifier<EditorState> {
       state = state.copyWith(deletedGames: updatedDeleted);
     }
 
+    // 1. Look for category default card first
+    Map<String, dynamic>? modelCard;
+    if (category != null && category.isNotEmpty) {
+      modelCard = getCategoryDefaultCard(gameName, category);
+    }
+    // 2. If none, look for game default card
+    modelCard ??= getGameDefaultCard(gameName);
+
     final categories = getCategoriesForGame(gameName);
-    final chosenCategory = category != null
-        ? categories.firstWhere(
-            (c) => c.name.toLowerCase() == category.toLowerCase(),
-            orElse: () => GameCategory(id: 'cat', name: category),
-          )
-        : (categories.isNotEmpty ? categories.first : null);
+    GameCategory? chosenCategory;
+    if (category != null && category.isNotEmpty) {
+      chosenCategory = categories.firstWhere(
+        (c) => c.name.toLowerCase() == category.toLowerCase(),
+        orElse: () => GameCategory(id: 'cat', name: category),
+      );
+    } else if (categories.isNotEmpty) {
+      chosenCategory = categories.first;
+    } else {
+      // Game has no categories yet! Ensure default 'General' category is created
+      final defaultCat = GameCategory(
+        id: 'cat_general_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'General',
+        icon: '🃏',
+        defaultType: 'Criatura',
+        defaultCost: '1',
+        defaultRarity: 'Común',
+        defaultAttack: '1',
+        defaultDefense: '1',
+        defaultRules: 'Habilidad especial para el juego $gameName.',
+        defaultColor: 0xFF7C3AED,
+        hasCost: true,
+        hasCombatStats: true,
+        hasRarity: true,
+        hasRules: true,
+      );
+      final updatedCats = Map<String, List<GameCategory>>.from(state.gameCategories);
+      updatedCats[gameName] = [defaultCat];
+      state = state.copyWith(gameCategories: updatedCats);
+      chosenCategory = defaultCat;
+    }
 
-    final finalCatName = chosenCategory?.name ?? category ?? 'General';
-    final finalIcon = icon ?? chosenCategory?.icon ?? '🃏';
-    final finalType = type ?? chosenCategory?.defaultType ?? 'Creature';
-    final finalColor = artColor ?? chosenCategory?.defaultColor ?? 0xFF7C3AED;
-    final finalRules = rulesText ?? (chosenCategory?.defaultRules.isNotEmpty == true
-        ? chosenCategory!.defaultRules
-        : 'Habilidad especial para el juego $gameName.');
+    final hasValidCat = chosenCategory.id != 'cat';
+    final preferModel = category == null && modelCard != null;
 
-    final newCard = {
+    final finalCatName = category ?? (preferModel && modelCard['category']?.toString().isNotEmpty == true
+        ? modelCard['category'].toString()
+        : (hasValidCat ? chosenCategory.name : 'General'));
+
+    final finalIcon = icon ?? (preferModel && modelCard['icon']?.toString().isNotEmpty == true
+        ? modelCard['icon'].toString()
+        : (hasValidCat ? chosenCategory.icon : '🃏'));
+
+    final finalType = type ?? (preferModel && modelCard['type']?.toString().isNotEmpty == true
+        ? modelCard['type'].toString()
+        : (hasValidCat && chosenCategory.defaultType.isNotEmpty ? chosenCategory.defaultType : 'Criatura'));
+
+    final finalColor = artColor ??
+        (preferModel && modelCard['art_color'] != null
+            ? (modelCard['art_color'] is int
+                ? modelCard['art_color'] as int
+                : int.tryParse(modelCard['art_color'].toString()))
+            : (hasValidCat ? chosenCategory.defaultColor : null)) ??
+        0xFF7C3AED;
+
+    final finalRules = rulesText ??
+        (preferModel && modelCard['rules_text']?.toString().isNotEmpty == true
+            ? modelCard['rules_text'].toString()
+            : (hasValidCat && chosenCategory.defaultRules.isNotEmpty
+                ? chosenCategory.defaultRules
+                : 'Habilidad especial para el juego $gameName.'));
+
+    final finalCost = preferModel
+        ? (modelCard['cost']?.toString() ?? '1')
+        : (hasValidCat && !chosenCategory.hasCost
+            ? ''
+            : (hasValidCat && chosenCategory.defaultCost.isNotEmpty ? chosenCategory.defaultCost : '1'));
+
+    final finalRarity = preferModel
+        ? (modelCard['rarity']?.toString() ?? 'Común')
+        : (hasValidCat && !chosenCategory.hasRarity
+            ? ''
+            : (hasValidCat && chosenCategory.defaultRarity.isNotEmpty ? chosenCategory.defaultRarity : 'Común'));
+
+    final finalAtk = preferModel
+        ? (modelCard['attack']?.toString() ?? '')
+        : (hasValidCat && !chosenCategory.hasCombatStats
+            ? ''
+            : (hasValidCat && chosenCategory.defaultAttack.isNotEmpty ? chosenCategory.defaultAttack : '1'));
+
+    final finalDef = preferModel
+        ? (modelCard['defense']?.toString() ?? '')
+        : (hasValidCat && !chosenCategory.hasCombatStats
+            ? ''
+            : (hasValidCat && chosenCategory.defaultDefense.isNotEmpty ? chosenCategory.defaultDefense : '1'));
+    final sourceTpl = modelCard != null
+        ? resolveTemplateForRow(modelCard)
+        : resolveTemplateForRow({'game': gameName, 'category': finalCatName});
+    const uuid = Uuid();
+    final cardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+    final cardTpl = CardTemplate(
+      id: cardTplId,
+      name: '${cardName ?? 'Nueva Carta'} Plantilla',
+      layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backgroundColor: sourceTpl.backgroundColor,
+      backBackgroundColor: sourceTpl.backBackgroundColor,
+      cornerRadius: sourceTpl.cornerRadius,
+    );
+    final updatedTemplates = [...state.project.templates, cardTpl];
+    state = state.copyWith(
+      project: state.project.copyWith(templates: updatedTemplates),
+    );
+
+    final newCard = <String, dynamic>{
       'card_name': cardName ?? 'Nueva Carta ($gameName)',
-      'cost': '3',
-      'type': finalType,
-      'rarity': 'Common',
-      'attack': finalType.toLowerCase().contains('creature') || finalType.toLowerCase().contains('unicorn') ? '2' : '0',
-      'defense': finalType.toLowerCase().contains('creature') || finalType.toLowerCase().contains('unicorn') ? '2' : '0',
+      'game': gameName,
+      'category': finalCatName.isNotEmpty ? finalCatName : 'General',
+      'qty': '1',
+      'cost': finalCost,
+      'type': finalType.isNotEmpty ? finalType : 'Criatura',
+      'rarity': finalRarity.isNotEmpty ? finalRarity : 'Común',
+      'attack': finalAtk,
+      'defense': finalDef,
       'creator': 'Grimoire Studio',
-      'icon': finalIcon,
+      'icon': finalIcon.isNotEmpty ? finalIcon : '🃏',
       'art_color': finalColor,
+      'art_url': '',
+      'prompt': '',
       'rules_text': finalRules,
       'rules': finalRules,
-      'game': gameName,
-      'category': finalCatName,
+      'template_id': cardTplId,
     };
     addRow(newCard);
+  }
+
+  void duplicateCard(int index) {
+    if (index < 0 || index >= state.project.rows.length) return;
+    _recordHistory();
+    const uuid = Uuid();
+    final source = Map<String, dynamic>.from(state.project.rows[index]);
+    final cloned = Map<String, dynamic>.from(source);
+    cloned.remove('is_category_default');
+    cloned.remove('is_game_default');
+    final originalName = source['card_name']?.toString() ?? 'Carta';
+    cloned['card_name'] = '$originalName (Copia)';
+    final game = cloned['game']?.toString() ?? 'Magic';
+
+    final sourceTpl = resolveTemplateForRow(source);
+    final clonedTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+    final clonedTpl = CardTemplate(
+      id: clonedTplId,
+      name: '${cloned['card_name']} Plantilla',
+      layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backgroundColor: sourceTpl.backgroundColor,
+      backBackgroundColor: sourceTpl.backBackgroundColor,
+      cornerRadius: sourceTpl.cornerRadius,
+    );
+    cloned['template_id'] = clonedTplId;
+
+    final templates = List<CardTemplate>.from(state.project.templates)..add(clonedTpl);
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    rows.insert(index + 1, cloned);
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: templates,
+        rows: rows,
+        activeRowIndex: index + 1,
+        activeTemplateIndex: templates.length - 1,
+      ),
+    );
+    _persistWorkspace(syncGameName: game);
+  }
+
+  void batchCreateCards({
+    required String gameName,
+    required GameCategory category,
+    required List<String> cardNames,
+  }) {
+    if (cardNames.isEmpty) return;
+    _recordHistory();
+    for (final name in cardNames) {
+      final cleanName = name.trim();
+      if (cleanName.isNotEmpty) {
+        createCardFromCategory(gameName, category, cardName: cleanName);
+      }
+    }
+    _persistWorkspace(syncGameName: gameName);
   }
 
   void deleteGame(String gameName) {
@@ -1409,6 +2843,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
       ),
       deletedGames: updatedDeletedGames,
     );
+    _persistWorkspace(syncGameName: gameName);
   }
 
   void restoreSampleGames() {
@@ -1422,11 +2857,13 @@ class EditorNotifier extends StateNotifier<EditorState> {
       gameCategories: defaultCategories,
       deletedGames: {},
     );
+    _persistWorkspace();
   }
 
   void removeRow(int index) {
     final rows = List<Map<String, dynamic>>.from(state.project.rows);
     if (index >= 0 && index < rows.length) {
+      final game = (rows[index]['game'] ?? '').toString();
       rows.removeAt(index);
       final newIndex = (state.project.activeRowIndex >= rows.length)
           ? (rows.isEmpty ? 0 : rows.length - 1)
@@ -1437,11 +2874,12 @@ class EditorNotifier extends StateNotifier<EditorState> {
           activeRowIndex: newIndex,
         ),
       );
+      _persistWorkspace(syncGameName: game);
     }
   }
 
   void setZoom(double newZoom) {
-    state = state.copyWith(zoom: newZoom.clamp(0.4, 3.0));
+    state = state.copyWith(zoom: newZoom.clamp(0.4, 4.0));
   }
 
   void toggleGrid() {
@@ -1452,8 +2890,13 @@ class EditorNotifier extends StateNotifier<EditorState> {
     state = state.copyWith(showSnapping: !state.showSnapping);
   }
 
+  void toggleBleedGuides() {
+    state = state.copyWith(showBleedGuides: !state.showBleedGuides);
+  }
+
   void setProject(CardProject project) {
     state = state.copyWith(project: project, clearSelectedLayer: true);
+    _persistWorkspace();
   }
 
   void setActiveTemplate(int index) {
@@ -1462,10 +2905,106 @@ class EditorNotifier extends StateNotifier<EditorState> {
         project: state.project.copyWith(activeTemplateIndex: index),
         clearSelectedLayer: true,
       );
+      _persistWorkspace();
+    }
+  }
+
+  void _ensureActiveCardHasDedicatedTemplate() {
+    if (state.project.rows.isEmpty) return;
+    if (state.project.activeRowIndex < 0 || state.project.activeRowIndex >= state.project.rows.length) return;
+    final activeRow = state.project.activeRow;
+    final game = (activeRow['game'] ?? '').toString().trim();
+    if (game.isEmpty) return;
+
+    final isCategoryDefault = isRowCategoryDefault(activeRow);
+    final isGameDefault = isRowGameDefault(activeRow);
+    final isModel = isCategoryDefault || isGameDefault;
+
+    final currentTemplate = state.project.activeTemplate;
+    final cardsResolvingToThisTemplate = state.project.rows.where((r) => resolveTemplateForRow(r).id == currentTemplate.id).length;
+
+    final isShared = cardsResolvingToThisTemplate > 1 || currentTemplate.id == 'template-main';
+    final isModelTemplateUsedByNormalCard = !isModel && (
+      currentTemplate.id.startsWith('tpl_cat_') ||
+      currentTemplate.id.startsWith('tpl_model_') ||
+      currentTemplate.id.contains('_base') ||
+      state.project.rows.any((r) => (isRowCategoryDefault(r) || isRowGameDefault(r)) && resolveTemplateForRow(r).id == currentTemplate.id)
+    );
+
+    if (isModel) {
+      // If other cards were sharing this template, fork them so their appearance is preserved
+      final otherCardsIndices = <int>[];
+      for (int i = 0; i < state.project.rows.length; i++) {
+        if (i != state.project.activeRowIndex) {
+          final r = state.project.rows[i];
+          if (resolveTemplateForRow(r).id == currentTemplate.id) {
+            otherCardsIndices.add(i);
+          }
+        }
+      }
+      if (otherCardsIndices.isNotEmpty) {
+        const uuid = Uuid();
+        final currentTemplates = List<CardTemplate>.from(state.project.templates);
+        final updatedRows = List<Map<String, dynamic>>.from(state.project.rows);
+        for (final idx in otherCardsIndices) {
+          final r = updatedRows[idx];
+          final preservedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+          final preservedTpl = CardTemplate(
+            id: preservedId,
+            name: '${r['card_name'] ?? 'Carta'} Plantilla',
+            layers: currentTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backLayers: currentTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+            backgroundColor: currentTemplate.backgroundColor,
+            backBackgroundColor: currentTemplate.backBackgroundColor,
+            cornerRadius: currentTemplate.cornerRadius,
+          );
+          currentTemplates.add(preservedTpl);
+          final updatedR = Map<String, dynamic>.from(r);
+          updatedR['template_id'] = preservedId;
+          updatedRows[idx] = updatedR;
+        }
+        state = state.copyWith(
+          project: state.project.copyWith(
+            templates: currentTemplates,
+            rows: updatedRows,
+          ),
+        );
+      }
+    } else if (isShared || isModelTemplateUsedByNormalCard) {
+      const uuid = Uuid();
+      final dedicatedId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+
+      final forked = CardTemplate(
+        id: dedicatedId,
+        name: '${currentTemplate.name} (Copia)',
+        layers: currentTemplate.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backLayers: currentTemplate.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+        backgroundColor: currentTemplate.backgroundColor,
+        backBackgroundColor: currentTemplate.backBackgroundColor,
+        cornerRadius: currentTemplate.cornerRadius,
+      );
+
+      final currentTemplates = List<CardTemplate>.from(state.project.templates);
+      currentTemplates.add(forked);
+      final newIdx = currentTemplates.length - 1;
+
+      final updatedRows = List<Map<String, dynamic>>.from(state.project.rows);
+      final updatedActive = Map<String, dynamic>.from(activeRow);
+      updatedActive['template_id'] = dedicatedId;
+      updatedRows[state.project.activeRowIndex] = updatedActive;
+
+      state = state.copyWith(
+        project: state.project.copyWith(
+          templates: currentTemplates,
+          activeTemplateIndex: newIdx,
+          rows: updatedRows,
+        ),
+      );
     }
   }
 
   void _updateTemplateLayers(List<LayerItem> layers) {
+    _ensureActiveCardHasDedicatedTemplate();
     final currentTemplate = state.project.activeTemplate;
     final updatedTemplate = state.currentSide == CardSide.front
         ? currentTemplate.copyWith(layers: layers)
@@ -1476,6 +3015,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
     state = state.copyWith(
       project: state.project.copyWith(templates: templates),
     );
+    _persistWorkspace();
   }
 
   void switchSide(CardSide side) {
@@ -1490,6 +3030,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void updateBackgroundColor(Color color) {
+    _ensureActiveCardHasDedicatedTemplate();
     final currentTemplate = state.project.activeTemplate;
     final updatedTemplate = state.currentSide == CardSide.front
         ? currentTemplate.copyWith(backgroundColor: color)
@@ -1500,9 +3041,11 @@ class EditorNotifier extends StateNotifier<EditorState> {
     state = state.copyWith(
       project: state.project.copyWith(templates: templates),
     );
+    _persistWorkspace();
   }
 
   void updateCornerRadius(double radius) {
+    _ensureActiveCardHasDedicatedTemplate();
     final currentTemplate = state.project.activeTemplate;
     final updatedTemplate = currentTemplate.copyWith(cornerRadius: radius);
     final templates = List<CardTemplate>.from(state.project.templates);
@@ -1511,17 +3054,19 @@ class EditorNotifier extends StateNotifier<EditorState> {
     state = state.copyWith(
       project: state.project.copyWith(templates: templates),
     );
+    _persistWorkspace();
   }
 
   Future<void> syncGameDataCsv(String gameName) async {
     final gameCards = state.project.rows
         .where((r) => (r['game'] ?? '').toString().toLowerCase() == gameName.toLowerCase())
         .toList();
-    await GameFolderService.saveGameDataCsv(gameName, gameCards);
+    await GameFolderService.saveGameDataCsv(gameName, gameCards, customRootDir: customPersistenceDir);
+    _persistWorkspace();
   }
 
   Future<bool> reloadGameFromCsv(String gameName) async {
-    final loadedCards = await GameFolderService.loadGameDataCsv(gameName);
+    final loadedCards = await GameFolderService.loadGameDataCsv(gameName, customRootDir: customPersistenceDir);
     if (loadedCards.isEmpty) return false;
 
     final otherCards = state.project.rows
@@ -1539,6 +3084,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
         activeRowIndex: newIndex,
       ),
     );
+    _persistWorkspace();
     return true;
   }
 
@@ -1550,26 +3096,222 @@ class EditorNotifier extends StateNotifier<EditorState> {
     return await GameFolderService.openGameAssetsFolderInExplorer(gameName);
   }
 
-  Future<String?> uploadImageForActiveCard(String sourceFilePath) async {
+  /// Imports a .grimoire package archive and updates current editor & workspace state
+  Future<GrimoireImportResult> importGrimoirePackage(File packageFile) async {
+    final result = await ExportService.importGrimoirePackage(
+      packageFile: packageFile,
+      gamesRootDir: customPersistenceDir,
+    );
+
+    if (result.success) {
+      final persisted = GameFolderService.loadWorkspaceStateSync(
+        customRootDir: customPersistenceDir,
+      );
+
+      if (persisted != null) {
+        final combinedRows = [
+          if (persisted.project != null) ...persisted.project!.rows.map((r) => GameFolderService.normalizeCardRow(r)),
+          ...persisted.discoveredRows.map((r) => GameFolderService.normalizeCardRow(r)),
+        ];
+
+        final currentProject = persisted.project ?? state.project;
+        state = state.copyWith(
+          project: currentProject.copyWith(
+            rows: combinedRows.isNotEmpty ? combinedRows : currentProject.rows,
+            activeRowIndex: 0,
+          ),
+          gameCategories: persisted.gameCategories.isNotEmpty ? persisted.gameCategories : state.gameCategories,
+          deletedGames: persisted.deletedGames,
+          clearSelectedLayer: true,
+        );
+      }
+      _persistWorkspace();
+    }
+
+    return result;
+  }
+
+  /// Exports the workspace or a specific game to a portable .grimoire package
+  Future<File> exportGrimoirePackage({String? gameName, Directory? outputDirectory}) async {
+    _persistWorkspace();
+    final workspaceFile = GameFolderService.getWorkspaceStateFile(customRootDir: customPersistenceDir);
+    Map<String, dynamic> payload = {};
+    if (workspaceFile.existsSync()) {
+      try {
+        payload = jsonDecode(workspaceFile.readAsStringSync()) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    if (payload.isEmpty) {
+      payload = {
+        'version': 1,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'project': state.project.toJson(),
+        'gameCategories': state.gameCategories.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
+        'deletedGames': state.deletedGames.toList(),
+      };
+    }
+
+    final pkgName = (gameName != null && gameName.trim().isNotEmpty)
+        ? gameName.trim()
+        : (state.project.name.isNotEmpty ? state.project.name : 'Grimoire_Workspace');
+
+    return await ExportService.exportGrimoirePackage(
+      workspaceStatePayload: payload,
+      packageName: pkgName,
+      filterGameName: gameName,
+      gamesRootDir: customPersistenceDir ?? GameFolderService.getGamesRootDir(),
+      outputDirectory: outputDirectory,
+    );
+  }
+
+  /// Applies a pre-configured starter card template (TCG, Minimalist Action, or Mystic Tarot)
+  void applyPresetTemplate(String presetType) {
+    final activeGame = (state.project.activeRow['game'] ?? 'Magic').toString();
+    CardTemplate preset;
+    switch (presetType) {
+      case 'boardgameAction':
+        preset = CardTemplate.createBoardgameAction(
+          id: 'tpl_${activeGame.toLowerCase()}_action',
+          name: '$activeGame Acción',
+        );
+        break;
+      case 'tarotHero':
+        preset = CardTemplate.createTarotHero(
+          id: 'tpl_${activeGame.toLowerCase()}_tarot',
+          name: '$activeGame Héroe / Tarot',
+        );
+        break;
+      case 'tcgFantasy':
+      default:
+        preset = CardTemplate.createTcgFantasy(
+          id: 'tpl_${activeGame.toLowerCase()}_tcg',
+          name: '$activeGame TCG Fantasía',
+        );
+        break;
+    }
+
+    final templates = List<CardTemplate>.from(state.project.templates);
+    final existingIdx = templates.indexWhere((t) => t.id == preset.id);
+    if (existingIdx >= 0) {
+      templates[existingIdx] = preset;
+    } else {
+      templates.add(preset);
+    }
+
+    final activeIdx = templates.indexOf(preset);
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: templates,
+        activeTemplateIndex: activeIdx >= 0 ? activeIdx : 0,
+      ),
+      selectedLayerId: null,
+      selectedLayerIds: {},
+    );
+    _persistWorkspace();
+  }
+
+  /// Synchronizes active game data.csv and persists workspace state
+  Future<void> saveActiveProjectAndCsv() async {
+    final activeGame = (state.project.activeRow['game'] ?? 'Magic').toString();
+    await syncGameDataCsv(activeGame);
+    _persistWorkspace();
+  }
+
+  /// Uploads an image to the game's assets repository WITHOUT auto-assigning to any card or layer
+  Future<String?> uploadImageToGameAssets(String sourceFilePath, {String? targetSubfolder}) async {
     final activeRow = state.project.activeRow;
     final gameName = (activeRow['game'] ?? 'Magic').toString();
     final sourceFile = File(sourceFilePath);
     if (!sourceFile.existsSync()) return null;
 
-    final targetFile = await GameFolderService.importImageToGameAssets(gameName, sourceFile);
-    final relativeUrl = 'assets/${targetFile.uri.pathSegments.last}';
-
-    updateActiveRowData('art_url', relativeUrl);
-
-    if (state.selectedLayer != null && state.selectedLayer!.type == LayerType.image) {
-      updateLayer(state.selectedLayer!.copyWith(
-        imagePath: targetFile.path,
-        bindingKey: 'art_url',
-      ));
-    }
-
-    await syncGameDataCsv(gameName);
+    final targetFile = await GameFolderService.importImageToGameAssets(
+      gameName,
+      sourceFile,
+      subfolder: targetSubfolder,
+    );
+    final relativeUrl = GameFolderService.getRelativeAssetPath(gameName, targetFile);
     return relativeUrl;
+  }
+
+  Future<String?> uploadImageForActiveCard(String sourceFilePath) async {
+    // Simply import into the game's assets bank without forcing onto any element
+    return uploadImageToGameAssets(sourceFilePath);
+  }
+
+  /// Assign an asset to a specific layer (Image layer or Background layer)
+  void assignAssetToLayer(String layerId, String assetRelativePath) {
+    _ensureActiveCardHasDedicatedTemplate();
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    final resolvedFile = GameFolderService.resolveCardImageFile(gameName, assetRelativePath);
+    if (resolvedFile == null) return;
+
+    final template = state.project.activeTemplate;
+    final side = state.currentSide;
+    final layers = template.getLayers(side);
+
+    final updatedLayers = layers.map((l) {
+      if (l.id == layerId) {
+        if (l.type == LayerType.image) {
+          return l.copyWith(
+            imagePath: resolvedFile.path,
+            bindingKey: l.bindingKey,
+          );
+        } else if (l.type == LayerType.background) {
+          return l.copyWith(
+            fillMode: LayerFillMode.image,
+            imagePath: resolvedFile.path,
+          );
+        }
+      }
+      return l;
+    }).toList();
+
+    final updatedTemplate = side == CardSide.front
+        ? template.copyWith(layers: updatedLayers)
+        : template.copyWith(backLayers: updatedLayers);
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: state.project.templates.map((t) => t.id == updatedTemplate.id ? updatedTemplate : t).toList(),
+      ),
+    );
+    _persistWorkspace();
+  }
+
+  /// Remove/clear asset from a specific layer
+  void removeAssetFromLayer(String layerId) {
+    _ensureActiveCardHasDedicatedTemplate();
+    final template = state.project.activeTemplate;
+    final side = state.currentSide;
+    final layers = template.getLayers(side);
+
+    final updatedLayers = layers.map((l) {
+      if (l.id == layerId) {
+        if (l.type == LayerType.background) {
+          return l.copyWith(
+            fillMode: LayerFillMode.solid,
+            imagePath: null,
+          );
+        }
+        return l.copyWith(
+          imagePath: null,
+          bindingKey: '',
+        );
+      }
+      return l;
+    }).toList();
+
+    final updatedTemplate = side == CardSide.front
+        ? template.copyWith(layers: updatedLayers)
+        : template.copyWith(backLayers: updatedLayers);
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: state.project.templates.map((t) => t.id == updatedTemplate.id ? updatedTemplate : t).toList(),
+      ),
+    );
+    _persistWorkspace();
   }
 
   Future<void> assignAssetToActiveCard(String assetRelativePath) async {
@@ -1578,11 +3320,18 @@ class EditorNotifier extends StateNotifier<EditorState> {
     updateActiveRowData('art_url', assetRelativePath);
 
     final resolvedFile = GameFolderService.resolveCardImageFile(gameName, assetRelativePath);
-    if (state.selectedLayer != null && state.selectedLayer!.type == LayerType.image && resolvedFile != null) {
-      updateLayer(state.selectedLayer!.copyWith(
-        imagePath: resolvedFile.path,
-        bindingKey: 'art_url',
-      ));
+    if (state.selectedLayer != null && resolvedFile != null) {
+      if (state.selectedLayer!.type == LayerType.image) {
+        updateLayer(state.selectedLayer!.copyWith(
+          imagePath: resolvedFile.path,
+          bindingKey: 'art_url',
+        ));
+      } else if (state.selectedLayer!.type == LayerType.background) {
+        updateLayer(state.selectedLayer!.copyWith(
+          fillMode: LayerFillMode.image,
+          imagePath: resolvedFile.path,
+        ));
+      }
     }
     await syncGameDataCsv(gameName);
   }
@@ -1593,6 +3342,247 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void setAssetsPanelOpen(bool open) {
     state = state.copyWith(showAssetsPanel: open);
+  }
+
+  // --- TEMPLATE MANAGEMENT & CARD DIMENSIONS ---
+
+  void createNewTemplate(String name) {
+    _recordHistory();
+    const uuid = Uuid();
+    final active = state.project.activeTemplate;
+    final clonedFront = active.layers.map((l) => l.copyWith(id: uuid.v4())).toList();
+    final clonedBack = active.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList();
+
+    final newTemplate = CardTemplate(
+      id: 'template_${uuid.v4()}',
+      name: name.trim().isEmpty ? 'Nueva Plantilla' : name.trim(),
+      layers: clonedFront,
+      backLayers: clonedBack,
+      backgroundColor: active.backgroundColor,
+      backBackgroundColor: active.backBackgroundColor,
+      cornerRadius: active.cornerRadius,
+    );
+
+    final updatedTemplates = [...state.project.templates, newTemplate];
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: updatedTemplates,
+        activeTemplateIndex: updatedTemplates.length - 1,
+      ),
+      clearSelectedLayer: true,
+    );
+    _persistWorkspace();
+  }
+
+  void duplicateActiveTemplate() {
+    final active = state.project.activeTemplate;
+    createNewTemplate('${active.name} (Copy)');
+  }
+
+  void renameActiveTemplate(String newName) {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    _recordHistory();
+    final templates = List<CardTemplate>.from(state.project.templates);
+    final idx = state.project.activeTemplateIndex.clamp(0, templates.length - 1);
+    templates[idx] = templates[idx].copyWith(name: trimmed);
+    state = state.copyWith(
+      project: state.project.copyWith(templates: templates),
+    );
+    _persistWorkspace();
+  }
+
+  bool deleteActiveTemplate() {
+    if (state.project.templates.length <= 1) return false;
+    _recordHistory();
+    final templates = List<CardTemplate>.from(state.project.templates);
+    final idx = state.project.activeTemplateIndex.clamp(0, templates.length - 1);
+    templates.removeAt(idx);
+    final nextIdx = idx >= templates.length ? templates.length - 1 : idx;
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: templates,
+        activeTemplateIndex: nextIdx,
+      ),
+      clearSelectedLayer: true,
+    );
+    _persistWorkspace();
+    return true;
+  }
+
+  void updateCardDimensions(double widthMm, double heightMm) {
+    _recordHistory();
+    final newCanvasW = widthMm * 4.0;
+    final newCanvasH = heightMm * 4.0;
+
+    final updatedTemplates = state.project.templates.map((tpl) {
+      final updatedFront = tpl.layers.map((l) {
+        if (l.type == LayerType.background || (l.name.toLowerCase().contains('background') && l.isLocked)) {
+          return l.copyWith(width: newCanvasW, height: newCanvasH);
+        }
+        return l;
+      }).toList();
+      final updatedBack = tpl.backLayers.map((l) {
+        if (l.type == LayerType.background || (l.name.toLowerCase().contains('background') && l.isLocked)) {
+          return l.copyWith(width: newCanvasW, height: newCanvasH);
+        }
+        return l;
+      }).toList();
+      return tpl.copyWith(layers: updatedFront, backLayers: updatedBack);
+    }).toList();
+
+    state = state.copyWith(
+      project: state.project.copyWith(
+        widthMm: widthMm,
+        heightMm: heightMm,
+        templates: updatedTemplates,
+      ),
+    );
+    _persistWorkspace();
+  }
+
+  /// Resolves the appropriate CardTemplate for a given card row
+  CardTemplate resolveTemplateForRow(Map<String, dynamic> row) {
+    final templates = state.project.templates;
+    if (templates.isEmpty) return state.project.activeTemplate;
+
+    final tplId = (row['template_id'] ?? '').toString().trim();
+    if (tplId.isNotEmpty) {
+      final match = templates.where((t) => t.id == tplId || t.name.toLowerCase() == tplId.toLowerCase()).firstOrNull;
+      if (match != null) return match;
+    }
+
+    final game = (row['game'] ?? '').toString().trim();
+    final category = (row['category'] ?? '').toString().trim();
+
+    // Check dedicated category template
+    if (game.isNotEmpty && category.isNotEmpty) {
+      final safeGame = game.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final safeCat = category.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final catTplId = 'tpl_${safeGame}_$safeCat';
+      final matchCat = templates.where((t) => t.id == catTplId).firstOrNull;
+      if (matchCat != null) return matchCat;
+
+      final catModel = getCategoryDefaultCard(game, category);
+      final modelTplId = (catModel?['template_id'] ?? '').toString().trim();
+      if (modelTplId.isNotEmpty) {
+        final matchModel = templates.where((t) => t.id == modelTplId).firstOrNull;
+        if (matchModel != null) return matchModel;
+      }
+    }
+
+    // Check dedicated game base template
+    if (game.isNotEmpty) {
+      final safeGame = game.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final gameTplId = 'tpl_${safeGame}_base';
+      final matchGame = templates.where((t) => t.id == gameTplId).firstOrNull;
+      if (matchGame != null) return matchGame;
+
+      final gameModel = getGameDefaultCard(game);
+      final modelTplId = (gameModel?['template_id'] ?? '').toString().trim();
+      if (modelTplId.isNotEmpty) {
+        final matchModel = templates.where((t) => t.id == modelTplId).firstOrNull;
+        if (matchModel != null) return matchModel;
+      }
+    }
+
+    final gameLower = game.toLowerCase();
+    if (gameLower.contains('unicorn')) {
+      final unicornTpl = templates.where((t) => t.id.contains('unicorn') || t.name.toLowerCase().contains('unicorn')).firstOrNull;
+      if (unicornTpl != null) return unicornTpl;
+    }
+
+    return templates.isNotEmpty ? templates.first : state.project.activeTemplate;
+  }
+
+  // --- DATABASE COLUMN MANAGEMENT ---
+
+  void addCustomColumnToDatabase(String columnName, {String defaultValue = ''}) {
+    final cleanKey = columnName.trim().replaceAll(RegExp(r'\s+'), '_').toLowerCase();
+    if (cleanKey.isEmpty) return;
+    _recordHistory();
+    final rows = state.project.rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      if (!map.containsKey(cleanKey)) {
+        map[cleanKey] = defaultValue;
+      }
+      return map;
+    }).toList();
+    state = state.copyWith(
+      project: state.project.copyWith(rows: rows),
+    );
+    _persistWorkspace();
+  }
+
+  void removeCustomColumnFromDatabase(String columnKey) {
+    final cleanKey = columnKey.trim();
+    if (cleanKey.isEmpty) return;
+    _recordHistory();
+    final rows = state.project.rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      map.remove(cleanKey);
+      return map;
+    }).toList();
+    state = state.copyWith(
+      project: state.project.copyWith(rows: rows),
+    );
+    _persistWorkspace();
+  }
+
+  void renameCustomColumnInDatabase(String oldKey, String newKey) {
+    final cleanOld = oldKey.trim();
+    final cleanNew = newKey.trim().replaceAll(RegExp(r'\s+'), '_').toLowerCase();
+    if (cleanOld.isEmpty || cleanNew.isEmpty || cleanOld == cleanNew) return;
+    _recordHistory();
+    final rows = state.project.rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      if (map.containsKey(cleanOld)) {
+        final val = map.remove(cleanOld);
+        map[cleanNew] = val;
+      }
+      return map;
+    }).toList();
+    state = state.copyWith(
+      project: state.project.copyWith(rows: rows),
+    );
+    _persistWorkspace();
+  }
+
+  void duplicateRow(int index) {
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    if (index < 0 || index >= rows.length) return;
+    _recordHistory();
+    const uuid = Uuid();
+    final original = Map<String, dynamic>.from(rows[index]);
+    original.remove('is_category_default');
+    original.remove('is_game_default');
+    original['card_name'] = '${original['card_name'] ?? 'Card'} (Copy)';
+
+    final sourceTpl = resolveTemplateForRow(rows[index]);
+    final clonedTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
+    final clonedTpl = CardTemplate(
+      id: clonedTplId,
+      name: '${original['card_name']} Plantilla',
+      layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backgroundColor: sourceTpl.backgroundColor,
+      backBackgroundColor: sourceTpl.backBackgroundColor,
+      cornerRadius: sourceTpl.cornerRadius,
+    );
+    original['template_id'] = clonedTplId;
+
+    final templates = List<CardTemplate>.from(state.project.templates)..add(clonedTpl);
+    rows.insert(index + 1, original);
+    state = state.copyWith(
+      project: state.project.copyWith(
+        templates: templates,
+        rows: rows,
+        activeRowIndex: index + 1,
+        activeTemplateIndex: templates.length - 1,
+      ),
+    );
+    final game = (original['game'] ?? '').toString();
+    _persistWorkspace(syncGameName: game);
   }
 }
 

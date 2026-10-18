@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/theme/grimoire_theme.dart';
@@ -8,10 +7,9 @@ import '../../../../core/localization/locale_provider.dart';
 import '../../../editor/presentation/providers/editor_provider.dart';
 import '../../services/ai_service.dart';
 import '../../services/comfy_ui_service.dart';
-import '../../services/nvidia_service.dart';
 import '../providers/comfy_ui_provider.dart';
-import '../providers/nvidia_provider.dart';
 import 'comfy_ui_connection_dialog.dart';
+import '../../../editor/services/background_removal_service.dart';
 
 class AiPromptDialog extends ConsumerStatefulWidget {
   final String? layerId;
@@ -27,13 +25,24 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
   late TextEditingController _promptController;
   late TextEditingController _negativePromptController;
   late TextEditingController _nvidiaKeyController;
-  late TextEditingController _nvidiaModelController;
-  bool _obscureNvidiaKey = true;
-  bool _isEnhancingPrompt = false;
-  AiProviderType _selectedProvider = AiProviderType.comfyUiLocal;
+  late TextEditingController _geminiKeyController;
+  late TextEditingController _geminiModelController;
+  final List<String> _geminiPresetModels = [
+    'imagen-3.0-generate-002',
+    'imagen-3.0-generate-001',
+    'imagen-3.0-fast-generate-001',
+  ];
+  List<String> _geminiFetchedModels = [];
+  bool _isFetchingGeminiModels = false;
+  bool _isCustomGeminiModel = false;
+  AiProviderType _selectedProvider = AiProviderType.googleGemini;
+  String _selectedGeminiAspectRatio = '3:4';
   bool _isLoading = false;
   String? _statusMessage;
   bool _showNegativePrompt = false;
+  bool _obscureNvidiaKey = true;
+  bool _obscureGeminiKey = true;
+  bool _autoRemoveBg = false;
   final AiService _aiService = AiService();
 
   @override
@@ -47,14 +56,11 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
     _negativePromptController = TextEditingController(
       text: 'worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia',
     );
-    _nvidiaKeyController = TextEditingController(text: NvidiaService().apiKey);
-    _nvidiaModelController = TextEditingController(text: NvidiaService().selectedModel);
-
-    // If ComfyUI is offline but NVIDIA key is configured, select NVIDIA automatically
-    final isComfyOnline = ref.read(comfyUiProvider).serverInfo.isOnline;
-    if (!isComfyOnline && NvidiaService().isConfigured) {
-      _selectedProvider = AiProviderType.nvidiaCloud;
-    }
+    _nvidiaKeyController = TextEditingController(text: AiService.getNvidiaApiKey());
+    _geminiKeyController = TextEditingController(text: AiService.getGeminiApiKey());
+    final currentModel = AiService.getGeminiModel();
+    _geminiModelController = TextEditingController(text: currentModel);
+    _isCustomGeminiModel = !_geminiPresetModels.contains(currentModel);
   }
 
   @override
@@ -62,11 +68,52 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
     _promptController.dispose();
     _negativePromptController.dispose();
     _nvidiaKeyController.dispose();
-    _nvidiaModelController.dispose();
+    _geminiKeyController.dispose();
+    _geminiModelController.dispose();
     super.dispose();
   }
 
+  Future<void> _fetchGeminiModels() async {
+    final key = _geminiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa primero tu API Key de Google Gemini para consultar los modelos.')),
+      );
+      return;
+    }
+    setState(() => _isFetchingGeminiModels = true);
+    final models = await AiService.fetchAvailableGeminiModels(apiKey: key);
+    if (mounted) {
+      setState(() {
+        _isFetchingGeminiModels = false;
+        if (models.isNotEmpty) {
+          _geminiFetchedModels = models;
+          if (!_geminiPresetModels.contains(_geminiModelController.text.trim()) &&
+              !models.contains(_geminiModelController.text.trim())) {
+            _geminiModelController.text = models.first;
+            AiService.setGeminiModel(models.first);
+            _isCustomGeminiModel = false;
+          }
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(models.isNotEmpty
+              ? 'Se encontraron ${models.length} modelos en tu cuenta de Google AI Studio.'
+              : 'No se encontraron modelos de imagen o la clave no tiene permisos.'),
+        ),
+      );
+    }
+  }
+
   Future<void> _handleGenerate() async {
+    if (_selectedProvider == AiProviderType.googleGemini) {
+      AiService.setGeminiApiKey(_geminiKeyController.text.trim());
+      AiService.setGeminiModel(_geminiModelController.text.trim());
+    } else if (_selectedProvider == AiProviderType.nvidiaFluxKlein) {
+      AiService.setNvidiaApiKey(_nvidiaKeyController.text.trim());
+    }
+
     setState(() {
       _isLoading = true;
       _statusMessage = 'Iniciando generación con ${_getProviderName(_selectedProvider)}...';
@@ -90,25 +137,13 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
           if (mounted) setState(() => _statusMessage = status);
         },
       );
-    } else if (_selectedProvider == AiProviderType.nvidiaCloud) {
-      final nvidiaService = NvidiaService();
-      final customModel = _nvidiaModelController.text.trim();
-      result = await nvidiaService.generateArtwork(
-        prompt: _promptController.text.trim(),
-        negativePrompt: _negativePromptController.text.trim().isNotEmpty
-            ? _negativePromptController.text.trim()
-            : null,
-        gameName: game,
-        customModel: customModel.isNotEmpty ? customModel : null,
-        onProgress: (status) {
-          if (mounted) setState(() => _statusMessage = status);
-        },
-      );
     } else {
       result = await _aiService.generateArtwork(
         prompt: _promptController.text.trim(),
         gameName: game,
         provider: _selectedProvider,
+        aspectRatio: _selectedGeminiAspectRatio,
+        geminiModel: _geminiModelController.text.trim(),
       );
     }
 
@@ -118,15 +153,36 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
       });
 
       if (result.success && result.localFilePath != null) {
-        final fileName = File(result.localFilePath!).uri.pathSegments.last;
+        String finalPath = result.localFilePath!;
+
+        if (_autoRemoveBg) {
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Quitando fondo con transparencia alfa...';
+            });
+          }
+          try {
+            final processedFile = await BackgroundRemovalService.removeBackgroundFromFile(
+              File(finalPath),
+            );
+            finalPath = processedFile.path;
+          } catch (e) {
+            debugPrint('Error quitando fondo automáticamente: $e');
+          }
+        }
+
+        final fileName = File(finalPath).uri.pathSegments.last;
         final relativeUrl = 'assets/$fileName';
-        await ref.read(editorProvider.notifier).assignAssetToActiveCard(relativeUrl);
+        // The generated image is saved in the game's assets bank and is NOT forced onto any element.
+        // The user can drag and drop it onto Background/Image layers or choose it from the inspector.
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: GrimoireTheme.accentEmerald,
-              content: Text('Arte generado y guardado en $relativeUrl'),
+              content: Text(_autoRemoveBg
+                  ? 'Arte generado y guardado en $relativeUrl con fondo transparente.'
+                  : 'Arte guardado en $relativeUrl. Listo para arrastrar a Fondo o Imagen.'),
             ),
           );
           Navigator.of(context).pop(true);
@@ -143,10 +199,14 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
 
   String _getProviderName(AiProviderType type) {
     switch (type) {
+      case AiProviderType.googleGemini:
+        return 'Google Gemini (Imagen 3 • Google AI Studio)';
+      case AiProviderType.nvidiaFluxKlein:
+        return 'NVIDIA NIM (BFL FLUX.1 [klein] 1024×1024)';
       case AiProviderType.comfyUiLocal:
         return 'Local ComfyUI (127.0.0.1:8188)';
-      case AiProviderType.nvidiaCloud:
-        return 'NVIDIA NIM Cloud (Nemotron 3.5 / SD3)';
+      case AiProviderType.pollinationsCloud:
+        return 'Nube Gratuita (Pollinations.ai - Sin API Key)';
       case AiProviderType.ollamaLocal:
         return 'Local Ollama / LM Studio (127.0.0.1:11434)';
       case AiProviderType.cloudApi:
@@ -157,7 +217,6 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
   @override
   Widget build(BuildContext context) {
     final comfyState = ref.watch(comfyUiProvider);
-    final nvidiaState = ref.watch(nvidiaProvider);
     final activeWorkflow = comfyState.activeWorkflow;
     final serverInfo = comfyState.serverInfo;
 
@@ -188,21 +247,15 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                       Container(
                         padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: _selectedProvider == AiProviderType.nvidiaCloud
-                              ? const Color(0xFF76B900).withValues(alpha: 0.2)
-                              : GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                          color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: _selectedProvider == AiProviderType.nvidiaCloud
-                                ? const Color(0xFF76B900).withValues(alpha: 0.6)
-                                : GrimoireTheme.accentPurple.withValues(alpha: 0.5),
+                            color: GrimoireTheme.accentPurple.withValues(alpha: 0.5),
                           ),
                         ),
-                        child: Icon(
-                          _selectedProvider == AiProviderType.nvidiaCloud ? Icons.memory : Icons.auto_awesome,
-                          color: _selectedProvider == AiProviderType.nvidiaCloud
-                              ? const Color(0xFF76B900)
-                              : GrimoireTheme.accentPurple,
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          color: GrimoireTheme.accentPurple,
                           size: 20,
                         ),
                       ),
@@ -247,46 +300,6 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                                 color: serverInfo.isOnline ? GrimoireTheme.accentEmerald : Colors.redAccent,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else if (_selectedProvider == AiProviderType.nvidiaCloud)
-                    InkWell(
-                      onTap: () => ComfyUiConnectionDialog.show(context),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: nvidiaState.isConfigured
-                              ? const Color(0xFF064E3B)
-                              : const Color(0xFF451A03),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: nvidiaState.isConfigured ? GrimoireTheme.accentEmerald : const Color(0xFFF59E0B),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: nvidiaState.isConfigured ? const Color(0xFF76B900) : const Color(0xFFF59E0B),
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              nvidiaState.isConfigured ? 'NVIDIA Listo' : 'API Key Pendiente',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: nvidiaState.isConfigured ? const Color(0xFF76B900) : const Color(0xFFF59E0B),
                               ),
                             ),
                           ],
@@ -486,299 +499,204 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                 ),
                 const SizedBox(height: 12),
               ],
-
-              // Interactive NVIDIA NIM Configuration Panel
-              if (_selectedProvider == AiProviderType.nvidiaCloud) ...[
+              if (_selectedProvider == AiProviderType.googleGemini) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF101713),
+                    color: const Color(0xFF1E2640),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF76B900).withValues(alpha: 0.4)),
+                    border: Border.all(color: const Color(0xFF4285F4).withValues(alpha: 0.6)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // NVIDIA Header & Status
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 6,
+                      Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF76B900),
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFF4285F4).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'NVIDIA',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
+                            child: const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF60A5FA)),
                           ),
-                          const Text(
-                            'NVIDIA NIM & AI Foundation',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: nvidiaState.isConfigured
-                                  ? const Color(0xFF064E3B)
-                                  : const Color(0xFF451A03),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: nvidiaState.isConfigured
-                                    ? GrimoireTheme.accentEmerald
-                                    : const Color(0xFFF59E0B),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  nvidiaState.isConfigured ? Icons.check_circle : Icons.warning_amber,
-                                  size: 11,
-                                  color: nvidiaState.isConfigured
-                                      ? GrimoireTheme.accentEmerald
-                                      : const Color(0xFFF59E0B),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  nvidiaState.isConfigured
-                                      ? ref.tr('nvidia_key_configured')
-                                      : ref.tr('nvidia_key_missing'),
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: nvidiaState.isConfigured
-                                        ? GrimoireTheme.accentEmerald
-                                        : const Color(0xFFF59E0B),
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Google Gemini • Imagen 3 (imagen-3.0-generate-002)',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-
-                      // API Key Section (Directly visible, editable, with paste & test buttons)
                       const Text(
-                        'CLAVE DE ACCESO NVIDIA API (NVAPI-...):',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: GrimoireTheme.textSecondary),
+                        'Tu Google Gemini API Key (se guarda localmente):',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF93C5FD)),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _geminiKeyController,
+                        obscureText: _obscureGeminiKey,
+                        style: const TextStyle(fontSize: 11.5, color: Colors.white, fontFamily: 'monospace'),
+                        decoration: InputDecoration(
+                          hintText: 'AIzaSy...',
+                          hintStyle: const TextStyle(color: GrimoireTheme.textMuted),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureGeminiKey ? Icons.visibility_off : Icons.visibility,
+                              size: 16,
+                              color: GrimoireTheme.textMuted,
+                            ),
+                            onPressed: () => setState(() => _obscureGeminiKey = !_obscureGeminiKey),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          AiService.setGeminiApiKey(val.trim());
+                        },
+                      ),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 36,
-                              child: TextField(
-                                controller: _nvidiaKeyController,
-                                obscureText: _obscureNvidiaKey,
-                                style: const TextStyle(fontSize: 11.5, color: Colors.white, fontFamily: 'monospace'),
-                                decoration: InputDecoration(
-                                  hintText: 'nvapi-...',
-                                  isDense: true,
-                                  prefixIcon: const Icon(Icons.vpn_key, size: 14, color: Color(0xFF76B900)),
-                                  suffixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'Pegar del portapapeles',
-                                        icon: const Icon(Icons.content_paste, size: 14, color: Color(0xFF76B900)),
-                                        onPressed: () async {
-                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
-                                          if (data?.text != null && data!.text!.trim().isNotEmpty) {
-                                            final key = data.text!.trim();
-                                            _nvidiaKeyController.text = key;
-                                            await ref.read(nvidiaProvider.notifier).saveApiKey(key);
-                                            if (mounted) setState(() {});
-                                          }
-                                        },
-                                      ),
-                                      IconButton(
-                                        tooltip: _obscureNvidiaKey ? 'Mostrar clave' : 'Ocultar clave',
-                                        icon: Icon(
-                                          _obscureNvidiaKey ? Icons.visibility_off : Icons.visibility,
-                                          size: 14,
-                                          color: GrimoireTheme.textMuted,
-                                        ),
-                                        onPressed: () => setState(() => _obscureNvidiaKey = !_obscureNvidiaKey),
-                                      ),
-                                    ],
+                          const Icon(Icons.tune, size: 13, color: Color(0xFF93C5FD)),
+                          const SizedBox(width: 5),
+                          const Text(
+                            'Modelo de Imagen (Gemini / Imagen 3):',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF93C5FD)),
+                          ),
+                          const Spacer(),
+                          InkWell(
+                            onTap: _isFetchingGeminiModels ? null : _fetchGeminiModels,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isFetchingGeminiModels)
+                                    const SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF93C5FD)),
+                                    )
+                                  else
+                                    const Icon(Icons.sync, size: 12, color: Color(0xFF93C5FD)),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Consultar Modelos',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFF93C5FD),
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                ),
+                                ],
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF76B900),
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            icon: const Icon(Icons.save, size: 14),
-                            label: Text(
-                              ref.tr('nvidia_save_key'),
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                            onPressed: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              final key = _nvidiaKeyController.text.trim();
-                              await ref.read(nvidiaProvider.notifier).saveApiKey(key);
-                              if (!mounted) return;
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  backgroundColor: GrimoireTheme.accentEmerald,
-                                  content: Text(ref.tr('nvidia_api_key_saved')),
-                                ),
-                              );
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 34,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131728),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: GrimoireTheme.borderSubtle),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _isCustomGeminiModel
+                                ? '__custom__'
+                                : ({..._geminiPresetModels, ..._geminiFetchedModels}.contains(_geminiModelController.text.trim())
+                                    ? _geminiModelController.text.trim()
+                                    : '__custom__'),
+                            isExpanded: true,
+                            dropdownColor: const Color(0xFF1E2640),
+                            style: const TextStyle(fontSize: 11, color: Colors.white),
+                            items: [
+                              ...{..._geminiPresetModels, ..._geminiFetchedModels}.map((m) {
+                                String label = m;
+                                if (m == 'imagen-3.0-generate-002') {
+                                  label = '$m (Recomendado • Alta Calidad)';
+                                } else if (m == 'imagen-3.0-generate-001') {
+                                  label = '$m (Imagen 3 v1)';
+                                } else if (m == 'imagen-3.0-fast-generate-001') {
+                                  label = '$m (Fast Generate)';
+                                }
+                                return DropdownMenuItem(value: m, child: Text(label));
+                              }),
+                              const DropdownMenuItem(
+                                value: '__custom__',
+                                child: Text('Personalizado (Escribir ID manualmente)...'),
+                              ),
+                            ],
+                            onChanged: (v) {
+                              if (v == null) return;
+                              if (v == '__custom__') {
+                                setState(() => _isCustomGeminiModel = true);
+                              } else {
+                                setState(() {
+                                  _isCustomGeminiModel = false;
+                                  _geminiModelController.text = v;
+                                });
+                                AiService.setGeminiModel(v);
+                              }
                             },
                           ),
-                          const SizedBox(width: 6),
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF76B900),
-                              side: const BorderSide(color: Color(0xFF76B900)),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: nvidiaState.isTesting
-                                ? null
-                                : () async {
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    final key = _nvidiaKeyController.text.trim();
-                                    final ok = await ref.read(nvidiaProvider.notifier).testConnection(key);
-                                    if (!mounted) return;
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: ok ? GrimoireTheme.accentEmerald : Colors.redAccent,
-                                        content: Text(ok
-                                            ? '¡Conexión verificada con éxito con NVIDIA NIM!'
-                                            : 'Error al conectar con NVIDIA. Revisa tu clave.'),
-                                      ),
-                                    );
-                                  },
-                            child: nvidiaState.isTesting
-                                ? const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF76B900)),
-                                  )
-                                : const Text('Probar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
+                        ),
                       ),
+                      if (_isCustomGeminiModel) ...[
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _geminiModelController,
+                          style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'monospace'),
+                          decoration: const InputDecoration(
+                            hintText: 'Ej: imagen-3.0-generate-002',
+                            hintStyle: TextStyle(color: GrimoireTheme.textMuted),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            prefixIcon: Icon(Icons.edit, size: 14, color: Color(0xFF93C5FD)),
+                          ),
+                          onChanged: (val) => AiService.setGeminiModel(val.trim()),
+                        ),
+                      ],
                       const SizedBox(height: 10),
-
-                      // Model Label
-                      const Text(
-                        'MODELO NVIDIA (PERSONALIZADO O SELECCIONADO):',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: GrimoireTheme.textSecondary),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Model and Aspect Ratio in a Row
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Expanded(
-                            flex: 6,
-                            child: SizedBox(
-                              height: 36,
-                              child: TextField(
-                                controller: _nvidiaModelController,
-                                style: const TextStyle(fontSize: 11.5, color: Colors.white, fontFamily: 'monospace'),
-                                decoration: InputDecoration(
-                                  hintText: 'ej. nvidia/nemotron-3.5-super-vl-120b-a12b',
-                                  isDense: true,
-                                  prefixIcon: const Icon(Icons.memory, size: 14, color: Color(0xFF76B900)),
-                                  suffixIcon: PopupMenuButton<String>(
-                                    tooltip: 'Elegir modelo recomendado',
-                                    icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF76B900)),
-                                    color: const Color(0xFF151922),
-                                    onSelected: (modelId) {
-                                      _nvidiaModelController.text = modelId;
-                                      ref.read(nvidiaProvider.notifier).setModel(modelId);
-                                      setState(() {});
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      const PopupMenuItem(
-                                        enabled: false,
-                                        child: Text('🧠 RAZONAMIENTO Y VISIÓN (LLM/VLM)',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF76B900))),
-                                      ),
-                                      ...NvidiaService.availableTextModels.map((m) => PopupMenuItem(
-                                            value: m.id,
-                                            child: Text('${m.name}\n${m.id}',
-                                                style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                          )),
-                                      const PopupMenuDivider(),
-                                      const PopupMenuItem(
-                                        enabled: false,
-                                        child: Text('🎨 GENERACIÓN DE IMAGEN (ARTE)',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF76B900))),
-                                      ),
-                                      ...NvidiaService.availableImageModels.map((m) => PopupMenuItem(
-                                            value: m.id,
-                                            child: Text('${m.name}\n${m.id}',
-                                                style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                          )),
-                                    ],
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                ),
-                                onChanged: (val) {
-                                  ref.read(nvidiaProvider.notifier).setModel(val.trim());
-                                },
-                              ),
-                            ),
+                          const Text(
+                            'Proporción (Aspect Ratio):',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                           Expanded(
-                            flex: 3,
                             child: Container(
-                              height: 36,
+                              height: 32,
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF151922),
-                                borderRadius: BorderRadius.circular(8),
+                                color: const Color(0xFF131728),
+                                borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: GrimoireTheme.borderSubtle),
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: nvidiaState.aspectRatio,
-                                  dropdownColor: const Color(0xFF151922),
+                                  value: _selectedGeminiAspectRatio,
                                   isExpanded: true,
-                                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF76B900)),
-                                  items: NvidiaService.availableAspectRatios.map((r) {
-                                    return DropdownMenuItem<String>(
-                                      value: r,
-                                      child: Text(
-                                        r == '1:1' ? '1:1 Cuadrado' : (r == '2:3' ? '2:3 Carta' : r),
-                                        style: const TextStyle(fontSize: 11, color: Colors.white),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      ref.read(nvidiaProvider.notifier).setAspectRatio(val);
-                                    }
+                                  dropdownColor: const Color(0xFF1E2640),
+                                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                                  items: const [
+                                    DropdownMenuItem(value: '3:4', child: Text('3:4 • Carta Vertical (Estándar TCG)')),
+                                    DropdownMenuItem(value: '1:1', child: Text('1:1 • Cuadrado (Iconos / Retratos)')),
+                                    DropdownMenuItem(value: '4:3', child: Text('4:3 • Horizontal Clásico')),
+                                    DropdownMenuItem(value: '9:16', child: Text('9:16 • Vertical Panorámico')),
+                                    DropdownMenuItem(value: '16:9', child: Text('16:9 • Panorámico')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setState(() => _selectedGeminiAspectRatio = v);
                                   },
                                 ),
                               ),
@@ -786,47 +704,90 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-
-                      // Quick Model Preset Chips
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
+                      const SizedBox(height: 6),
+                      const Text(
+                        '💡 Clave obtenible gratis en Google AI Studio (aistudio.google.com). El arte se guarda automáticamente en la carpeta assets.',
+                        style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_selectedProvider == AiProviderType.nvidiaFluxKlein) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF76B900).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF76B900).withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
                         children: [
-                          _buildModelChip('Nemotron 3.5 (120B)', 'nvidia/nemotron-3.5-super-vl-120b-a12b', Icons.psychology),
-                          _buildModelChip('SD3 Medium', 'stabilityai/stable-diffusion-3-medium', Icons.image),
-                          _buildModelChip('FLUX.1 Schnell', 'black-forest-labs/flux-1-schnell', Icons.bolt),
-                          _buildModelChip('FLUX.1 Dev', 'black-forest-labs/flux-1-dev', Icons.auto_awesome),
+                          Icon(Icons.bolt, size: 22, color: Color(0xFF76B900)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'NVIDIA NIM Cloud • Modelo: Black Forest Labs FLUX.1 [klein] • Resolución: 1024×1024 (50 pasos)',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
+                            ),
+                          ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Tu NVIDIA API Key (se guarda localmente):',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFD9F99D)),
+                      ),
                       const SizedBox(height: 6),
-                      // Model type descriptor
-                      if (NvidiaService.isChatModel(_nvidiaModelController.text.trim()))
-                        const Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 12, color: Color(0xFF76B900)),
-                            SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                'Modelo de Razonamiento Nemotron: Optimiza prompts, analiza arte y piensa la composición.',
-                                style: TextStyle(fontSize: 9.5, color: Color(0xFF76B900)),
-                              ),
+                      TextField(
+                        controller: _nvidiaKeyController,
+                        obscureText: _obscureNvidiaKey,
+                        style: const TextStyle(fontSize: 11.5, color: Colors.white, fontFamily: 'monospace'),
+                        decoration: InputDecoration(
+                          hintText: 'nvapi-...',
+                          hintStyle: const TextStyle(color: GrimoireTheme.textMuted),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNvidiaKey ? Icons.visibility_off : Icons.visibility,
+                              size: 16,
+                              color: GrimoireTheme.textMuted,
                             ),
-                          ],
-                        )
-                      else
-                        const Row(
-                          children: [
-                            Icon(Icons.palette_outlined, size: 12, color: Color(0xFF38BDF8)),
-                            SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                'Modelo de Imagen (Difusión): Renderiza y genera la ilustración física de la carta.',
-                                style: TextStyle(fontSize: 9.5, color: Color(0xFF38BDF8)),
-                              ),
-                            ),
-                          ],
+                            onPressed: () => setState(() => _obscureNvidiaKey = !_obscureNvidiaKey),
+                          ),
                         ),
+                        onChanged: (val) {
+                          AiService.setNvidiaApiKey(val.trim());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_selectedProvider == AiProviderType.pollinationsCloud) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: GrimoireTheme.accentEmerald.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: GrimoireTheme.accentEmerald.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.cloud_done, size: 20, color: GrimoireTheme.accentEmerald),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Generación en la nube inmediata, 100% gratuita y sin necesidad de servidor local o API Key (vía Pollinations.ai).',
+                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -849,97 +810,28 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
               ),
               const SizedBox(height: 8),
 
-              // Actions Row: Negative Prompt Toggle + Llama 3.1 Prompt Enhancer
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  InkWell(
-                    onTap: () => setState(() => _showNegativePrompt = !_showNegativePrompt),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _showNegativePrompt ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                            size: 16,
-                            color: GrimoireTheme.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _showNegativePrompt ? 'Ocultar Prompt Negativo' : 'Añadir Prompt Negativo',
-                            style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
-                          ),
-                        ],
+              // Actions Row: Negative Prompt Toggle
+              InkWell(
+                onTap: () => setState(() => _showNegativePrompt = !_showNegativePrompt),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _showNegativePrompt ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        size: 16,
+                        color: GrimoireTheme.textMuted,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _showNegativePrompt ? 'Ocultar Prompt Negativo' : 'Añadir Prompt Negativo',
+                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                      ),
+                    ],
                   ),
-
-                  // Llama 3.1 Prompt Enhancer Button
-                  InkWell(
-                    onTap: _isEnhancingPrompt
-                        ? null
-                        : () async {
-                            final current = _promptController.text.trim();
-                            if (current.isEmpty) return;
-                            final messenger = ScaffoldMessenger.of(context);
-                            setState(() => _isEnhancingPrompt = true);
-                            final enhanced = await NvidiaService().enhancePromptWithLlama(basicPrompt: current);
-                            if (!mounted) return;
-                            setState(() => _isEnhancingPrompt = false);
-                            if (enhanced != null && enhanced.isNotEmpty) {
-                              _promptController.text = enhanced;
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  backgroundColor: GrimoireTheme.accentEmerald,
-                                  content: Text(ref.tr('nvidia_prompt_enhanced')),
-                                ),
-                              );
-                            } else {
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Configura tu API Key de NVIDIA para usar el optimizador Nemotron 3.5.'),
-                                ),
-                              );
-                            }
-                          },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF76B900).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF76B900).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_isEnhancingPrompt)
-                            const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF76B900)),
-                            )
-                          else
-                            const Icon(Icons.auto_awesome, size: 12, color: Color(0xFF76B900)),
-                          const SizedBox(width: 5),
-                          Text(
-                            _isEnhancingPrompt ? ref.tr('nvidia_enhancing') : ref.tr('nvidia_enhance_prompt'),
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF76B900),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
 
               if (_showNegativePrompt) ...[
@@ -954,6 +846,61 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                   ),
                 ),
               ],
+
+              const SizedBox(height: 10),
+
+              // Auto Background Removal Option
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _autoRemoveBg
+                      ? GrimoireTheme.accentIndigo.withValues(alpha: 0.15)
+                      : GrimoireTheme.surfacePanel,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _autoRemoveBg
+                        ? GrimoireTheme.accentIndigo.withValues(alpha: 0.5)
+                        : GrimoireTheme.borderSubtle,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _autoRemoveBg,
+                      activeColor: GrimoireTheme.accentIndigo,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (val) => setState(() => _autoRemoveBg = val ?? false),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.auto_fix_high, size: 13, color: GrimoireTheme.accentIndigo),
+                              SizedBox(width: 4),
+                              Text(
+                                'Quitar fondo automáticamente',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Genera transparencia alfa perfecta para el sujeto o icono al terminar.',
+                            style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 12),
 
@@ -1037,51 +984,6 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModelChip(String label, String modelId, IconData icon) {
-    final isSelected = _nvidiaModelController.text.trim() == modelId;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _nvidiaModelController.text = modelId;
-        });
-        ref.read(nvidiaProvider.notifier).setModel(modelId);
-      },
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF76B900).withValues(alpha: 0.25)
-              : const Color(0xFF151922),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF76B900) : GrimoireTheme.borderSubtle,
-            width: isSelected ? 1.2 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 11,
-              color: isSelected ? const Color(0xFF76B900) : GrimoireTheme.textMuted,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? const Color(0xFF76B900) : const Color(0xFFCBD5E1),
-              ),
-            ),
-          ],
         ),
       ),
     );

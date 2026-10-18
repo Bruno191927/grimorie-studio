@@ -2,16 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'comfy_ui_service.dart';
-import 'nvidia_service.dart';
 
 enum AiProviderType {
+  googleGemini,
+  nvidiaFluxKlein,
   comfyUiLocal,
-  nvidiaCloud,
+  pollinationsCloud,
   ollamaLocal,
   cloudApi,
 }
@@ -36,6 +38,204 @@ class AiService {
   String cloudApiKey = '';
   String cloudApiEndpoint = 'https://api.openai.com/v1/images/generations';
 
+  // Google Gemini (Imagen 3)
+  static String _savedGeminiApiKey = '';
+  static File _getGeminiConfigFile() {
+    final root = GameFolderService.getGamesRootDir();
+    return File('${root.path}/.gemini_config.json');
+  }
+
+  static String getGeminiApiKey() {
+    if (_savedGeminiApiKey.isNotEmpty) return _savedGeminiApiKey;
+    try {
+      final f = _getGeminiConfigFile();
+      if (f.existsSync()) {
+        final data = jsonDecode(f.readAsStringSync());
+        if (data is Map && data['gemini_api_key'] != null) {
+          _savedGeminiApiKey = data['gemini_api_key'].toString().trim();
+          return _savedGeminiApiKey;
+        }
+      }
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      if (fShared.existsSync()) {
+        final data = jsonDecode(fShared.readAsStringSync());
+        if (data is Map && data['gemini_api_key'] != null) {
+          _savedGeminiApiKey = data['gemini_api_key'].toString().trim();
+          return _savedGeminiApiKey;
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  static void setGeminiApiKey(String key) {
+    _savedGeminiApiKey = key.trim();
+    try {
+      final f = _getGeminiConfigFile();
+      Map<String, dynamic> data = {};
+      if (f.existsSync()) {
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(f.readAsStringSync()));
+        } catch (_) {}
+      }
+      data['gemini_api_key'] = _savedGeminiApiKey;
+      f.writeAsStringSync(jsonEncode(data));
+
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      Map<String, dynamic> sharedData = {};
+      if (fShared.existsSync()) {
+        try {
+          sharedData = Map<String, dynamic>.from(jsonDecode(fShared.readAsStringSync()));
+        } catch (_) {}
+      }
+      sharedData['gemini_api_key'] = _savedGeminiApiKey;
+      fShared.writeAsStringSync(jsonEncode(sharedData));
+    } catch (_) {}
+  }
+
+  String get geminiApiKey => getGeminiApiKey();
+  set geminiApiKey(String val) => setGeminiApiKey(val);
+
+  static String _savedGeminiModel = '';
+
+  static String getGeminiModel() {
+    if (_savedGeminiModel.isNotEmpty) return _savedGeminiModel;
+    try {
+      final f = _getGeminiConfigFile();
+      if (f.existsSync()) {
+        final data = jsonDecode(f.readAsStringSync());
+        if (data is Map && data['gemini_model'] != null && data['gemini_model'].toString().trim().isNotEmpty) {
+          _savedGeminiModel = data['gemini_model'].toString().trim();
+          return _savedGeminiModel;
+        }
+      }
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      if (fShared.existsSync()) {
+        final data = jsonDecode(fShared.readAsStringSync());
+        if (data is Map && data['gemini_model'] != null && data['gemini_model'].toString().trim().isNotEmpty) {
+          _savedGeminiModel = data['gemini_model'].toString().trim();
+          return _savedGeminiModel;
+        }
+      }
+    } catch (_) {}
+    return 'imagen-3.0-generate-002';
+  }
+
+  static void setGeminiModel(String model) {
+    _savedGeminiModel = model.trim().isEmpty ? 'imagen-3.0-generate-002' : model.trim();
+    try {
+      final f = _getGeminiConfigFile();
+      Map<String, dynamic> data = {};
+      if (f.existsSync()) {
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(f.readAsStringSync()));
+        } catch (_) {}
+      }
+      data['gemini_model'] = _savedGeminiModel;
+      f.writeAsStringSync(jsonEncode(data));
+
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      Map<String, dynamic> sharedData = {};
+      if (fShared.existsSync()) {
+        try {
+          sharedData = Map<String, dynamic>.from(jsonDecode(fShared.readAsStringSync()));
+        } catch (_) {}
+      }
+      sharedData['gemini_model'] = _savedGeminiModel;
+      fShared.writeAsStringSync(jsonEncode(sharedData));
+    } catch (_) {}
+  }
+
+  static Future<List<String>> fetchAvailableGeminiModels({String? apiKey}) async {
+    final key = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : getGeminiApiKey();
+    if (key.isEmpty) return [];
+
+    try {
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$key');
+      final res = await http.get(url).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['models'] is List) {
+          final list = data['models'] as List;
+          final List<String> imagenModels = [];
+          final List<String> otherModels = [];
+
+          for (final item in list) {
+            if (item is Map && item['name'] != null) {
+              String name = item['name'].toString();
+              if (name.startsWith('models/')) {
+                name = name.substring('models/'.length);
+              }
+              final methods = (item['supportedGenerationMethods'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final isPredict = methods.contains('predict') || methods.contains('generateImages');
+              final isImagen = name.toLowerCase().contains('imagen') || name.toLowerCase().contains('image');
+
+              if (isPredict || isImagen) {
+                imagenModels.add(name);
+              } else {
+                otherModels.add(name);
+              }
+            }
+          }
+
+          if (imagenModels.isNotEmpty) {
+            return imagenModels;
+          }
+          return otherModels;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching Gemini models: $e');
+    }
+    return [];
+  }
+
+  // NVIDIA NIM Cloud (BFL FLUX.1 [klein] / Flux-3-image-klein)
+  static String _savedNvidiaApiKey = '';
+  String nvidiaFluxEndpoint = 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux-3-image-klein';
+
+  static File _getConfigFile() {
+    final root = GameFolderService.getGamesRootDir();
+    return File('${root.path}/.nvidia_config.json');
+  }
+
+  static String getNvidiaApiKey() {
+    if (_savedNvidiaApiKey.isNotEmpty) return _savedNvidiaApiKey;
+    try {
+      final f = _getConfigFile();
+      if (f.existsSync()) {
+        final data = jsonDecode(f.readAsStringSync());
+        if (data is Map && data['nvidia_api_key'] != null) {
+          _savedNvidiaApiKey = data['nvidia_api_key'].toString().trim();
+          return _savedNvidiaApiKey;
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  static void setNvidiaApiKey(String key) {
+    _savedNvidiaApiKey = key.trim();
+    try {
+      final f = _getConfigFile();
+      Map<String, dynamic> data = {};
+      if (f.existsSync()) {
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(f.readAsStringSync()));
+        } catch (_) {}
+      }
+      data['nvidia_api_key'] = _savedNvidiaApiKey;
+      f.writeAsStringSync(jsonEncode(data));
+    } catch (_) {}
+  }
+
+  String get nvidiaApiKey => getNvidiaApiKey();
+  set nvidiaApiKey(String val) => setNvidiaApiKey(val);
+
   /// Tests connectivity to an AI endpoint
   Future<bool> testEndpoint(String url) async {
     try {
@@ -52,10 +252,25 @@ class AiService {
     required String prompt,
     String? gameName,
     String? negativePrompt,
-    AiProviderType provider = AiProviderType.comfyUiLocal,
+    AiProviderType provider = AiProviderType.googleGemini,
     int width = 512,
     int height = 512,
+    String? aspectRatio,
+    String? geminiModel,
   }) async {
+    if (provider == AiProviderType.googleGemini && geminiApiKey.trim().isEmpty) {
+      return const AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de Google Gemini. Por favor configúrala en el panel de IA.',
+      );
+    }
+    if (provider == AiProviderType.nvidiaFluxKlein && nvidiaApiKey.trim().isEmpty) {
+      return const AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de NVIDIA. Por favor ingrésala en la ventana de generación.',
+      );
+    }
+
     try {
       Directory targetDir;
       if (gameName != null && gameName.trim().isNotEmpty) {
@@ -73,21 +288,30 @@ class AiService {
       final fileName = 'art_$timestamp.png';
       final file = File('${targetDir.path}/$fileName');
 
-      if (provider == AiProviderType.comfyUiLocal) {
-        await _generateViaComfyUi(prompt, file);
-      } else if (provider == AiProviderType.nvidiaCloud) {
-        final nRes = await NvidiaService().generateArtwork(
-          prompt: prompt,
-          gameName: gameName,
-          negativePrompt: negativePrompt,
+      AiGenerationResult? customResult;
+      if (provider == AiProviderType.googleGemini) {
+        customResult = await _generateViaGemini(
+          prompt,
+          file,
+          width: width,
+          height: height,
+          aspectRatio: aspectRatio,
+          model: geminiModel,
         );
-        if (nRes.success && nRes.localFilePath != null) {
-          return nRes;
-        }
+      } else if (provider == AiProviderType.comfyUiLocal) {
+        await _generateViaComfyUi(prompt, file);
+      } else if (provider == AiProviderType.nvidiaFluxKlein) {
+        customResult = await _generateViaNvidiaFluxKlein(prompt, file, width: width, height: height);
+      } else if (provider == AiProviderType.pollinationsCloud) {
+        await _generateViaPollinations(prompt, file, width: width, height: height);
       } else if (provider == AiProviderType.cloudApi) {
         await _generateViaCloud(prompt, file);
       } else {
         await _generateViaOllama(prompt, file);
+      }
+
+      if (customResult != null && !customResult.success) {
+        return customResult;
       }
 
       // Ensure a physical PNG file exists on disk
@@ -112,6 +336,113 @@ class AiService {
         errorMessage: 'Generation error: $e',
       );
     }
+  }
+
+  /// Generates artwork via Google Gemini / Imagen API
+  Future<AiGenerationResult> _generateViaGemini(
+    String prompt,
+    File targetFile, {
+    int width = 750,
+    int height = 1050,
+    String? aspectRatio,
+    String? model,
+  }) async {
+    final key = geminiApiKey.trim();
+    if (key.isEmpty) {
+      return const AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de Google Gemini. Por favor configúrala en el panel de IA.',
+      );
+    }
+
+    String resolvedRatio = aspectRatio ?? '1:1';
+    if (aspectRatio == null || aspectRatio == 'auto') {
+      final ratio = width / (height > 0 ? height : 1);
+      if (ratio <= 0.65) {
+        resolvedRatio = '9:16';
+      } else if (ratio <= 0.85) {
+        resolvedRatio = '3:4';
+      } else if (ratio <= 1.18) {
+        resolvedRatio = '1:1';
+      } else if (ratio <= 1.55) {
+        resolvedRatio = '4:3';
+      } else {
+        resolvedRatio = '16:9';
+      }
+    }
+
+    final targetModel = (model != null && model.trim().isNotEmpty)
+        ? model.trim()
+        : getGeminiModel();
+
+    String? lastError;
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:predict?key=$key',
+      );
+
+      final payload = {
+        'instances': [
+          {'prompt': prompt.trim()},
+        ],
+        'parameters': {
+          'sampleCount': 1,
+          'aspectRatio': resolvedRatio,
+          'outputMimeType': 'image/png',
+          'personGeneration': 'ALLOW_ADULT',
+        },
+      };
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'x-goog-api-key': key,
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final predictions = decoded['predictions'] as List<dynamic>?;
+        if (predictions != null && predictions.isNotEmpty) {
+          final first = predictions.first as Map<String, dynamic>;
+          final b64 = first['bytesBase64Encoded'] as String?;
+          if (b64 != null && b64.isNotEmpty) {
+            final imageBytes = base64Decode(b64);
+            await targetFile.writeAsBytes(imageBytes);
+            return AiGenerationResult(
+              success: true,
+              localFilePath: targetFile.path,
+              imageBytes: imageBytes,
+            );
+          }
+        }
+      } else {
+        try {
+          final errJson = jsonDecode(response.body);
+          if (errJson is Map && errJson['error'] != null) {
+            final errObj = errJson['error'];
+            final msg = (errObj is Map) ? (errObj['message'] ?? response.body) : errObj.toString();
+            lastError = 'Google Gemini ($targetModel error ${response.statusCode}): $msg';
+          } else {
+            lastError = 'Google Gemini HTTP ${response.statusCode}: ${response.body}';
+          }
+        } catch (_) {
+          lastError = 'Google Gemini HTTP ${response.statusCode}: ${response.body}';
+        }
+        debugPrint('Gemini Imagen attempt failed with $targetModel: $lastError');
+      }
+    } catch (e) {
+      lastError = 'Excepción al conectar con Google Gemini ($targetModel): $e';
+      debugPrint(lastError);
+    }
+
+    return AiGenerationResult(
+      success: targetFile.existsSync(),
+      localFilePath: targetFile.path,
+      errorMessage: lastError,
+    );
   }
 
   Future<AiGenerationResult> _generateViaComfyUi(String prompt, File targetFile) async {
@@ -144,6 +475,109 @@ class AiService {
 
     return AiGenerationResult(
       success: true,
+      localFilePath: targetFile.path,
+    );
+  }
+
+  /// Generates artwork via Pollinations.ai (Free public cloud AI, zero API keys required)
+  Future<AiGenerationResult> _generateViaPollinations(
+    String prompt,
+    File targetFile, {
+    int width = 512,
+    int height = 512,
+  }) async {
+    try {
+      final seed = DateTime.now().millisecondsSinceEpoch % 1000000;
+      final encodedPrompt = Uri.encodeComponent(prompt.trim());
+      final safeW = width.clamp(256, 1024);
+      final safeH = height.clamp(256, 1024);
+      final url = Uri.parse(
+        'https://image.pollinations.ai/prompt/$encodedPrompt?width=$safeW&height=$safeH&seed=$seed&nologo=true',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        await targetFile.writeAsBytes(response.bodyBytes);
+        return AiGenerationResult(
+          success: true,
+          localFilePath: targetFile.path,
+          imageBytes: response.bodyBytes,
+        );
+      }
+    } catch (e) {
+      debugPrint('Pollinations AI generation error: $e');
+    }
+
+    return AiGenerationResult(
+      success: targetFile.existsSync(),
+      localFilePath: targetFile.path,
+    );
+  }
+
+  /// Generates artwork via NVIDIA NIM API (Black Forest Labs FLUX.1 [klein] / flux-3-image-klein)
+  Future<AiGenerationResult> _generateViaNvidiaFluxKlein(
+    String prompt,
+    File targetFile, {
+    int width = 1024,
+    int height = 1024,
+    int steps = 50,
+  }) async {
+    final key = nvidiaApiKey.trim();
+    if (key.isEmpty) {
+      return AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de NVIDIA. Por favor ingrésala en la ventana de generación.',
+      );
+    }
+
+    try {
+      final url = Uri.parse(nvidiaFluxEndpoint);
+      final safeW = (width >= 1024) ? 1024 : 1024;
+      final safeH = (height >= 1024) ? 1024 : 1024;
+
+      final requestBody = jsonEncode({
+        'prompt': prompt.trim(),
+        'width': safeW,
+        'height': safeH,
+        'seed': DateTime.now().millisecondsSinceEpoch % 1000000,
+        'steps': steps.clamp(20, 50),
+      });
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $nvidiaApiKey',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      ).timeout(const Duration(seconds: 90));
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final artifacts = decoded['artifacts'] as List<dynamic>?;
+        if (artifacts != null && artifacts.isNotEmpty) {
+          final firstArt = artifacts.first as Map<String, dynamic>;
+          final base64Image = firstArt['base64'] as String?;
+          if (base64Image != null && base64Image.isNotEmpty) {
+            final imageBytes = base64Decode(base64Image);
+            await targetFile.writeAsBytes(imageBytes);
+            return AiGenerationResult(
+              success: true,
+              localFilePath: targetFile.path,
+              imageBytes: imageBytes,
+            );
+          }
+        }
+      } else {
+        debugPrint('NVIDIA NIM API error (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('NVIDIA NIM API request failed: $e');
+    }
+
+    return AiGenerationResult(
+      success: targetFile.existsSync(),
       localFilePath: targetFile.path,
     );
   }

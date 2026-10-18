@@ -90,12 +90,16 @@ class ComfyUiService {
           final fileName = file.uri.pathSegments.last;
           final baseName = fileName.replaceAll(RegExp(r'\.json$', caseSensitive: false), '');
           final isImage = baseName.toLowerCase() == 'image';
+          final isFluxOrT2i = baseName.toLowerCase().contains('texttoimage') || baseName.toLowerCase().contains('flux');
+          final description = isImage
+              ? 'Anima Base v1.0 (Text to Image Subgraph)'
+              : (isFluxOrT2i ? 'FLUX 3 Klein (Text to Image)' : 'Workflow de ComfyUI');
 
           workflows.add(
             ComfyWorkflowItem(
               name: baseName,
               filePath: file.path,
-              description: isImage ? 'Anima Base v1.0 (Text to Image Subgraph)' : 'Workflow de ComfyUI',
+              description: description,
               isDefaultTarget: isImage,
             ),
           );
@@ -378,15 +382,121 @@ class ComfyUiService {
     };
   }
 
+  /// Detects installed UNET models on the running ComfyUI instance
+  Future<List<String>> fetchInstalledUnetModels([String? urlOverride]) async {
+    final url = urlOverride ?? serverUrl;
+    try {
+      final res = await http.get(Uri.parse('$url/object_info/UNETLoader')).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final unetList = data['UNETLoader']?['input']?['required']?['unet_name']?[0];
+        if (unetList is List) {
+          return unetList.map((e) => e.toString()).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Builds the execution prompt dictionary for Flux 3 Klein (TextToImage)
+  Map<String, dynamic> buildFlux3KleinWorkflowPrompt({
+    required String positivePrompt,
+    String? negativePrompt,
+    int? seed,
+  }) {
+    final effectiveSeed = seed ?? (math.Random().nextInt(900000000) + 100000000);
+    return {
+      '1': {
+        'inputs': {
+          'unet_name': 'flux3_image_klein_sd_int8_convrot.safetensors',
+          'weight_dtype': 'default',
+        },
+        'class_type': 'UNETLoader',
+      },
+      '2': {
+        'inputs': {
+          'clip_name': 'qwen3vl_4b_int8_convrot.safetensors',
+          'type': 'flux3',
+          'device': 'default',
+        },
+        'class_type': 'CLIPLoader',
+      },
+      '3': {
+        'inputs': {
+          'vae_name': 'flux2-vae.safetensors',
+        },
+        'class_type': 'VAELoader',
+      },
+      '4': {
+        'inputs': {
+          'text': positivePrompt,
+          'clip': ['2', 0],
+        },
+        'class_type': 'CLIPTextEncode',
+      },
+      '5': {
+        'inputs': {
+          'text': negativePrompt ?? '',
+          'clip': ['2', 0],
+        },
+        'class_type': 'CLIPTextEncode',
+      },
+      '6': {
+        'inputs': {
+          'width': 1024,
+          'height': 1024,
+          'batch_size': 1,
+        },
+        'class_type': 'EmptyFlux2LatentImage',
+      },
+      '7': {
+        'inputs': {
+          'seed': effectiveSeed,
+          'steps': 15,
+          'cfg': 1.0,
+          'sampler_name': 'euler',
+          'scheduler': 'simple',
+          'denoise': 1.0,
+          'model': ['1', 0],
+          'positive': ['4', 0],
+          'negative': ['5', 0],
+          'latent_image': ['6', 0],
+        },
+        'class_type': 'KSampler',
+      },
+      '8': {
+        'inputs': {
+          'samples': ['7', 0],
+          'vae': ['3', 0],
+        },
+        'class_type': 'VAEDecode',
+      },
+      '9': {
+        'inputs': {
+          'filename_prefix': 'Grimoire',
+          'images': ['8', 0],
+        },
+        'class_type': 'SaveImage',
+      },
+    };
+  }
+
   /// Builds execution prompt dictionary dynamically based on the active target workflow
   Future<Map<String, dynamic>> buildWorkflowPromptForTarget({
     required String positivePrompt,
     String? negativePrompt,
     int? seed,
   }) async {
-    // If target is Image (Anima Base v1.0), use the verified optimized prompt
-    if (targetWorkflowName.toLowerCase() == 'image' || targetWorkflowPath == null) {
-      return buildAnimaWorkflowPrompt(
+    // Check installed UNET models on ComfyUI server
+    final installedUnets = await fetchInstalledUnetModels();
+    final bool hasFluxKlein = installedUnets.any((u) => u.toLowerCase().contains('flux3_image_klein'));
+    final bool hasAnima = installedUnets.any((u) => u.toLowerCase().contains('anima'));
+
+    final targetLower = targetWorkflowName.toLowerCase();
+
+    // If target is specifically TextToImage or user has Flux Klein installed without Anima
+    if (targetLower.contains('texttoimage') || (hasFluxKlein && !hasAnima && (targetWorkflowPath == null || targetLower == 'image'))) {
+      return buildFlux3KleinWorkflowPrompt(
         positivePrompt: positivePrompt,
         negativePrompt: negativePrompt,
         seed: seed,
@@ -395,51 +505,82 @@ class ComfyUiService {
 
     // Try reading custom workflow from disk if path exists
     try {
-      final file = File(targetWorkflowPath!);
-      if (file.existsSync()) {
-        final content = await file.readAsString();
-        final dynamic decoded = jsonDecode(content);
-        if (decoded is Map<String, dynamic>) {
-          // If in ComfyUI API format (map of node IDs with class_type & inputs)
-          final isApiFormat = decoded.values.any((v) => v is Map && v.containsKey('class_type'));
-          if (isApiFormat) {
-            final Map<String, dynamic> promptMap = Map<String, dynamic>.from(decoded);
-            final effectiveSeed = seed ?? (math.Random().nextInt(900000000) + 100000000);
+      if (targetWorkflowPath != null) {
+        final file = File(targetWorkflowPath!);
+        if (file.existsSync()) {
+          final content = await file.readAsString();
+          final dynamic decoded = jsonDecode(content);
+          if (decoded is Map<String, dynamic>) {
+            // If in ComfyUI API format (map of node IDs with class_type & inputs)
+            final isApiFormat = decoded.values.any((v) => v is Map && v.containsKey('class_type'));
+            if (isApiFormat) {
+              final Map<String, dynamic> promptMap = Map<String, dynamic>.from(decoded);
+              final effectiveSeed = seed ?? (math.Random().nextInt(900000000) + 100000000);
 
-            final textNodes = promptMap.entries.where((e) {
-              final val = e.value;
-              return val is Map && val['class_type'] == 'CLIPTextEncode';
-            }).toList();
-
-            if (textNodes.length == 1) {
-              textNodes[0].value['inputs']['text'] = positivePrompt;
-            } else if (textNodes.length >= 2) {
-              textNodes[0].value['inputs']['text'] = positivePrompt;
-              textNodes[1].value['inputs']['text'] =
-                  negativePrompt ?? 'worst quality, low quality, blurry, bad anatomy';
-            }
-
-            for (final entry in promptMap.entries) {
-              final val = entry.value;
-              if (val is Map &&
-                  (val['class_type'] == 'KSampler' || val['class_type'] == 'KSamplerAdvanced')) {
-                if (val['inputs'] is Map && val['inputs'].containsKey('seed')) {
-                  val['inputs']['seed'] = effectiveSeed;
+              // Auto-remap UNETLoader if model is missing but another is installed
+              for (final entry in promptMap.entries) {
+                final val = entry.value;
+                if (val is Map && val['class_type'] == 'UNETLoader' && val['inputs'] is Map) {
+                  final currentUnet = val['inputs']['unet_name']?.toString() ?? '';
+                  if (installedUnets.isNotEmpty && !installedUnets.contains(currentUnet)) {
+                    val['inputs']['unet_name'] = installedUnets.first;
+                  }
                 }
               }
-              if (val is Map && val['class_type'] == 'SaveImage') {
-                if (val['inputs'] is Map) {
-                  val['inputs']['filename_prefix'] = 'Grimoire';
+
+              final textNodes = promptMap.entries.where((e) {
+                final val = e.value;
+                return val is Map && val['class_type'] == 'CLIPTextEncode';
+              }).toList();
+
+              if (textNodes.length == 1) {
+                textNodes[0].value['inputs']['text'] = positivePrompt;
+              } else if (textNodes.length >= 2) {
+                textNodes[0].value['inputs']['text'] = positivePrompt;
+                textNodes[1].value['inputs']['text'] =
+                    negativePrompt ?? 'worst quality, low quality, blurry, bad anatomy';
+              }
+
+              for (final entry in promptMap.entries) {
+                final val = entry.value;
+                if (val is Map &&
+                    (val['class_type'] == 'KSampler' || val['class_type'] == 'KSamplerAdvanced')) {
+                  if (val['inputs'] is Map && val['inputs'].containsKey('seed')) {
+                    val['inputs']['seed'] = effectiveSeed;
+                  }
+                }
+                if (val is Map && val['class_type'] == 'SaveImage') {
+                  if (val['inputs'] is Map) {
+                    val['inputs']['filename_prefix'] = 'Grimoire';
+                  }
                 }
               }
-            }
 
-            return promptMap;
+              return promptMap;
+            } else if (decoded.containsKey('nodes')) {
+              // Custom workflow is in ComfyUI UI format (not API format).
+              // If user has Flux Klein installed, automatically run Flux Klein prompt!
+              if (hasFluxKlein) {
+                return buildFlux3KleinWorkflowPrompt(
+                  positivePrompt: positivePrompt,
+                  negativePrompt: negativePrompt,
+                  seed: seed,
+                );
+              }
+            }
           }
         }
       }
     } catch (e) {
-      debugPrint('Fallback to Anima prompt due to error adapting custom workflow: $e');
+      debugPrint('Fallback adapting custom workflow: $e');
+    }
+
+    if (hasFluxKlein && !hasAnima) {
+      return buildFlux3KleinWorkflowPrompt(
+        positivePrompt: positivePrompt,
+        negativePrompt: negativePrompt,
+        seed: seed,
+      );
     }
 
     return buildAnimaWorkflowPrompt(

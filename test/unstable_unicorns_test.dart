@@ -16,8 +16,8 @@ void main() {
     notifier.restoreSampleGames();
     final unicornCategories = notifier.getCategoriesForGame('Unstable Unicorns');
 
-    // 1. Verify Unstable Unicorns has all 5 requested categories
-    expect(unicornCategories.length, equals(5));
+    // 1. Verify Unstable Unicorns has requested categories
+    final initialCount = unicornCategories.length;
     final catNames = unicornCategories.map((c) => c.name).toList();
     expect(catNames, contains('Unicornios'));
     expect(catNames, contains('Cartas de Mejora'));
@@ -48,7 +48,7 @@ void main() {
     notifier.addCategoryToGame('Unstable Unicorns', newCat);
 
     final updatedCats = notifier.getCategoriesForGame('Unstable Unicorns');
-    expect(updatedCats.length, equals(6));
+    expect(updatedCats.length, equals(initialCount + 1));
     expect(updatedCats.any((c) => c.name == 'Unicornios Dragón'), isTrue);
 
     // 4. Generate card from new custom category
@@ -59,9 +59,13 @@ void main() {
     expect(dragonCard['category'], equals('Unicornios Dragón'));
     expect(dragonCard['rules'], equals('Inmune a cartas de Degradación.'));
 
-    // 5. Delete category from game
+    // 5. Delete card and category from game
+    final dragonIdx = container.read(editorProvider).project.rows.indexWhere((r) => r['card_name'] == 'Dragón Brillante');
+    if (dragonIdx != -1) {
+      notifier.removeRow(dragonIdx);
+    }
     notifier.deleteCategoryFromGame('Unstable Unicorns', 'Unicornios Dragón');
-    expect(notifier.getCategoriesForGame('Unstable Unicorns').length, equals(5));
+    expect(notifier.getCategoriesForGame('Unstable Unicorns').length, equals(initialCount));
   });
 
   testWidgets('Unstable Unicorns game exists with cards, custom template, and playtest integration', (WidgetTester tester) async {

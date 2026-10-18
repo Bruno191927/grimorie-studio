@@ -4,13 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../editor/models/card_template.dart';
+import '../../../editor/models/card_project.dart';
 import '../../../editor/presentation/providers/editor_provider.dart';
+import '../../../editor/presentation/widgets/card_renderer_widget.dart';
+import '../../../editor/services/game_folder_service.dart';
 import '../../services/export_service.dart';
 
 enum ExportFormat {
+  printAndPlaySheet,
   pdfPrint,
+  htmlShowcase,
   tabletopSimulator,
   pngZip,
+  grimoirePackage,
 }
 
 class ExportOptionsDialog extends ConsumerStatefulWidget {
@@ -47,63 +53,125 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
   bool _includeBleed = true;
   bool _includeCropMarks = true;
   bool _includeBacks = true;
+  bool _useUsLetter = false;
+  bool _respectQuantityColumn = true;
   bool _isProcessing = false;
   String _statusMessage = '';
   double _progress = 0.0;
 
+  // Embedded off-stage RepaintBoundary inside the dialog so batch export works from ANY tab!
+  final GlobalKey _dialogRenderBoundaryKey = GlobalKey();
+  Map<String, dynamic> _currentRenderingRow = const {};
+  CardSide _currentRenderingSide = CardSide.front;
+  CardTemplate? _currentRenderingTemplate;
+
   Future<void> _runExport() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Preparando cartas...';
+      _statusMessage = 'Preparando exportación...';
       _progress = 0.05;
     });
 
     final editorNotifier = ref.read(editorProvider.notifier);
-    final initialSide = ref.read(editorProvider).currentSide;
-    final initialRowIndex = ref.read(editorProvider).project.activeRowIndex;
-    final allRows = ref.read(editorProvider).project.rows;
-
-    // Filter rows if specified
-    final targetRows = widget.filterGame == null || widget.filterGame == 'All'
-        ? allRows
-        : allRows.where((r) => (r['game'] ?? '').toString().toLowerCase() == widget.filterGame!.toLowerCase()).toList();
-
-    final cardImages = <Uint8List>[];
-    Uint8List? backImageBytes;
+    final editorState = ref.read(editorProvider);
+    final project = editorState.project;
+    final allRows = project.rows;
 
     try {
-      // 1. Capture Back Face (if requested)
+      // Handle .grimoire Package Export directly without rendering images
+      if (_selectedFormat == ExportFormat.grimoirePackage) {
+        setState(() {
+          _statusMessage = 'Empaquetando proyecto .grimoire (Plantillas, CSVs y Assets)...';
+          _progress = 0.5;
+        });
+
+        final payload = <String, dynamic>{
+          'version': 1,
+          'savedAt': DateTime.now().toIso8601String(),
+          'project': project.toJson(),
+          'gameCategories': editorState.gameCategories.map(
+            (k, v) => MapEntry(k, v.map((c) => c.toJson()).toList()),
+          ),
+          'deletedGames': editorState.deletedGames.toList(),
+        };
+
+        final pkgFile = await ExportService.exportGrimoirePackage(
+          workspaceStatePayload: payload,
+          packageName: widget.filterGame ?? project.name,
+          gamesRootDir: GameFolderService.getGamesRootDir(),
+        );
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: GrimoireTheme.accentEmerald,
+              duration: const Duration(seconds: 5),
+              content: Text('Paquete .grimoire exportado:\n${pkgFile.path}'),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Filter rows if specified
+      final targetRows = widget.filterGame == null || widget.filterGame == 'All'
+          ? allRows
+          : allRows.where((r) => (r['game'] ?? '').toString().toLowerCase() == widget.filterGame!.toLowerCase()).toList();
+      final rowsToRender = targetRows.isEmpty ? allRows : targetRows;
+
+      final cardImages = <Uint8List>[];
+      final expandedCardNames = <String>[];
+      Uint8List? backImageBytes;
+
+      // 1. Capture Back Face using the dialog's dedicated RepaintBoundary
       if (_includeBacks || _selectedFormat == ExportFormat.tabletopSimulator) {
         setState(() {
-          _statusMessage = 'Renderizando reverso de carta (Back Face)...';
+          _statusMessage = 'Renderizando reverso de carta (300 DPI)...';
+          _currentRenderingRow = rowsToRender.isNotEmpty ? rowsToRender.first : {};
+          _currentRenderingTemplate = rowsToRender.isNotEmpty
+              ? editorNotifier.resolveTemplateForRow(rowsToRender.first)
+              : project.activeTemplate;
+          _currentRenderingSide = CardSide.back;
           _progress = 0.15;
         });
 
-        editorNotifier.switchSide(CardSide.back);
-        await Future.delayed(const Duration(milliseconds: 120));
-        backImageBytes = await ExportService.captureBoundaryToImage(widget.repaintBoundaryKey);
+        await WidgetsBinding.instance.endOfFrame;
+        await Future.delayed(const Duration(milliseconds: 60));
+        backImageBytes = await ExportService.captureBoundaryToImage(_dialogRenderBoundaryKey) ??
+            await ExportService.captureBoundaryToImage(widget.repaintBoundaryKey);
       }
 
-      // 2. Capture Each Card Front Face
-      editorNotifier.switchSide(CardSide.front);
-      await Future.delayed(const Duration(milliseconds: 80));
-
-      final rowsToRender = targetRows.isEmpty ? allRows : targetRows;
+      // 2. Capture Each Card Front Face (respecting `qty` / `quantity` column if enabled)
       for (int i = 0; i < rowsToRender.length; i++) {
-        final rowIndexInAll = allRows.indexOf(rowsToRender[i]);
-        if (rowIndexInAll != -1) {
-          editorNotifier.setActiveRow(rowIndexInAll);
-          await Future.delayed(const Duration(milliseconds: 80));
-        }
+        final row = rowsToRender[i];
+        final resolvedTpl = editorNotifier.resolveTemplateForRow(row);
 
         setState(() {
-          _statusMessage = 'Renderizando carta ${i + 1} de ${rowsToRender.length}...';
-          _progress = 0.2 + (0.5 * (i + 1) / rowsToRender.length);
+          _currentRenderingRow = row;
+          _currentRenderingTemplate = resolvedTpl;
+          _currentRenderingSide = CardSide.front;
+          _statusMessage = 'Renderizando carta ${i + 1} de ${rowsToRender.length} (${row['card_name'] ?? 'Card'})...';
+          _progress = 0.2 + (0.55 * (i + 1) / rowsToRender.length);
         });
 
-        final img = await ExportService.captureBoundaryToImage(widget.repaintBoundaryKey);
+        await WidgetsBinding.instance.endOfFrame;
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        final img = await ExportService.captureBoundaryToImage(_dialogRenderBoundaryKey) ??
+            await ExportService.captureBoundaryToImage(widget.repaintBoundaryKey);
+
         if (img != null) {
-          cardImages.add(img);
+          int copies = 1;
+          if (_respectQuantityColumn) {
+            final rawQty = (row['qty'] ?? row['quantity'] ?? '1').toString().trim();
+            copies = (int.tryParse(rawQty) ?? 1).clamp(1, 20);
+          }
+          final baseName = (row['card_name'] ?? 'card_${i + 1}').toString();
+          for (int c = 0; c < copies; c++) {
+            cardImages.add(img);
+            expandedCardNames.add(copies > 1 ? '${baseName}_${c + 1}' : baseName);
+          }
         }
       }
 
@@ -113,14 +181,28 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
 
       // 3. Perform Output Operation
       setState(() {
-        _statusMessage = 'Comprimiendo y generando archivos finales...';
+        _statusMessage = 'Generando archivo final (${cardImages.length} cartas)...';
         _progress = 0.85;
       });
 
       final deckName = widget.filterGame ?? 'Grimoire_Deck';
-
       String resultPath = '';
+
       switch (_selectedFormat) {
+        case ExportFormat.printAndPlaySheet:
+          final pnpFile = await ExportService.exportCardsToPrintAndPlaySheetPdf(
+            cardImages: cardImages,
+            backImage: _includeBacks ? backImageBytes : null,
+            fileName: '${deckName}_PnP_3x3_${_useUsLetter ? 'Letter' : 'A4'}',
+            useUsLetter: _useUsLetter,
+            includeBacks: _includeBacks,
+            includeCutLines: _includeCropMarks,
+            cardWidthMm: project.widthMm,
+            cardHeightMm: project.heightMm,
+          );
+          resultPath = pnpFile.path;
+          break;
+
         case ExportFormat.pdfPrint:
           final pdfFile = await ExportService.exportCardsToPdf(
             cardImages: cardImages,
@@ -130,6 +212,17 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
             includeBacks: _includeBacks,
           );
           resultPath = pdfFile.path;
+          break;
+
+        case ExportFormat.htmlShowcase:
+          final htmlFile = await ExportService.exportHtmlShowcase(
+            cardImages: cardImages,
+            cardNames: expandedCardNames,
+            backImage: _includeBacks ? backImageBytes : null,
+            showcaseTitle: deckName,
+            cardDataList: rowsToRender,
+          );
+          resultPath = htmlFile.path;
           break;
 
         case ExportFormat.tabletopSimulator:
@@ -142,20 +235,18 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
           break;
 
         case ExportFormat.pngZip:
-          final cardNames = rowsToRender.map((r) => r['card_name']?.toString() ?? 'card').toList();
           final zipFile = await ExportService.exportCardsToZip(
             cardImages: cardImages,
-            cardNames: cardNames,
+            cardNames: expandedCardNames,
             backImage: _includeBacks ? backImageBytes : null,
             zipName: '${deckName}_PNG_Cards',
           );
           resultPath = zipFile.path;
           break;
-      }
 
-      // Restore original state
-      editorNotifier.switchSide(initialSide);
-      editorNotifier.setActiveRow(initialRowIndex);
+        case ExportFormat.grimoirePackage:
+          break;
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -169,7 +260,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '${ref.tr('export_success')}\n$resultPath',
+                    '${ref.tr('export_success')} (${cardImages.length} cartas)\n$resultPath',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -179,10 +270,6 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
         );
       }
     } catch (e) {
-      // Restore original state on error
-      editorNotifier.switchSide(initialSide);
-      editorNotifier.setActiveRow(initialRowIndex);
-
       if (mounted) {
         setState(() {
           _isProcessing = false;
@@ -199,236 +286,500 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final editorState = ref.watch(editorProvider);
+    final project = editorState.project;
+    final activeTpl = _currentRenderingTemplate ?? project.activeTemplate;
+    final activeRow = _currentRenderingRow.isNotEmpty ? _currentRenderingRow : project.activeRow;
+    final cardWidth = project.widthMm * 4.0;
+    final cardHeight = project.heightMm * 4.0;
+
     return Dialog(
       backgroundColor: GrimoireTheme.surfacePanel,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: GrimoireTheme.borderSubtle),
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
-                    ),
-                    child: const Icon(Icons.print_outlined, color: GrimoireTheme.accentPurple, size: 22),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ref.tr('export_options_title'),
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.filterGame != null && widget.filterGame != 'All'
-                              ? 'Mazo: ${widget.filterGame}'
-                              : 'Todas las cartas del proyecto',
-                          style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!_isProcessing)
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20, color: GrimoireTheme.textMuted),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                ],
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Hidden / Behind-Dialog 300 DPI Render Surface (Always mounted & painted even from Gallery/DB/Playtest tabs)
+          Positioned(
+            left: -9999,
+            top: -9999,
+            child: RepaintBoundary(
+              key: _dialogRenderBoundaryKey,
+              child: CardRendererWidget(
+                template: activeTpl,
+                cardData: activeRow,
+                side: _currentRenderingSide,
+                cardWidth: cardWidth,
+                cardHeight: cardHeight,
+                showGrid: false,
               ),
-              const SizedBox(height: 20),
+            ),
+          ),
 
-              // Format Selector Tabs
-              Text(
-                ref.tr('export_format'),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GrimoireTheme.textSecondary),
-              ),
-              const SizedBox(height: 8),
-              Row(
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 640,
+              maxHeight: MediaQuery.of(context).size.height * 0.90,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildFormatTab(
-                    format: ExportFormat.pdfPrint,
-                    title: 'PDF Imprenta',
-                    icon: Icons.picture_as_pdf,
-                    color: GrimoireTheme.accentPurple,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFormatTab(
-                    format: ExportFormat.tabletopSimulator,
-                    title: 'TTS Sprite Sheet',
-                    icon: Icons.casino,
-                    color: GrimoireTheme.accentIndigo,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFormatTab(
-                    format: ExportFormat.pngZip,
-                    title: 'PNG Individual',
-                    icon: Icons.folder_zip,
-                    color: GrimoireTheme.accentEmerald,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              // Dynamic Options Based on Format
-              if (_selectedFormat == ExportFormat.pdfPrint) ...[
-                _buildSwitchOption(
-                  title: ref.tr('option_bleed'),
-                  description: ref.tr('option_bleed_desc'),
-                  value: _includeBleed,
-                  icon: Icons.aspect_ratio,
-                  onChanged: _isProcessing ? null : (v) => setState(() => _includeBleed = v),
-                ),
-                const SizedBox(height: 10),
-                _buildSwitchOption(
-                  title: ref.tr('option_crop_marks'),
-                  description: ref.tr('option_crop_marks_desc'),
-                  value: _includeCropMarks,
-                  icon: Icons.crop,
-                  onChanged: _isProcessing ? null : (v) => setState(() => _includeCropMarks = v),
-                ),
-                const SizedBox(height: 10),
-                _buildSwitchOption(
-                  title: ref.tr('option_include_backs'),
-                  description: ref.tr('option_include_backs_desc'),
-                  value: _includeBacks,
-                  icon: Icons.flip,
-                  onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
-                ),
-              ] else if (_selectedFormat == ExportFormat.tabletopSimulator) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF16182E),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.4)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Header
+                  Row(
                     children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.auto_awesome, size: 16, color: GrimoireTheme.accentIndigo),
-                          SizedBox(width: 8),
-                          Text(
-                            'Tabletop Simulator (TTS) Ready',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: GrimoireTheme.accentPurple.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.5)),
+                        ),
+                        child: const Icon(Icons.print_outlined, color: GrimoireTheme.accentPurple, size: 22),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        ref.tr('tts_deck_info'),
-                        style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ref.tr('export_options_title'),
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.filterGame != null && widget.filterGame != 'All'
+                                  ? 'Mazo: ${widget.filterGame}'
+                                  : 'Todas las cartas del proyecto (${project.widthMm.toStringAsFixed(1)}×${project.heightMm.toStringAsFixed(1)} mm)',
+                              style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 14,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: const [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
-                              SizedBox(width: 6),
-                              Text('Hoja Frontal (Grid hasta 10x7)', style: TextStyle(fontSize: 11, color: Colors.white)),
-                            ],
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
-                              SizedBox(width: 6),
-                              Text('Hoja de Reverso & Config TXT', style: TextStyle(fontSize: 11, color: Colors.white)),
-                            ],
-                          ),
-                        ],
+                      if (!_isProcessing)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20, color: GrimoireTheme.textMuted),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Format Selector Tabs
+                  Text(
+                    ref.tr('export_format'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GrimoireTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildFormatTab(
+                        format: ExportFormat.printAndPlaySheet,
+                        title: 'Print & Play 3×3',
+                        icon: Icons.grid_view_rounded,
+                        color: GrimoireTheme.accentPink,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.pdfPrint,
+                        title: 'PDF Imprenta',
+                        icon: Icons.picture_as_pdf,
+                        color: GrimoireTheme.accentPurple,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.htmlShowcase,
+                        title: 'Web 3D',
+                        icon: Icons.view_in_ar,
+                        color: GrimoireTheme.accentCyan,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.tabletopSimulator,
+                        title: 'TTS Sprite Sheet',
+                        icon: Icons.casino,
+                        color: GrimoireTheme.accentIndigo,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.pngZip,
+                        title: 'PNG Individual',
+                        icon: Icons.folder_zip,
+                        color: GrimoireTheme.accentEmerald,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.grimoirePackage,
+                        title: '.grimoire',
+                        icon: Icons.inventory_2_outlined,
+                        color: GrimoireTheme.accentAmber,
                       ),
                     ],
                   ),
-                ),
-              ] else ...[
-                _buildSwitchOption(
-                  title: ref.tr('option_include_backs'),
-                  description: ref.tr('option_include_backs_desc'),
-                  value: _includeBacks,
-                  icon: Icons.flip,
-                  onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
-                ),
-              ],
+                  const SizedBox(height: 16),
 
-              const SizedBox(height: 20),
-
-              // Progress Bar if running
-              if (_isProcessing) ...[
-                LinearProgressIndicator(
-                  value: _progress,
-                  backgroundColor: const Color(0xFF10121E),
-                  valueColor: const AlwaysStoppedAnimation(GrimoireTheme.accentPurple),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _statusMessage,
-                  style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 14),
-              ],
-
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
-                    child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: GrimoireTheme.accentPurple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  // Dynamic Options Based on Format
+                  if (_selectedFormat == ExportFormat.printAndPlaySheet) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPaperChoiceChip(
+                            label: 'Hoja A4 (210 × 297 mm)',
+                            selected: !_useUsLetter,
+                            onTap: () => setState(() => _useUsLetter = false),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPaperChoiceChip(
+                            label: 'US Letter (8.5 × 11 in)',
+                            selected: _useUsLetter,
+                            onTap: () => setState(() => _useUsLetter = true),
+                          ),
+                        ),
+                      ],
                     ),
-                    onPressed: _isProcessing ? null : _runExport,
-                    icon: _isProcessing
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.file_download_outlined, size: 16),
-                    label: Text(
-                      _isProcessing ? ref.tr('exporting') : ref.tr('btn_start_export'),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    const SizedBox(height: 10),
+                    _buildSwitchOption(
+                      title: 'Guías de Corte (Grid 3×3)',
+                      description: 'Dibuja líneas guía alrededor de las 9 cartas por página para corte con tijera o guillotina.',
+                      value: _includeCropMarks,
+                      icon: Icons.crop,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeCropMarks = v),
                     ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('option_include_backs'),
+                      description: 'Genera página trasera espejada automáticamente para imprimir a doble cara.',
+                      value: _includeBacks,
+                      icon: Icons.flip,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Multiplicar por Columna Cantidad (qty)',
+                      description: 'Si una carta tiene qty=4 en la base de datos, imprime 4 copias en la hoja.',
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.pdfPrint) ...[
+                    _buildSwitchOption(
+                      title: ref.tr('option_bleed'),
+                      description: ref.tr('option_bleed_desc'),
+                      value: _includeBleed,
+                      icon: Icons.aspect_ratio,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeBleed = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('option_crop_marks'),
+                      description: ref.tr('option_crop_marks_desc'),
+                      value: _includeCropMarks,
+                      icon: Icons.crop,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeCropMarks = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('option_include_backs'),
+                      description: ref.tr('option_include_backs_desc'),
+                      value: _includeBacks,
+                      icon: Icons.flip,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPreflightChecklist(project),
+                  ] else if (_selectedFormat == ExportFormat.htmlShowcase) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1A28),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: GrimoireTheme.accentCyan.withValues(alpha: 0.45)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.view_in_ar, size: 16, color: GrimoireTheme.accentCyan),
+                              SizedBox(width: 8),
+                              Text(
+                                'Visor Web 3D Interactivo (100% Autónomo)',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Genera un archivo .html único con visualización 3D reactiva al cursor del ratón, brillo holográfico, filtro de búsqueda instantánea y zoom modal con giro anverso/reverso. Abre directamente en cualquier navegador moderno sin requerir internet ni servidor.',
+                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                          SizedBox(height: 10),
+                          Wrap(
+                            spacing: 14,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  SizedBox(width: 6),
+                                  Text('Tilt 3D & Holographic Sheen', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  SizedBox(width: 6),
+                                  Text('Giro Anverso / Reverso', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  SizedBox(width: 6),
+                                  Text('Búsqueda en Vivo', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  SizedBox(width: 6),
+                                  Text('100% Offline', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('option_include_backs'),
+                      description: 'Permite voltear las cartas en 3D para inspeccionar el reverso en el navegador.',
+                      value: _includeBacks,
+                      icon: Icons.flip,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Multiplicar por Columna Cantidad (qty)',
+                      description: 'Incluye tantas copias de cada carta en la galería web como indique la columna qty.',
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.tabletopSimulator) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16182E),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.auto_awesome, size: 16, color: GrimoireTheme.accentIndigo),
+                              SizedBox(width: 8),
+                              Text(
+                                'Tabletop Simulator (TTS) Ready',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            ref.tr('tts_deck_info'),
+                            style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                          const SizedBox(height: 10),
+                          const Wrap(
+                            spacing: 14,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
+                                  SizedBox(width: 6),
+                                  Text('Hoja Frontal (Grid hasta 10x7)', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
+                                  SizedBox(width: 6),
+                                  Text('Hoja de Reverso & Config TXT', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Multiplicar por Columna Cantidad (qty)',
+                      description: 'Genera copias múltiples en el Sprite Sheet según la columna qty.',
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.grimoirePackage) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1C1810),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: GrimoireTheme.accentAmber.withValues(alpha: 0.45)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.inventory_2_outlined, size: 16, color: GrimoireTheme.accentAmber),
+                              SizedBox(width: 8),
+                              Text(
+                                'Paquete de Proyecto Portable (.grimoire)',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Empaqueta todas tus plantillas, capas, reglas condicionales, archivos data.csv y carpetas de imágenes assets/ en un único archivo .grimoire listo para respaldo o para compartir con tu equipo.',
+                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    _buildSwitchOption(
+                      title: ref.tr('option_include_backs'),
+                      description: ref.tr('option_include_backs_desc'),
+                      value: _includeBacks,
+                      icon: Icons.flip,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
+                    ),
+                  ],
+
+                  const SizedBox(height: 18),
+
+                  // Progress Bar if running
+                  if (_isProcessing) ...[
+                    LinearProgressIndicator(
+                      value: _progress,
+                      backgroundColor: const Color(0xFF10121E),
+                      valueColor: const AlwaysStoppedAnimation(GrimoireTheme.accentPurple),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _statusMessage,
+                      style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
+                        child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: GrimoireTheme.accentPurple,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _isProcessing ? null : _runExport,
+                        icon: _isProcessing
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.file_download_outlined, size: 16),
+                        label: Text(
+                          _isProcessing ? ref.tr('exporting') : ref.tr('btn_start_export'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaperChoiceChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: _isProcessing ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? GrimoireTheme.accentPink.withValues(alpha: 0.18) : const Color(0xFF111320),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? GrimoireTheme.accentPink : GrimoireTheme.borderSubtle,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 15,
+              color: selected ? GrimoireTheme.accentPink : GrimoireTheme.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? Colors.white : GrimoireTheme.textSecondary,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -446,7 +797,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
         borderRadius: BorderRadius.circular(10),
         onTap: _isProcessing ? null : () => setState(() => _selectedFormat = format),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
           decoration: BoxDecoration(
             color: isSelected ? color.withValues(alpha: 0.18) : const Color(0xFF131524),
             borderRadius: BorderRadius.circular(10),
@@ -457,13 +808,15 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
           ),
           child: Column(
             children: [
-              Icon(icon, size: 20, color: isSelected ? color : GrimoireTheme.textMuted),
-              const SizedBox(height: 6),
+              Icon(icon, size: 18, color: isSelected ? color : GrimoireTheme.textMuted),
+              const SizedBox(height: 5),
               Text(
                 title,
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected ? Colors.white : GrimoireTheme.textMuted,
                 ),
@@ -483,7 +836,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
     required ValueChanged<bool>? onChanged,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: const Color(0xFF111320),
         borderRadius: BorderRadius.circular(8),
@@ -513,6 +866,131 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
             activeThumbColor: GrimoireTheme.accentPurple,
             onChanged: onChanged,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreflightChecklist(CardProject project) {
+    final report = ExportService.generatePreflightReport(
+      widthMm: project.widthMm,
+      heightMm: project.heightMm,
+      bleedEnabled: _includeBleed,
+      cropMarksEnabled: _includeCropMarks,
+      duplexEnabled: _includeBacks,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131726),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: report.warningCount > 0
+              ? GrimoireTheme.accentAmber.withValues(alpha: 0.5)
+              : GrimoireTheme.borderSubtle,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                report.warningCount > 0 ? Icons.warning_amber_rounded : Icons.verified_outlined,
+                size: 16,
+                color: report.warningCount > 0 ? GrimoireTheme.accentAmber : GrimoireTheme.accentEmerald,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pre-flight Imprenta & Perfil CMYK (PDF/X-1a)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (report.warningCount > 0 ? GrimoireTheme.accentAmber : GrimoireTheme.accentEmerald)
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: (report.warningCount > 0 ? GrimoireTheme.accentAmber : GrimoireTheme.accentEmerald)
+                        .withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  report.warningCount > 0 ? '${report.warningCount} Advertencia' : '100% Listo',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: report.warningCount > 0 ? GrimoireTheme.accentAmber : GrimoireTheme.accentEmerald,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...report.checks.map((item) {
+            final Color iconColor;
+            final IconData iconData;
+            switch (item.status) {
+              case PreflightStatus.pass:
+                iconColor = GrimoireTheme.accentEmerald;
+                iconData = Icons.check_circle_rounded;
+                break;
+              case PreflightStatus.warning:
+                iconColor = GrimoireTheme.accentAmber;
+                iconData = Icons.warning_rounded;
+                break;
+              case PreflightStatus.info:
+                iconColor = GrimoireTheme.accentCyan;
+                iconData = Icons.info_outline;
+                break;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(iconData, size: 12, color: iconColor),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.95),
+                          ),
+                        ),
+                        Text(
+                          item.description,
+                          style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, height: 1.25),
+                        ),
+                        if (item.recommendation != null)
+                          Text(
+                            '💡 ${item.recommendation!}',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: iconColor.withValues(alpha: 0.9),
+                              height: 1.25,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

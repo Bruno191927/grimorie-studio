@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import 'core/theme/grimoire_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'features/editor/presentation/screens/editor_screen.dart';
@@ -10,9 +13,9 @@ import 'features/editor/presentation/providers/editor_provider.dart';
 import 'core/localization/locale_provider.dart';
 import 'core/localization/language_selector.dart';
 import 'features/export/presentation/dialogs/export_options_dialog.dart';
-import 'features/ai_generator/presentation/widgets/comfy_ui_connection_dialog.dart';
-import 'features/ai_generator/presentation/providers/comfy_ui_provider.dart';
-import 'features/ai_generator/presentation/providers/nvidia_provider.dart';
+import 'core/widgets/keyboard_shortcuts_dialog.dart';
+import 'core/widgets/quick_card_search_dialog.dart';
+import 'core/widgets/grimoire_toast.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,16 +51,10 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   int _currentTab = 0; // 0: Gallery, 1: Editor, 2: Database, 3: Playtest
   final GlobalKey _repaintBoundaryKey = GlobalKey();
 
-  void _showAiEngineStatusDialog() {
-    ComfyUiConnectionDialog.show(context);
-  }
-
   Future<void> _handleBatchExport() async {
     final project = ref.read(editorProvider).project;
     if (project.rows.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No cards available to export.')),
-      );
+      GrimoireToast.warning(context, 'No cards available to export.');
       return;
     }
 
@@ -67,252 +64,298 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
     );
   }
 
+  Future<void> _handleImportGrimoire() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['grimoire', 'zip'],
+        dialogTitle: 'Seleccionar paquete de juego Grimoire Studio (.grimoire / .zip)',
+      );
+
+      if (files.isEmpty || files.first.path == null) {
+        return;
+      }
+
+      final file = File(files.first.path!);
+      final result = await ref.read(editorProvider.notifier).importGrimoirePackage(file);
+      if (!mounted) return;
+
+      if (result.success) {
+        GrimoireToast.success(context, result.message);
+      } else {
+        GrimoireToast.error(context, result.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        GrimoireToast.error(context, 'Error al importar paquete: $e');
+      }
+    }
+  }
+
+  Future<void> _handleSaveProject() async {
+    await ref.read(editorProvider.notifier).saveActiveProjectAndCsv();
+    if (mounted) {
+      GrimoireToast.success(
+        context,
+        'Proyecto y CSV guardados con éxito (Ctrl+S)',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: GrimoireTheme.bgCanvas,
-      body: Column(
-        children: [
-          // Global App Header Bar (Inspired by the Reference Image)
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: const BoxDecoration(
-              color: GrimoireTheme.surfacePanel,
-              border: Border(bottom: BorderSide(color: GrimoireTheme.borderSubtle)),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _handleSaveProject,
+        const SingleActivator(LogicalKeyboardKey.keyE, control: true): _handleBatchExport,
+        const SingleActivator(LogicalKeyboardKey.keyO, control: true): _handleImportGrimoire,
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () => QuickCardSearchDialog.show(
+              context,
+              onCardSelected: () => setState(() => _currentTab = 1),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Left Section: Logo & Nav Tabs
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+        const SingleActivator(LogicalKeyboardKey.keyB, control: true, shift: true): () =>
+            ref.read(editorProvider.notifier).toggleBleedGuides(),
+        const SingleActivator(LogicalKeyboardKey.slash, control: true): () => KeyboardShortcutsDialog.show(context),
+        const SingleActivator(LogicalKeyboardKey.digit1, control: true): () => setState(() => _currentTab = 0),
+        const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => setState(() => _currentTab = 1),
+        const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => setState(() => _currentTab = 2),
+        const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => setState(() => _currentTab = 3),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: GrimoireTheme.bgCanvas,
+          body: Column(
+            children: [
+              // Global App Header Bar
+              Container(
+                height: 60,
+                padding: const EdgeInsets.only(left: 18, right: 36),
+                decoration: const BoxDecoration(
+                  color: GrimoireTheme.surfacePanel,
+                  border: Border(bottom: BorderSide(color: GrimoireTheme.borderSubtle)),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Logo & Brand Name
+                            // Left Section: Logo & Nav Tabs
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 34,
-                                  height: 34,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [GrimoireTheme.accentPurple, GrimoireTheme.accentIndigo, GrimoireTheme.accentPink],
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.4),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Center(
-                                    child: Icon(Icons.local_fire_department, color: Colors.white, size: 20),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                const Text(
-                                  'Grimoire ',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                                const Text(
-                                  'Studio',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: GrimoireTheme.accentPurple,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 28),
-
-                            // Navigation Tabs
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildNavTab(0, ref.tr('nav_gallery'), Icons.collections_bookmark_outlined),
-                                const SizedBox(width: 8),
-                                _buildNavTab(1, ref.tr('nav_editor'), Icons.palette_outlined),
-                                const SizedBox(width: 8),
-                                _buildNavTab(2, ref.tr('nav_database'), Icons.table_chart_outlined),
-                                const SizedBox(width: 8),
-                                _buildNavTab(3, ref.tr('nav_playtest'), Icons.casino_outlined),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(width: 24),
-
-                        // Right Section: Language Selector & Action Buttons
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Language Selector (ES / EN)
-                            const LanguageSelector(),
-                            const SizedBox(width: 12),
-
-                            // Action: Connect AI Engine Button (Supports ComfyUI & NVIDIA NIM Cloud)
-                            Builder(
-                              builder: (context) {
-                                final comfyState = ref.watch(comfyUiProvider);
-                                final nvidiaState = ref.watch(nvidiaProvider);
-                                final isComfyOnline = comfyState.serverInfo.isOnline;
-                                final isNvidiaConfigured = nvidiaState.isConfigured;
-                                final activeWfName = comfyState.activeWorkflow.name;
-
-                                final isAnyOnline = isComfyOnline || isNvidiaConfigured;
-                                final borderColor = isComfyOnline
-                                    ? GrimoireTheme.accentEmerald
-                                    : (isNvidiaConfigured
-                                        ? const Color(0xFF76B900)
-                                        : GrimoireTheme.accentPurple.withValues(alpha: 0.6));
-                                final bgColor = isComfyOnline
-                                    ? const Color(0xFF064E3B).withValues(alpha: 0.3)
-                                    : (isNvidiaConfigured
-                                        ? const Color(0xFF101713)
-                                        : const Color(0xFF16172B));
-                                final dotColor = isComfyOnline
-                                    ? GrimoireTheme.accentEmerald
-                                    : const Color(0xFF76B900);
-
-                                String buttonText;
-                                if (isComfyOnline) {
-                                  buttonText = 'ComfyUI: $activeWfName';
-                                } else if (isNvidiaConfigured) {
-                                  final shortModel = nvidiaState.selectedModel.split('/').last;
-                                  buttonText = 'NVIDIA: $shortModel';
-                                } else {
-                                  buttonText = ref.tr('btn_connect_ai');
-                                }
-
-                                return OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: borderColor,
-                                      width: isAnyOnline ? 1.5 : 1,
-                                    ),
-                                    backgroundColor: bgColor,
-                                    foregroundColor: isAnyOnline ? Colors.white : const Color(0xFFE9D5FF),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                  ),
-                                  icon: isAnyOnline
-                                      ? Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: dotColor,
+                                // Logo & Brand Name
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 34,
+                                      height: 34,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [GrimoireTheme.accentPurple, GrimoireTheme.accentIndigo, GrimoireTheme.accentPink],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: GrimoireTheme.accentPurple.withValues(alpha: 0.4),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 2),
                                           ),
-                                        )
-                                      : const Icon(Icons.bolt, size: 16, color: GrimoireTheme.accentPurple),
-                                  label: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        buttonText,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: isAnyOnline ? FontWeight.bold : FontWeight.w600,
-                                          color: isComfyOnline
-                                              ? const Color(0xFFD1FAE5)
-                                              : (isNvidiaConfigured
-                                                  ? const Color(0xFFD9F99D)
-                                                  : const Color(0xFFE9D5FF)),
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.asset(
+                                          'assets/app_icon.png',
+                                          fit: BoxFit.contain,
                                         ),
                                       ),
-                                      if (isAnyOnline) ...[
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.textMuted),
-                                      ],
-                                    ],
-                                  ),
-                                  onPressed: _showAiEngineStatusDialog,
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 12),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Grimoire ',
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    const Text(
+                                      'Studio',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: GrimoireTheme.accentPurple,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 20),
 
-                            // Batch 300 DPI Export Button
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: GrimoireTheme.accentPurple,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                // Navigation Tabs with Hotkeys
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildNavTab(0, ref.tr('nav_gallery'), Icons.collections_bookmark_outlined),
+                                    const SizedBox(width: 6),
+                                    _buildNavTab(1, ref.tr('nav_editor'), Icons.palette_outlined),
+                                    const SizedBox(width: 6),
+                                    _buildNavTab(2, ref.tr('nav_database'), Icons.table_chart_outlined),
+                                    const SizedBox(width: 6),
+                                    _buildNavTab(3, ref.tr('nav_playtest'), Icons.casino_outlined),
+                                  ],
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // Center: Quick Spotlight Card Search Bar
+                            InkWell(
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: () => QuickCardSearchDialog.show(
+                                context,
+                                onCardSelected: () => setState(() => _currentTab = 1),
                               ),
-                              icon: const Icon(Icons.archive_outlined, size: 16),
-                              label: Text(ref.tr('btn_batch_export')),
-                              onPressed: _handleBatchExport,
+                              child: Container(
+                                width: 200,
+                                height: 34,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF131625),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: GrimoireTheme.borderSubtle),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.search, size: 16, color: GrimoireTheme.textMuted),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Text(
+                                        'Buscar cartas o tags...',
+                                        style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1E2235),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFF2E3550)),
+                                      ),
+                                      child: const Text('Ctrl+K', style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textSecondary, fontFamily: 'monospace')),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // Right Section: Shortcuts Helper & Language Selector
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Keyboard Shortcuts Helper Button
+                                IconButton(
+                                  tooltip: 'Atajos de Teclado (Ctrl+/)',
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(0xFF141726),
+                                    side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.all(8),
+                                  ),
+                                  icon: const Icon(Icons.keyboard_outlined, size: 16, color: GrimoireTheme.textSecondary),
+                                  onPressed: () => KeyboardShortcutsDialog.show(context),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // Language Selector (ES / EN)
+                                const LanguageSelector(),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Main Screen Body
-          Expanded(
-            child: IndexedStack(
-              index: _currentTab,
-              children: [
-                // 0: Card Gallery (Visual style matching the reference image)
-                CardGalleryScreen(
-                  onOpenEditor: () {
-                    setState(() => _currentTab = 1);
+                      ),
+                    );
                   },
                 ),
+              ),
 
-                // 1: Canvas Editor (Three-panel interactive layout)
-                EditorScreen(repaintBoundaryKey: _repaintBoundaryKey),
+              // Main Screen Body
+              Expanded(
+                child: IndexedStack(
+                  index: _currentTab,
+                  children: [
+                    // 0: Card Gallery (Visual style matching the reference image)
+                    CardGalleryScreen(
+                      onOpenEditor: () {
+                        ref.read(editorProvider.notifier).syncActiveTemplateWithActiveRow();
+                        setState(() => _currentTab = 1);
+                      },
+                      onBatchExport: _handleBatchExport,
+                    ),
 
-                // 2: Database Table & CSV Importer
-                const DataTableView(),
+                    // 1: Canvas Editor (Three-panel interactive layout)
+                    EditorScreen(repaintBoundaryKey: _repaintBoundaryKey),
 
-                // 3: Tabletop Playtesting Mat
-                const PlaytestScreen(),
-              ],
-            ),
+                    // 2: Database Table & CSV Importer
+                    const DataTableView(),
+
+                    // 3: Tabletop Playtesting Mat
+                    const PlaytestScreen(),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildNavTab(int index, String label, IconData icon) {
     final isSelected = _currentTab == index;
+    final shortcutNumber = index + 1;
 
     return InkWell(
-      onTap: () => setState(() => _currentTab = index),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      onTap: () {
+        if (index == 1) {
+          ref.read(editorProvider.notifier).syncActiveTemplateWithActiveRow();
+        }
+        setState(() => _currentTab = index);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? GrimoireTheme.accentPurple : Colors.transparent,
-            width: 1,
+            color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.8) : Colors.transparent,
+            width: 1.2,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: GrimoireTheme.accentPurple.withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textSecondary),
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textSecondary,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -322,10 +365,28 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                 color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
               ),
             ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? GrimoireTheme.accentPurple.withValues(alpha: 0.3)
+                    : const Color(0xFF191D2F),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$shortcutNumber',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? const Color(0xFFE9D5FF) : GrimoireTheme.textMuted,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

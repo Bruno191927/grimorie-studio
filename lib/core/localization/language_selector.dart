@@ -48,6 +48,39 @@ class LanguageSelector extends ConsumerWidget {
                 ],
               ),
             ),
+            DropdownMenuItem(
+              value: AppLanguage.fr,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🇫🇷', style: TextStyle(fontSize: 14)),
+                  SizedBox(width: 6),
+                  Text('FR (Français)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: AppLanguage.it,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🇮🇹', style: TextStyle(fontSize: 14)),
+                  SizedBox(width: 6),
+                  Text('IT (Italiano)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: AppLanguage.ja,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🇯🇵', style: TextStyle(fontSize: 14)),
+                  SizedBox(width: 6),
+                  Text('JA (日本語)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                ],
+              ),
+            ),
           ],
           onChanged: (lang) {
             if (lang != null) {

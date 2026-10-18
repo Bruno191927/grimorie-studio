@@ -3,12 +3,46 @@ class TemplateParser {
 
   /// Replaces all {{key}} in [template] with the matching value from [data].
   /// If the key is not present in [data], keeps the token or falls back to [fallback].
+  /// Also omits combat icons (⚔️ / 🛡️) or cost badges when those fields exist in [data] but are empty.
   static String parse(
     String template,
     Map<String, dynamic> data, {
     String? fallback,
   }) {
     if (template.isEmpty) return '';
+
+    // Handle combined combat stats templates (e.g. '⚔️ {{attack}} / 🛡️ {{defense}}')
+    if (template.contains('{{attack}}') || template.contains('{{defense}}')) {
+      final hasAtkKey = data.containsKey('attack');
+      final hasDefKey = data.containsKey('defense');
+      if (hasAtkKey || hasDefKey) {
+        final atk = (data['attack']?.toString() ?? '').trim();
+        final def = (data['defense']?.toString() ?? '').trim();
+        if (template.contains('{{attack}}') && template.contains('{{defense}}')) {
+          if (atk.isEmpty && def.isEmpty) {
+            return '';
+          }
+          if (atk.isEmpty && def.isNotEmpty) {
+            return '🛡️ $def';
+          }
+          if (atk.isNotEmpty && def.isEmpty) {
+            return '⚔️ $atk';
+          }
+        } else if (template.contains('{{attack}}') && atk.isEmpty) {
+          return '';
+        } else if (template.contains('{{defense}}') && def.isEmpty) {
+          return '';
+        }
+      }
+    }
+
+    // Handle cost badge templates (e.g. '🔥 {{cost}} MANA') when cost is explicitly empty
+    if (template.contains('{{cost}}') && data.containsKey('cost')) {
+      final cost = (data['cost']?.toString() ?? '').trim();
+      if (cost.isEmpty) {
+        return '';
+      }
+    }
 
     return template.replaceAllMapped(_variablePattern, (match) {
       final key = match.group(1);

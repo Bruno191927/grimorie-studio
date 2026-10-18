@@ -1,50 +1,150 @@
-# Miscellaneous
-*.class
+# ==============================================================================
+# Grimoire Studio - .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Grimoire Studio Local Runtime Data & Secrets
+# ------------------------------------------------------------------------------
+# AI Configuration & Secret API Keys (Gemini, NVIDIA, ComfyUI, etc.)
+games/.grimoire_ai_config.json
+games/.nvidia_config.json
+games/.gemini_config.json
+games/.*_config.json
+.*_config.json
+*.secret.json
+*.local.json
+
+# Local workspace state and user sessions
+games/workspace_state.json
+.samples_backup/
+
+# User created games and runtime art/data (only keep directory placeholder)
+games/*
+games/.*
+!games/.gitkeep
+
+# Environment variables & credentials
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+key.properties
+credentials.json
+service_account*.json
+
+# ------------------------------------------------------------------------------
+# 2. Flutter & Dart Build Artifacts & Caches
+# ------------------------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+**/doc/api/
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# ------------------------------------------------------------------------------
+# 3. Windows Native Build & Packaging Artifacts
+# ------------------------------------------------------------------------------
+windows/flutter/ephemeral/
+windows/runner/Release/
+windows/runner/Debug/
+*.exe
+*.msi
+*.msix
+*.lib
+*.exp
+*.pdb
+*.ilk
+# Allow source and resource files
+!windows/runner/resources/*
+!windows/runner/*.ico
+!windows/runner/*.png
+
+# ------------------------------------------------------------------------------
+# 4. macOS Native Build
+# ------------------------------------------------------------------------------
+macos/Flutter/ephemeral/
+macos/Pods/
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+
+# ------------------------------------------------------------------------------
+# 5. Linux Native Build
+# ------------------------------------------------------------------------------
+linux/flutter/ephemeral/
+linux/runner/Release/
+linux/runner/Debug/
+
+# ------------------------------------------------------------------------------
+# 6. Android Build
+# ------------------------------------------------------------------------------
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/captures/
+**/android/app/src/main/assets/
+
+# ------------------------------------------------------------------------------
+# 7. iOS Build
+# ------------------------------------------------------------------------------
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/flutter_assets/
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+
+# ------------------------------------------------------------------------------
+# 8. IDEs & Editors
+# ------------------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+.atom/
+
+# ------------------------------------------------------------------------------
+# 9. Operating System Generated Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------------------
+# 10. Miscellaneous & Logs
+# ------------------------------------------------------------------------------
 *.log
+*.buildlog
+*.class
 *.pyc
 *.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
 .history
 .svn/
 .swiftpm/
 migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-.samples_backup/
-.grimoire_ai_config.json
-*.local.json
-

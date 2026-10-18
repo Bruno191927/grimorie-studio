@@ -30,10 +30,4 @@ class AppConstants {
   // AI Service Defaults
   static const String defaultComfyUiUrl = 'http://127.0.0.1:8188';
   static const String defaultOllamaUrl = 'http://127.0.0.1:11434';
-
-  // NVIDIA NIM Defaults
-  static const String defaultNvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const String defaultNvidiaGenAiUrl = 'https://ai.api.nvidia.com/v1/genai';
-  static const String defaultNvidiaImageModel = 'stabilityai/stable-diffusion-3-medium';
-  static const String defaultNvidiaTextModel = 'nvidia/nemotron-3.5-super-vl-120b-a12b';
 }

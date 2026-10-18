@@ -74,6 +74,24 @@ class GrimoireTheme {
         thickness: 1,
         space: 1,
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: surfaceElevated,
+        contentTextStyle: const TextStyle(
+          color: textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: borderStrong, width: 1),
+        ),
+        elevation: 8,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        actionTextColor: accentCyan,
+        showCloseIcon: true,
+        closeIconColor: textMuted,
+      ),
       textTheme: baseTextTheme.apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
