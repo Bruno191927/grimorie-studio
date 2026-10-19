@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../services/game_folder_service.dart';
@@ -23,6 +24,7 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
   final TextEditingController _searchController = TextEditingController();
   String _searchFilter = '';
   String? _selectedFolder; // null = all, '' = root only, or folder name
+  bool _isDraggingOver = false;
 
   Future<void> _handleSplitSpriteSheet(String gameName, [File? initialFile]) async {
     final success = await SpriteSheetSplitterDialog.show(
@@ -41,28 +43,54 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
     super.dispose();
   }
 
+  Future<void> _importFiles(String gameName, List<String> paths) async {
+    if (paths.isEmpty) return;
+    final targetSub = (_selectedFolder != null && _selectedFolder!.isNotEmpty) ? _selectedFolder : null;
+    final results = await ref.read(editorProvider.notifier).uploadMultipleImagesToGameAssets(
+          paths,
+          targetSubfolder: targetSub,
+        );
+    if (mounted) {
+      setState(() {});
+      if (results.isNotEmpty) {
+        final count = results.length;
+        final folderMsg = targetSub != null ? ' ($targetSub)' : '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: GrimoireTheme.accentEmerald,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    count == 1
+                        ? 'Imagen guardada con éxito en Assets$folderMsg: ${results.first} (lista para arrastrar o asignar)'
+                        : '$count imágenes guardadas con éxito en Assets$folderMsg (listas para arrastrar o asignar)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleUpload(String gameName) async {
     try {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'bmp'],
       );
 
-      if (files.isNotEmpty && files.first.path != null) {
-        final filePath = files.first.path!;
-        final targetSub = (_selectedFolder != null && _selectedFolder!.isNotEmpty) ? _selectedFolder : null;
-        final relativeUrl = await ref.read(editorProvider.notifier).uploadImageToGameAssets(
-              filePath,
-              targetSubfolder: targetSub,
-            );
-        if (mounted && relativeUrl != null) {
-          setState(() {});
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: GrimoireTheme.accentEmerald,
-              content: Text('Imagen guardada en Assets del Juego${targetSub != null ? ' ($targetSub)' : ''}: $relativeUrl (lista para arrastrar o asignar)'),
-            ),
-          );
+      if (files.isNotEmpty) {
+        final paths = files.map((f) => f.path).whereType<String>().toList();
+        if (paths.isNotEmpty) {
+          await _importFiles(gameName, paths);
         }
       }
     } catch (e) {
@@ -70,7 +98,8 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text('Error al subir imagen: $e'),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Error al subir imágenes: $e'),
           ),
         );
       }
@@ -270,9 +299,10 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
         ? currentFolderAssets
         : currentFolderAssets.where((f) => f.uri.pathSegments.last.toLowerCase().contains(_searchFilter.toLowerCase())).toList();
 
+    final Widget panelWidget;
     // If collapsed, display a sleek vertical interactive rail
     if (!editorState.showAssetsPanel) {
-      return InkWell(
+      panelWidget = InkWell(
         onTap: () => ref.read(editorProvider.notifier).setAssetsPanelOpen(true),
         child: Container(
           width: 36,
@@ -352,10 +382,9 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
           ),
         ),
       );
-    }
-
-    // Expanded Assets Panel
-    return Container(
+    } else {
+      // Expanded Assets Panel
+      panelWidget = Container(
       width: 300,
       decoration: const BoxDecoration(
         color: Color(0xFF0F111D),
@@ -574,6 +603,93 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
                 ? _buildEmptyState(context, gameName)
                 : _buildAssetsGrid(context, gameName, filteredAssets, currentArtUrl),
           ),
+        ],
+      ),
+    );
+  }
+
+    return DropTarget(
+      onDragEntered: (details) {
+        setState(() => _isDraggingOver = true);
+        if (!editorState.showAssetsPanel) {
+          ref.read(editorProvider.notifier).setAssetsPanelOpen(true);
+        }
+      },
+      onDragExited: (details) {
+        setState(() => _isDraggingOver = false);
+      },
+      onDragDone: (details) async {
+        setState(() => _isDraggingOver = false);
+        if (!editorState.showAssetsPanel) {
+          ref.read(editorProvider.notifier).setAssetsPanelOpen(true);
+        }
+        final paths = details.files.map((e) => e.path).toList();
+        await _importFiles(gameName, paths);
+      },
+      child: Stack(
+        children: [
+          panelWidget,
+          if (_isDraggingOver)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xF2090B16),
+                  border: Border.all(color: GrimoireTheme.accentEmerald, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: GrimoireTheme.accentEmerald.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: GrimoireTheme.accentEmerald.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: GrimoireTheme.accentEmerald, width: 1.5),
+                          ),
+                          child: const Icon(
+                            Icons.file_download_outlined,
+                            size: 36,
+                            color: GrimoireTheme.accentEmerald,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '¡Suelta tus imágenes aquí!',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _selectedFolder != null && _selectedFolder!.isNotEmpty
+                              ? 'Se guardarán en la carpeta: "$_selectedFolder"'
+                              : 'Se guardarán en los assets del juego ($gameName)',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: Color(0xFFA7F3D0),
+                            height: 1.3,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

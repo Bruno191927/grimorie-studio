@@ -8,6 +8,15 @@ InstallDir "$LOCALAPPDATA\GrimoireStudio"
 InstallDirRegKey HKCU "Software\GrimoireStudio" "Install_Dir"
 RequestExecutionLevel user
 
+; Metadatos y Version de Windows
+VIProductVersion "1.0.0.0"
+VIAddVersionKey "ProductName" "Grimoire Studio"
+VIAddVersionKey "CompanyName" "Grimoire Studio"
+VIAddVersionKey "LegalCopyright" "© 2026 Grimoire Studio"
+VIAddVersionKey "FileDescription" "Grimoire Studio Setup"
+VIAddVersionKey "FileVersion" "1.0.0.0"
+VIAddVersionKey "ProductVersion" "1.0.0.0"
+
 ; Interfaz Grafica Moderna MUI2
 !define MUI_ABORTWARNING
 !define MUI_ICON "windows\runner\resources\app_icon.ico"
@@ -34,9 +43,8 @@ Section "Grimoire Studio" SecMain
   
   ; Copiar ejecutables y dependencias
   File "build\windows\x64\runner\Release\grimoire_studio.exe"
-  File "build\windows\x64\runner\Release\flutter_windows.dll"
-  File "build\windows\x64\runner\Release\pdfium.dll"
-  File "build\windows\x64\runner\Release\printing_plugin.dll"
+  File "build\windows\x64\runner\Release\*.dll"
+  File /nonfatal "build\windows\x64\runner\Release\native_assets.json"
   
   ; Copiar carpeta de recursos data
   SetOutPath "$INSTDIR\data"

@@ -12,6 +12,7 @@ import '../widgets/game_assets_panel.dart';
 import '../widgets/card_renderer_widget.dart';
 import '../dialogs/layer_delete_dialog.dart';
 import '../../../export/presentation/dialogs/export_options_dialog.dart';
+import '../dialogs/predefined_templates_dialog.dart';
 import 'package:grimoire_studio/core/localization/locale_provider.dart';
 import '../../../../core/widgets/grimoire_toast.dart';
 
@@ -303,6 +304,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     },
                   ),
                 ),
+                IconButton(
+                  tooltip: ref.tr('add_predefined_template'),
+                  icon: const Icon(Icons.style_outlined, size: 16, color: GrimoireTheme.accentPurple),
+                  onPressed: () => PredefinedTemplatesDialog.show(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                ),
                 PopupMenuButton<String>(
                   key: const Key('template_actions_menu'),
                   tooltip: 'Gestionar Plantillas y Tamaño',
@@ -312,11 +320,22 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                   onSelected: (action) => _handleTemplateMenuAction(context, action, editorState),
                   itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'browse_predefined_templates',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.style_outlined, size: 15, color: GrimoireTheme.accentPurple),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('add_predefined_template'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
                     const PopupMenuItem(
                       value: 'new_template',
                       child: Row(
                         children: [
-                          Icon(Icons.add_box_outlined, size: 15, color: GrimoireTheme.accentPurple),
+                          Icon(Icons.add_box_outlined, size: 15, color: GrimoireTheme.accentCyan),
                           SizedBox(width: 8),
                           Text('Nueva Plantilla', style: TextStyle(fontSize: 12, color: Colors.white)),
                         ],
@@ -363,6 +382,16 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       ),
                     ),
                     const PopupMenuItem(
+                      value: 'preset_default',
+                      child: Row(
+                        children: [
+                          Icon(Icons.dashboard_outlined, size: 15, color: GrimoireTheme.accentEmerald),
+                          SizedBox(width: 8),
+                          Text('Default (Estándar)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
                       value: 'preset_tcg_fantasy',
                       child: Row(
                         children: [
@@ -376,7 +405,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       value: 'preset_boardgame_action',
                       child: Row(
                         children: [
-                          Icon(Icons.flash_on, size: 15, color: GrimoireTheme.accentAmber),
+                          Icon(Icons.flash_on, size: 15, color: GrimoireTheme.accentCyan),
                           SizedBox(width: 8),
                           Text('Juego de Mesa / Acción', style: TextStyle(fontSize: 12, color: Colors.white)),
                         ],
@@ -386,9 +415,29 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       value: 'preset_tarot_hero',
                       child: Row(
                         children: [
-                          Icon(Icons.shield, size: 15, color: GrimoireTheme.accentEmerald),
+                          Icon(Icons.shield, size: 15, color: GrimoireTheme.accentAmber),
                           SizedBox(width: 8),
                           Text('Tarot / Héroe Legendario', style: TextStyle(fontSize: 12, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_cyberpunk',
+                      child: Row(
+                        children: [
+                          Icon(Icons.memory, size: 15, color: GrimoireTheme.accentPink),
+                          SizedBox(width: 8),
+                          Text('Cyberpunk Neón', style: TextStyle(fontSize: 12, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_minimalist',
+                      child: Row(
+                        children: [
+                          Icon(Icons.crop_portrait_outlined, size: 15, color: Color(0xFF818CF8)),
+                          SizedBox(width: 8),
+                          Text('Minimalista Moderno', style: TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
@@ -880,6 +929,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   void _handleTemplateMenuAction(BuildContext context, String action, EditorState state) {
     final notifier = ref.read(editorProvider.notifier);
     switch (action) {
+      case 'browse_predefined_templates':
+        PredefinedTemplatesDialog.show(context);
+        break;
       case 'new_template':
         _showTemplateNameDialog(
           context,
@@ -902,6 +954,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       case 'delete_template':
         notifier.deleteActiveTemplate();
         break;
+      case 'preset_default':
+        notifier.applyPresetTemplate('default');
+        GrimoireToast.success(
+          context,
+          'Plantilla "Default (Estándar)" aplicada.',
+        );
+        break;
       case 'preset_tcg_fantasy':
         notifier.applyPresetTemplate('tcgFantasy');
         GrimoireToast.info(
@@ -921,6 +980,20 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         GrimoireToast.success(
           context,
           'Plantilla "Tarot / Héroe Legendario" aplicada.',
+        );
+        break;
+      case 'preset_cyberpunk':
+        notifier.applyPresetTemplate('cyberpunk');
+        GrimoireToast.info(
+          context,
+          'Plantilla "Cyberpunk Neón" aplicada.',
+        );
+        break;
+      case 'preset_minimalist':
+        notifier.applyPresetTemplate('minimalist');
+        GrimoireToast.success(
+          context,
+          'Plantilla "Minimalista Moderno" aplicada.',
         );
         break;
       case 'size_poker':

@@ -10,6 +10,8 @@ import 'package:grimoire_studio/core/localization/locale_provider.dart';
 import 'package:grimoire_studio/core/widgets/grimoire_emoji_picker.dart';
 import 'package:grimoire_studio/features/ai_generator/presentation/widgets/batch_ai_dialog.dart';
 import 'package:grimoire_studio/features/editor/presentation/widgets/card_renderer_widget.dart';
+import 'package:grimoire_studio/features/editor/models/card_template.dart';
+import 'package:grimoire_studio/features/editor/presentation/dialogs/predefined_templates_dialog.dart';
 import 'package:grimoire_studio/features/editor/presentation/dialogs/batch_card_creation_dialog.dart';
 import 'package:grimoire_studio/features/editor/presentation/dialogs/card_3d_viewer_dialog.dart';
 import 'package:grimoire_studio/core/widgets/grimoire_toast.dart';
@@ -2648,71 +2650,174 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
   // --- Dialog: Create New Board Game ---
   void _showNewGameDialog() {
     final textController = TextEditingController();
+    String selectedPresetId = 'default';
+    final presets = CardTemplate.predefinedPresets;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: GrimoireTheme.surfacePanel,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.casino_outlined, color: GrimoireTheme.accentPurple),
-            const SizedBox(width: 8),
-            Text(
-              ref.tr('new_game_title'),
-              style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              ref.tr('new_game_hint'),
-              style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              style: const TextStyle(fontSize: 13, color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'ej. Dungeon Crawler TCG',
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: GrimoireTheme.surfacePanel,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.casino_outlined, color: GrimoireTheme.accentPurple),
+              const SizedBox(width: 8),
+              Text(
+                ref.tr('new_game_title'),
+                style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.bold),
               ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref.tr('new_game_hint'),
+                  style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 13, color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'ej. Dungeon Crawler TCG',
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      ref.tr('template_style'),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        minimumSize: const Size(0, 24),
+                      ),
+                      icon: const Icon(Icons.auto_awesome, size: 12, color: GrimoireTheme.accentPurple),
+                      label: const Text(
+                        'Explorar...',
+                        style: TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple),
+                      ),
+                      onPressed: () async {
+                        final chosen = await PredefinedTemplatesDialog.show(
+                          context,
+                          initialSelectedId: selectedPresetId,
+                          showModeSelector: false,
+                        );
+                        if (chosen != null) {
+                          setDialogState(() {
+                            final match = presets.firstWhere((p) => p.name == chosen.name, orElse: () => presets.first);
+                            selectedPresetId = match.id;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: presets.map((preset) {
+                    final isSelected = preset.id == selectedPresetId;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => setDialogState(() => selectedPresetId = preset.id),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? GrimoireTheme.accentPurple.withValues(alpha: 0.2)
+                              : const Color(0xFF10121E),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              preset.icon,
+                              size: 13,
+                              color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textMuted,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              preset.name,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.white : GrimoireTheme.textMuted,
+                              ),
+                            ),
+                            if (preset.isDefault) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: GrimoireTheme.accentEmerald,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Default',
+                                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GrimoireTheme.accentPurple,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                final gameName = textController.text.trim();
+                if (gameName.isNotEmpty) {
+                  ref.read(editorProvider.notifier).addCardToGame(
+                    gameName,
+                    presetTemplateId: selectedPresetId,
+                  );
+                  setState(() {
+                    _selectedGame = gameName;
+                  });
+                  Navigator.pop(ctx);
+                  GrimoireToast.success(
+                    context,
+                    '¡Juego de mesa "$gameName" creado con su primera carta!',
+                  );
+                }
+              },
+              child: Text(ref.tr('create')),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: GrimoireTheme.accentPurple,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              final gameName = textController.text.trim();
-              if (gameName.isNotEmpty) {
-                ref.read(editorProvider.notifier).addCardToGame(gameName);
-                setState(() {
-                  _selectedGame = gameName;
-                });
-                Navigator.pop(ctx);
-                GrimoireToast.success(
-                  context,
-                  '¡Juego de mesa "$gameName" creado con su primera carta!',
-                );
-              }
-            },
-            child: Text(ref.tr('create')),
-          ),
-        ],
       ),
     );
   }

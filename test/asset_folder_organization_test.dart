@@ -174,4 +174,49 @@ void main() {
     expect(backState.selectedAssetPath, 'assets/dragon.png');
     expect(File('${assetsDir.path}/dragon.png').existsSync(), isTrue);
   });
+
+  test('uploadMultipleImagesToGameAssets handles multiple files and nested directories', () async {
+    final tempDir = Directory.systemTemp.createTempSync('grimoire_batch_upload_');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    // Create 2 loose files
+    final img1 = File('${tempDir.path}/img1.png')..writeAsStringSync('png1');
+    final img2 = File('${tempDir.path}/img2.jpg')..writeAsStringSync('jpg2');
+    final notAnImg = File('${tempDir.path}/notes.txt')..writeAsStringSync('ignore me');
+
+    // Create a subfolder with 1 valid image
+    final subDir = Directory('${tempDir.path}/sub')..createSync();
+    File('${subDir.path}/img3.webp').writeAsStringSync('webp3');
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    // Set active row game to testGame
+    container.read(editorProvider.notifier).state = container.read(editorProvider).copyWith(
+          project: container.read(editorProvider).project.copyWith(
+            rows: [
+              {'id': 'card-test', 'name': 'Test', 'game': testGame}
+            ],
+          ),
+        );
+
+    final uploaded = await container.read(editorProvider.notifier).uploadMultipleImagesToGameAssets([
+      img1.path,
+      img2.path,
+      notAnImg.path,
+      tempDir.path, // Passing directory should recursively discover valid images
+    ]);
+
+    expect(uploaded, isNotEmpty);
+    // img1, img2, and from directory img1, img2, img3
+    expect(uploaded.any((u) => u.contains('img1.png')), isTrue);
+    expect(uploaded.any((u) => u.contains('img2.jpg')), isTrue);
+    expect(uploaded.any((u) => u.contains('img3.webp')), isTrue);
+    expect(uploaded.any((u) => u.contains('notes.txt')), isFalse);
+  });
 }
+

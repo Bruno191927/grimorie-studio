@@ -2631,6 +2631,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
     String? category,
     int? artColor,
     String? rulesText,
+    String? presetTemplateId,
   }) {
     if (state.deletedGames.contains(gameName)) {
       final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
@@ -2731,9 +2732,27 @@ class EditorNotifier extends StateNotifier<EditorState> {
         : (hasValidCat && !chosenCategory.hasCombatStats
             ? ''
             : (hasValidCat && chosenCategory.defaultDefense.isNotEmpty ? chosenCategory.defaultDefense : '1'));
-    final sourceTpl = modelCard != null
-        ? resolveTemplateForRow(modelCard)
-        : resolveTemplateForRow({'game': gameName, 'category': finalCatName});
+
+    final existingGameCards = state.project.rows
+        .where((r) => (r['game'] ?? '').toString().toLowerCase().trim() == gameName.toLowerCase().trim())
+        .toList();
+
+    CardTemplate sourceTpl;
+    if (modelCard != null) {
+      sourceTpl = resolveTemplateForRow(modelCard);
+    } else if (presetTemplateId != null && presetTemplateId.isNotEmpty) {
+      sourceTpl = CardTemplate.getPresetById(presetTemplateId);
+    } else if (existingGameCards.isNotEmpty) {
+      sourceTpl = resolveTemplateForRow({'game': gameName, 'category': finalCatName});
+    } else {
+      // Game is brand new! Always initialize with clean default structure
+      final cleanGame = gameName.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      sourceTpl = CardTemplate.createDefault(
+        id: 'tpl_${cleanGame}_default',
+        name: '$gameName Plantilla',
+      );
+    }
+
     const uuid = Uuid();
     final cardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
     final cardTpl = CardTemplate(
@@ -2760,14 +2779,14 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'rarity': finalRarity.isNotEmpty ? finalRarity : 'Común',
       'attack': finalAtk,
       'defense': finalDef,
+      'rules_text': finalRules,
+      'rules': finalRules,
+      'template_id': cardTplId,
       'creator': 'Grimoire Studio',
       'icon': finalIcon.isNotEmpty ? finalIcon : '🃏',
       'art_color': finalColor,
       'art_url': '',
       'prompt': '',
-      'rules_text': finalRules,
-      'rules': finalRules,
-      'template_id': cardTplId,
     };
     addRow(newCard);
   }
@@ -3164,41 +3183,60 @@ class EditorNotifier extends StateNotifier<EditorState> {
     );
   }
 
-  /// Applies a pre-configured starter card template (TCG, Minimalist Action, or Mystic Tarot)
-  void applyPresetTemplate(String presetType) {
-    final activeGame = (state.project.activeRow['game'] ?? 'Magic').toString();
-    CardTemplate preset;
-    switch (presetType) {
-      case 'boardgameAction':
-        preset = CardTemplate.createBoardgameAction(
-          id: 'tpl_${activeGame.toLowerCase()}_action',
-          name: '$activeGame Acción',
-        );
-        break;
-      case 'tarotHero':
-        preset = CardTemplate.createTarotHero(
-          id: 'tpl_${activeGame.toLowerCase()}_tarot',
-          name: '$activeGame Héroe / Tarot',
-        );
-        break;
-      case 'tcgFantasy':
-      default:
-        preset = CardTemplate.createTcgFantasy(
-          id: 'tpl_${activeGame.toLowerCase()}_tcg',
-          name: '$activeGame TCG Fantasía',
-        );
-        break;
-    }
+  /// Replaces layers and appearance of the active template
+  void replaceActiveTemplateLayers({
+    String? name,
+    required List<LayerItem> layers,
+    List<LayerItem> backLayers = const [],
+    Color? backgroundColor,
+    Color? backBackgroundColor,
+    double? cornerRadius,
+  }) {
+    _recordHistory();
+    const uuid = Uuid();
+    final active = state.project.activeTemplate;
+    final updated = active.copyWith(
+      name: name ?? active.name,
+      layers: layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backLayers: backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
+      backgroundColor: backgroundColor,
+      backBackgroundColor: backBackgroundColor,
+      cornerRadius: cornerRadius,
+    );
 
     final templates = List<CardTemplate>.from(state.project.templates);
-    final existingIdx = templates.indexWhere((t) => t.id == preset.id);
-    if (existingIdx >= 0) {
-      templates[existingIdx] = preset;
+    final idx = templates.indexWhere((t) => t.id == active.id);
+    if (idx != -1) {
+      templates[idx] = updated;
     } else {
-      templates.add(preset);
+      templates.add(updated);
     }
 
-    final activeIdx = templates.indexOf(preset);
+    state = state.copyWith(
+      project: state.project.copyWith(templates: templates),
+      selectedLayerId: null,
+      selectedLayerIds: {},
+    );
+    _persistWorkspace();
+  }
+
+  /// Adds a custom template to the project and optionally activates it
+  void addCustomTemplate(CardTemplate newTemplate, {bool setAsActive = true}) {
+    _recordHistory();
+    final templates = List<CardTemplate>.from(state.project.templates);
+    final existingIdx = templates.indexWhere((t) => t.id == newTemplate.id);
+    if (existingIdx >= 0) {
+      templates[existingIdx] = newTemplate;
+    } else {
+      templates.add(newTemplate);
+    }
+
+    final activeIdx = setAsActive ? templates.indexOf(newTemplate) : state.project.activeTemplateIndex;
+
+    if (setAsActive && state.project.rows.isNotEmpty) {
+      updateActiveRowData('template_id', newTemplate.id);
+    }
+
     state = state.copyWith(
       project: state.project.copyWith(
         templates: templates,
@@ -3208,6 +3246,31 @@ class EditorNotifier extends StateNotifier<EditorState> {
       selectedLayerIds: {},
     );
     _persistWorkspace();
+  }
+
+  /// Applies a pre-configured starter card template (Default, TCG, Action, Tarot, Cyberpunk, Minimalist)
+  void applyPresetTemplate(String presetType, {bool createAsNew = false}) {
+    final activeGame = (state.project.activeRow['game'] ?? 'Magic').toString();
+    final cleanGame = activeGame.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+
+    final preset = CardTemplate.getPresetById(
+      presetType,
+      id: 'tpl_${cleanGame}_$presetType',
+      name: '$activeGame ${CardTemplate.predefinedPresets.firstWhere((p) => p.id == presetType, orElse: () => CardTemplate.predefinedPresets.first).name}',
+    );
+
+    if (createAsNew) {
+      addCustomTemplate(preset, setAsActive: true);
+    } else {
+      replaceActiveTemplateLayers(
+        name: preset.name,
+        layers: preset.layers,
+        backLayers: preset.backLayers,
+        backgroundColor: preset.backgroundColor,
+        backBackgroundColor: preset.backBackgroundColor,
+        cornerRadius: preset.cornerRadius,
+      );
+    }
   }
 
   /// Synchronizes active game data.csv and persists workspace state
@@ -3231,6 +3294,53 @@ class EditorNotifier extends StateNotifier<EditorState> {
     );
     final relativeUrl = GameFolderService.getRelativeAssetPath(gameName, targetFile);
     return relativeUrl;
+  }
+
+  /// Uploads multiple images or folders of images to the game's assets repository
+  Future<List<String>> uploadMultipleImagesToGameAssets(
+    List<String> sourceFilePaths, {
+    String? targetSubfolder,
+  }) async {
+    final activeRow = state.project.activeRow;
+    final gameName = (activeRow['game'] ?? 'Magic').toString();
+    final results = <String>[];
+    const validExtensions = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'bmp'];
+
+    for (final path in sourceFilePaths) {
+      if (FileSystemEntity.isDirectorySync(path)) {
+        try {
+          final dir = Directory(path);
+          final entities = dir.listSync(recursive: true);
+          for (final entity in entities) {
+            if (entity is File) {
+              final ext = entity.path.toLowerCase().split('.').last;
+              if (validExtensions.contains(ext)) {
+                final targetFile = await GameFolderService.importImageToGameAssets(
+                  gameName,
+                  entity,
+                  subfolder: targetSubfolder,
+                );
+                final relativeUrl = GameFolderService.getRelativeAssetPath(gameName, targetFile);
+                results.add(relativeUrl);
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (FileSystemEntity.isFileSync(path)) {
+        final ext = path.toLowerCase().split('.').last;
+        if (validExtensions.contains(ext)) {
+          final sourceFile = File(path);
+          final targetFile = await GameFolderService.importImageToGameAssets(
+            gameName,
+            sourceFile,
+            subfolder: targetSubfolder,
+          );
+          final relativeUrl = GameFolderService.getRelativeAssetPath(gameName, targetFile);
+          results.add(relativeUrl);
+        }
+      }
+    }
+    return results;
   }
 
   Future<String?> uploadImageForActiveCard(String sourceFilePath) async {
@@ -3346,21 +3456,25 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   // --- TEMPLATE MANAGEMENT & CARD DIMENSIONS ---
 
-  void createNewTemplate(String name) {
+  void createNewTemplate(String name, {CardTemplate? baseTemplate}) {
     _recordHistory();
     const uuid = Uuid();
-    final active = state.project.activeTemplate;
-    final clonedFront = active.layers.map((l) => l.copyWith(id: uuid.v4())).toList();
-    final clonedBack = active.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList();
+    final templateName = name.trim().isEmpty ? 'Nueva Plantilla' : name.trim();
+    final base = baseTemplate ?? CardTemplate.createDefault(
+      id: 'template_${uuid.v4()}',
+      name: templateName,
+    );
+    final clonedFront = base.layers.map((l) => l.copyWith(id: uuid.v4())).toList();
+    final clonedBack = base.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList();
 
     final newTemplate = CardTemplate(
       id: 'template_${uuid.v4()}',
-      name: name.trim().isEmpty ? 'Nueva Plantilla' : name.trim(),
+      name: templateName,
       layers: clonedFront,
       backLayers: clonedBack,
-      backgroundColor: active.backgroundColor,
-      backBackgroundColor: active.backBackgroundColor,
-      cornerRadius: active.cornerRadius,
+      backgroundColor: base.backgroundColor,
+      backBackgroundColor: base.backBackgroundColor,
+      cornerRadius: base.cornerRadius,
     );
 
     final updatedTemplates = [...state.project.templates, newTemplate];
@@ -3376,7 +3490,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void duplicateActiveTemplate() {
     final active = state.project.activeTemplate;
-    createNewTemplate('${active.name} (Copy)');
+    createNewTemplate('${active.name} (Copy)', baseTemplate: active);
   }
 
   void renameActiveTemplate(String newName) {
@@ -3490,6 +3604,12 @@ class EditorNotifier extends StateNotifier<EditorState> {
     if (gameLower.contains('unicorn')) {
       final unicornTpl = templates.where((t) => t.id.contains('unicorn') || t.name.toLowerCase().contains('unicorn')).firstOrNull;
       if (unicornTpl != null) return unicornTpl;
+    }
+
+    if (game.isNotEmpty) {
+      final safeGame = game.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      final gameMatch = templates.where((t) => t.id.toLowerCase().contains(safeGame) || t.name.toLowerCase().contains(gameLower)).firstOrNull;
+      if (gameMatch != null) return gameMatch;
     }
 
     return templates.isNotEmpty ? templates.first : state.project.activeTemplate;

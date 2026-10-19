@@ -97,6 +97,124 @@ class CardTemplate {
     );
   }
 
+  /// Preset 0: Default structure requested by user:
+  /// fondo (background), titulo (top), imagen (middle), shape (bottom), and encima del shape descripcion.
+  factory CardTemplate.createDefault({
+    String id = 'tpl_default',
+    String name = 'Default',
+  }) {
+    return CardTemplate(
+      id: id,
+      name: name,
+      backgroundColor: const Color(0xFF131622),
+      backBackgroundColor: const Color(0xFF0C0E17),
+      cornerRadius: 16,
+      layers: const [
+        // 1. fondo
+        LayerItem(
+          id: 'def_fondo',
+          name: 'fondo',
+          type: LayerType.background,
+          x: 0,
+          y: 0,
+          width: 254,
+          height: 355.6,
+          fillMode: LayerFillMode.solid,
+          shapeColor: Color(0xFF131622),
+          borderRadius: 16,
+          isLocked: true,
+        ),
+        // 2. titulo
+        LayerItem(
+          id: 'def_titulo',
+          name: 'titulo',
+          type: LayerType.text,
+          x: 14,
+          y: 14,
+          width: 226,
+          height: 28,
+          text: '{{card_name}}',
+          bindingKey: 'card_name',
+          fontSize: 14,
+          isBold: true,
+          textAlign: TextAlign.center,
+          fontColor: Colors.white,
+        ),
+        // 3. imagen
+        LayerItem(
+          id: 'def_imagen',
+          name: 'imagen',
+          type: LayerType.image,
+          x: 14,
+          y: 48,
+          width: 226,
+          height: 160,
+          bindingKey: 'art_url',
+          imageFit: BoxFit.cover,
+          borderRadius: 8,
+        ),
+        // 4. shape
+        LayerItem(
+          id: 'def_shape',
+          name: 'shape',
+          type: LayerType.shape,
+          x: 14,
+          y: 218,
+          width: 226,
+          height: 122,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: Color(0xFF2E3852),
+          shapeColor: Color(0xFF181C2E),
+        ),
+        // 5. descripcion (encima del shape)
+        LayerItem(
+          id: 'def_descripcion',
+          name: 'descripcion',
+          type: LayerType.text,
+          x: 22,
+          y: 226,
+          width: 210,
+          height: 106,
+          text: '{{rules_text}}',
+          bindingKey: 'rules_text',
+          fontSize: 10.5,
+          fontColor: Color(0xFFCBD5E1),
+          textAlign: TextAlign.left,
+        ),
+      ],
+      backLayers: const [
+        LayerItem(
+          id: 'def_back_frame',
+          name: 'Marco Reverso',
+          type: LayerType.shape,
+          x: 8,
+          y: 8,
+          width: 238,
+          height: 340,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: Color(0xFF7C3AED),
+          shapeColor: Color(0xFF0D0F18),
+        ),
+        LayerItem(
+          id: 'def_back_title',
+          name: 'Título Reverso',
+          type: LayerType.text,
+          x: 20,
+          y: 160,
+          width: 214,
+          height: 30,
+          text: '✦ GRIMOIRE ✦',
+          isBold: true,
+          fontSize: 14,
+          textAlign: TextAlign.center,
+          fontColor: Colors.white,
+        ),
+      ],
+    );
+  }
+
   /// Preset 1: Standard TCG Fantasy Card (Magic / Hearthstone style)
   factory CardTemplate.createTcgFantasy({String id = 'tpl_tcg_fantasy', String name = 'TCG Fantasía Clásico'}) {
     return CardTemplate(
@@ -540,4 +658,337 @@ class CardTemplate {
       ],
     );
   }
+
+  /// Preset 4: Cyberpunk / Sci-Fi Neon Card
+  factory CardTemplate.createCyberpunk({String id = 'tpl_cyberpunk', String name = 'Cyberpunk Neón'}) {
+    return CardTemplate(
+      id: id,
+      name: name,
+      backgroundColor: const Color(0xFF080914),
+      backBackgroundColor: const Color(0xFF05060D),
+      cornerRadius: 14,
+      layers: const [
+        LayerItem(
+          id: 'cyber_frame',
+          name: 'Marco Neón',
+          type: LayerType.shape,
+          x: 6,
+          y: 6,
+          width: 242,
+          height: 344,
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: Color(0xFFEC4899),
+          shapeColor: Color(0xFF0F1123),
+        ),
+        LayerItem(
+          id: 'cyber_title',
+          name: 'Cyber Título',
+          type: LayerType.text,
+          x: 16,
+          y: 14,
+          width: 222,
+          height: 24,
+          text: '⚡ // {{card_name}}',
+          bindingKey: 'card_name',
+          isBold: true,
+          fontSize: 12.5,
+          fontColor: Color(0xFF38BDF8),
+          textAlign: TextAlign.left,
+        ),
+        LayerItem(
+          id: 'cyber_art',
+          name: 'Holo Arte',
+          type: LayerType.image,
+          x: 14,
+          y: 44,
+          width: 226,
+          height: 155,
+          bindingKey: 'art_url',
+          imageFit: BoxFit.cover,
+        ),
+        LayerItem(
+          id: 'cyber_databox',
+          name: 'Caja de Datos',
+          type: LayerType.shape,
+          x: 14,
+          y: 208,
+          width: 226,
+          height: 130,
+          borderRadius: 6,
+          borderWidth: 1.5,
+          borderColor: Color(0xFF06B6D4),
+          shapeColor: Color(0xFF0D1326),
+        ),
+        LayerItem(
+          id: 'cyber_rules',
+          name: 'Protocolo / Reglas',
+          type: LayerType.text,
+          x: 20,
+          y: 216,
+          width: 214,
+          height: 114,
+          text: '{{rules_text}}',
+          bindingKey: 'rules_text',
+          fontSize: 10,
+          fontColor: Color(0xFFE0F2FE),
+        ),
+      ],
+      backLayers: const [
+        LayerItem(
+          id: 'cyber_back_frame',
+          name: 'Marco Cyber Reverso',
+          type: LayerType.shape,
+          x: 6,
+          y: 6,
+          width: 242,
+          height: 344,
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: Color(0xFF06B6D4),
+          shapeColor: Color(0xFF070B16),
+        ),
+        LayerItem(
+          id: 'cyber_back_icon',
+          name: 'Icono Cyber Reverso',
+          type: LayerType.text,
+          x: 40,
+          y: 150,
+          width: 174,
+          height: 40,
+          text: '◈ CYBER // DECK ◈',
+          isBold: true,
+          fontSize: 13,
+          textAlign: TextAlign.center,
+          fontColor: Color(0xFF06B6D4),
+        ),
+      ],
+    );
+  }
+
+  /// Preset 5: Minimalist Clean Modern Tabletop Card
+  factory CardTemplate.createMinimalist({String id = 'tpl_minimalist', String name = 'Minimalista Moderno'}) {
+    return CardTemplate(
+      id: id,
+      name: name,
+      backgroundColor: const Color(0xFF1E2029),
+      backBackgroundColor: const Color(0xFF14161F),
+      cornerRadius: 18,
+      layers: const [
+        LayerItem(
+          id: 'mini_border',
+          name: 'Línea de Contorno',
+          type: LayerType.shape,
+          x: 10,
+          y: 10,
+          width: 234,
+          height: 336,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: Color(0xFF3B4252),
+          shapeColor: Color(0xFF161822),
+        ),
+        LayerItem(
+          id: 'mini_title',
+          name: 'Título Minimalista',
+          type: LayerType.text,
+          x: 18,
+          y: 20,
+          width: 218,
+          height: 24,
+          text: '{{card_name}}',
+          bindingKey: 'card_name',
+          isBold: true,
+          fontSize: 13,
+          fontColor: Colors.white,
+          textAlign: TextAlign.center,
+        ),
+        LayerItem(
+          id: 'mini_art',
+          name: 'Ilustración',
+          type: LayerType.image,
+          x: 20,
+          y: 50,
+          width: 214,
+          height: 165,
+          bindingKey: 'art_url',
+          imageFit: BoxFit.cover,
+        ),
+        LayerItem(
+          id: 'mini_desc_shape',
+          name: 'Caja Texto',
+          type: LayerType.shape,
+          x: 20,
+          y: 224,
+          width: 214,
+          height: 110,
+          borderRadius: 8,
+          shapeColor: Color(0xFF222638),
+          borderWidth: 0,
+          borderColor: Colors.transparent,
+        ),
+        LayerItem(
+          id: 'mini_desc',
+          name: 'Texto de Reglas',
+          type: LayerType.text,
+          x: 26,
+          y: 232,
+          width: 202,
+          height: 94,
+          text: '{{rules_text}}',
+          bindingKey: 'rules_text',
+          fontSize: 10.5,
+          fontColor: Color(0xFFD8DEE9),
+        ),
+      ],
+      backLayers: const [
+        LayerItem(
+          id: 'mini_back_border',
+          name: 'Contorno Reverso',
+          type: LayerType.shape,
+          x: 10,
+          y: 10,
+          width: 234,
+          height: 336,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: Color(0xFF3B4252),
+          shapeColor: Color(0xFF12131A),
+        ),
+        LayerItem(
+          id: 'mini_back_title',
+          name: 'Título Reverso',
+          type: LayerType.text,
+          x: 40,
+          y: 160,
+          width: 174,
+          height: 30,
+          text: 'G R I M O I R E',
+          letterSpacing: 2.0,
+          fontSize: 12,
+          fontColor: Color(0xFF94A3B8),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  /// All predefined starter presets available in Grimoire Studio
+  static List<PredefinedPresetInfo> get predefinedPresets => const [
+    PredefinedPresetInfo(
+      id: 'default',
+      name: 'Default',
+      badge: 'Default',
+      description: 'Estructura estándar: Título, Imagen, Shape y encima Descripción.',
+      isDefault: true,
+      icon: Icons.dashboard_outlined,
+      accentColor: Color(0xFF8B5CF6),
+      builder: _buildDefault,
+    ),
+    PredefinedPresetInfo(
+      id: 'tcgFantasy',
+      name: 'TCG Fantasía',
+      badge: 'TCG',
+      description: 'Estilo clásico Magic / Hearthstone con orbe de coste y escudo de atributos.',
+      icon: Icons.auto_awesome,
+      accentColor: Color(0xFFD4AF37),
+      builder: _buildTcg,
+    ),
+    PredefinedPresetInfo(
+      id: 'boardgameAction',
+      name: 'Juego de Mesa Acción',
+      badge: 'Action',
+      description: 'Carta de acción y eventos para juegos de tablero con bordes cian y diseño dinámico.',
+      icon: Icons.casino_outlined,
+      accentColor: Color(0xFF06B6D4),
+      builder: _buildAction,
+    ),
+    PredefinedPresetInfo(
+      id: 'tarotHero',
+      name: 'Tarot / Héroe',
+      badge: 'Tarot',
+      description: 'Retrato vertical extendido con marco místico dorado y placa de lore.',
+      icon: Icons.style_outlined,
+      accentColor: Color(0xFFF59E0B),
+      builder: _buildTarot,
+    ),
+    PredefinedPresetInfo(
+      id: 'cyberpunk',
+      name: 'Cyberpunk Neón',
+      badge: 'Sci-Fi',
+      description: 'Interfaz futurista con líneas de neón magenta/cian y caja holográfica.',
+      icon: Icons.memory,
+      accentColor: Color(0xFFEC4899),
+      builder: _buildCyber,
+    ),
+    PredefinedPresetInfo(
+      id: 'minimalist',
+      name: 'Minimalista',
+      badge: 'Clean',
+      description: 'Diseño limpio y moderno con líneas suaves, espaciado amplio y alta legibilidad.',
+      icon: Icons.crop_portrait_outlined,
+      accentColor: Color(0xFF818CF8),
+      builder: _buildMinimalist,
+    ),
+  ];
+
+  static CardTemplate _buildDefault({String id = 'tpl_default', String name = 'Default'}) =>
+      CardTemplate.createDefault(id: id, name: name);
+  static CardTemplate _buildTcg({String id = 'tpl_tcg', String name = 'TCG Fantasía'}) =>
+      CardTemplate.createTcgFantasy(id: id, name: name);
+  static CardTemplate _buildAction({String id = 'tpl_action', String name = 'Juego de Mesa Acción'}) =>
+      CardTemplate.createBoardgameAction(id: id, name: name);
+  static CardTemplate _buildTarot({String id = 'tpl_tarot', String name = 'Tarot Héroe'}) =>
+      CardTemplate.createTarotHero(id: id, name: name);
+  static CardTemplate _buildCyber({String id = 'tpl_cyber', String name = 'Cyberpunk Neón'}) =>
+      CardTemplate.createCyberpunk(id: id, name: name);
+  static CardTemplate _buildMinimalist({String id = 'tpl_minimalist', String name = 'Minimalista Moderno'}) =>
+      CardTemplate.createMinimalist(id: id, name: name);
+
+  /// Retrieves a template preset by id
+  static CardTemplate getPresetById(String presetId, {String? id, String? name}) {
+    final lower = presetId.toLowerCase().trim();
+    if (lower == 'default' || lower == 'estandar' || lower == 'standard') {
+      return CardTemplate.createDefault(id: id ?? 'tpl_default', name: name ?? 'Default');
+    }
+    if (lower == 'tcgfantasy' || lower.contains('tcg') || lower.contains('fantasia')) {
+      return CardTemplate.createTcgFantasy(id: id ?? 'tpl_tcg', name: name ?? 'TCG Fantasía');
+    }
+    if (lower == 'boardgameaction' || lower.contains('boardgame') || lower.contains('accion') || lower.contains('action')) {
+      return CardTemplate.createBoardgameAction(id: id ?? 'tpl_action', name: name ?? 'Juego de Mesa Acción');
+    }
+    if (lower == 'tarothero' || lower.contains('tarot') || lower.contains('heroe') || lower.contains('hero')) {
+      return CardTemplate.createTarotHero(id: id ?? 'tpl_tarot', name: name ?? 'Tarot Héroe');
+    }
+    if (lower == 'cyberpunk' || lower.contains('cyber') || lower.contains('neon')) {
+      return CardTemplate.createCyberpunk(id: id ?? 'tpl_cyber', name: name ?? 'Cyberpunk Neón');
+    }
+    if (lower == 'minimalist' || lower.contains('minimal') || lower.contains('modern')) {
+      return CardTemplate.createMinimalist(id: id ?? 'tpl_minimalist', name: name ?? 'Minimalista Moderno');
+    }
+    return CardTemplate.createDefault(id: id ?? 'tpl_default', name: name ?? 'Default');
+  }
 }
+
+class PredefinedPresetInfo {
+  final String id;
+  final String name;
+  final String badge;
+  final String description;
+  final bool isDefault;
+  final IconData icon;
+  final Color accentColor;
+  final CardTemplate Function({String id, String name}) builder;
+
+  const PredefinedPresetInfo({
+    required this.id,
+    required this.name,
+    required this.badge,
+    required this.description,
+    this.isDefault = false,
+    required this.icon,
+    required this.accentColor,
+    required this.builder,
+  });
+}
+

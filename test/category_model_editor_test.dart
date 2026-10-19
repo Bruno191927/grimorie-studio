@@ -250,7 +250,7 @@ void main() {
 
       // 1. Verify Assets panel is present between canvas and inspector
       expect(find.text('Assets del Juego'), findsWidgets);
-      expect(find.text('Subir Imagen'), findsWidgets);
+      expect(find.textContaining('Subir Imág'), findsWidgets);
       expect(find.text('Generar con IA'), findsWidgets);
 
       // 2. Verify sample Magic assets are displayed (e.g. black_lotus.png)

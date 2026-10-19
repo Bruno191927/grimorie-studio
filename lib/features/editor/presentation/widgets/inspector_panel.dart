@@ -2771,16 +2771,23 @@ class InspectorPanel extends ConsumerWidget {
                   type: FileType.custom,
                   allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
                 );
-                if (files.isNotEmpty && files.first.path != null) {
-                  final sourcePath = files.first.path!;
-                  final savedRelPath = await ref.read(editorProvider.notifier).uploadImageForActiveCard(sourcePath);
-                  if (context.mounted && savedRelPath != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: GrimoireTheme.accentEmerald,
-                        content: Text('Imagen guardada con éxito en games/$gameName/$savedRelPath'),
-                      ),
-                    );
+                if (files.isNotEmpty) {
+                  final paths = files.map((f) => f.path).whereType<String>().toList();
+                  if (paths.isNotEmpty) {
+                    final uploaded = await ref.read(editorProvider.notifier).uploadMultipleImagesToGameAssets(paths);
+                    if (context.mounted && uploaded.isNotEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: GrimoireTheme.accentEmerald,
+                          behavior: SnackBarBehavior.floating,
+                          content: Text(
+                            uploaded.length == 1
+                                ? 'Imagen guardada con éxito en games/$gameName/${uploaded.first}'
+                                : '${uploaded.length} imágenes guardadas con éxito en assets de $gameName',
+                          ),
+                        ),
+                      );
+                    }
                   }
                 }
               },
