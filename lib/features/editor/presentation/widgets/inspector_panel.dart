@@ -213,7 +213,7 @@ class InspectorPanel extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Ancho (mm)', style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted)),
+                    Text(ref.tr('width_mm'), style: const TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted)),
                     const SizedBox(height: 3),
                     TextFormField(
                       key: ValueKey('w_${project.widthMm}'),
@@ -240,7 +240,7 @@ class InspectorPanel extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Alto (mm)', style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted)),
+                    Text(ref.tr('height_mm'), style: const TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted)),
                     const SizedBox(height: 3),
                     TextFormField(
                       key: ValueKey('h_${project.heightMm}'),
@@ -502,20 +502,20 @@ class InspectorPanel extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
-            SizedBox(width: 5),
+            const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
+            const SizedBox(width: 5),
             Text(
-              'Modelos Predefinidos',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              ref.tr('predefined_models'),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Define esta carta como molde para que las próximas cartas que crees salgan con este mismo diseño.',
-          style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, height: 1.3),
+        Text(
+          ref.tr('card_mold_desc'),
+          style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted, height: 1.3),
         ),
         const SizedBox(height: 8),
 
@@ -538,13 +538,13 @@ class InspectorPanel extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Predefinida para "$activeCategory"',
+                          '${ref.tr('predefined_for')} "$activeCategory"',
                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFA7F3D0)),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const Text(
-                          'Nuevas cartas de esta categoría usarán este molde',
-                          style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
+                        Text(
+                          ref.tr('new_cards_category_use_mold'),
+                          style: const TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -556,7 +556,7 @@ class InspectorPanel extends ConsumerWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           backgroundColor: const Color(0xFF374151),
-                          content: Text('Carta desmarcada como predefinida de "$activeCategory".'),
+                          content: Text('${ref.tr('card_unmarked_category_default')} "$activeCategory".'),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -583,7 +583,7 @@ class InspectorPanel extends ConsumerWidget {
                 ),
                 icon: const Icon(Icons.auto_awesome, size: 14),
                 label: Text(
-                  'Marcar como predefinido para "$activeCategory"',
+                  '${ref.tr('mark_as_default_for')} "$activeCategory"',
                   style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -593,7 +593,7 @@ class InspectorPanel extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       backgroundColor: GrimoireTheme.accentEmerald,
-                      content: Text('¡Esta carta ahora es el modelo predefinido para "$activeCategory"!'),
+                      content: Text('${ref.tr('card_is_now_category_default')} "$activeCategory"!'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -621,13 +621,13 @@ class InspectorPanel extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Predefinida para $gameName',
+                        '${ref.tr('general_model_for')} $gameName',
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFDE68A)),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const Text(
-                        'Molde base para nuevas cartas del juego',
-                        style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
+                      Text(
+                        ref.tr('base_mold_for_game_cards'),
+                        style: const TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -639,7 +639,7 @@ class InspectorPanel extends ConsumerWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         backgroundColor: const Color(0xFF374151),
-                        content: Text('Carta desmarcada como predefinida de $gameName.'),
+                        content: Text('${ref.tr('card_unmarked_game_default')} $gameName.'),
                         duration: const Duration(seconds: 2),
                       ),
                     );
@@ -666,7 +666,7 @@ class InspectorPanel extends ConsumerWidget {
               ),
               icon: const Icon(Icons.star_outline, size: 14),
               label: Text(
-                'Marcar como predefinido para $gameName',
+                '${ref.tr('mark_as_general_model')} $gameName',
                 style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -676,7 +676,7 @@ class InspectorPanel extends ConsumerWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: const Color(0xFFD97706),
-                    content: Text('¡Esta carta ahora es el modelo predefinido general para "$gameName"!'),
+                    content: Text('${ref.tr('card_is_now_game_default')} "$gameName"!'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -856,7 +856,7 @@ class InspectorPanel extends ConsumerWidget {
         // ============================================================
         if (layer.type == LayerType.background) ...[
           const SizedBox(height: 16),
-          _buildSectionHeader('ESTILO DE FONDO (BACKGROUND)'),
+          _buildSectionHeader(ref.tr('background_style')),
           const SizedBox(height: 8),
           _buildBackgroundFillModeSelector(context, ref, layer),
           const SizedBox(height: 12),
@@ -865,7 +865,7 @@ class InspectorPanel extends ConsumerWidget {
             _buildColorPickerSection(
               context,
               ref,
-              title: 'Color Sólido de Fondo',
+              title: ref.tr('solid_background_color'),
               currentColor: layer.shapeColor,
               onChanged: (newColor) {
                 ref.read(editorProvider.notifier).updateLayer(layer.copyWith(shapeColor: newColor));
@@ -924,19 +924,31 @@ class InspectorPanel extends ConsumerWidget {
           const SizedBox(height: 16),
           _buildSectionHeader(ref.tr('typography_style')),
           const SizedBox(height: 8),
-          TextFormField(
-            key: ValueKey('text_${layer.id}'),
-            initialValue: layer.text,
-            style: const TextStyle(fontSize: 12, color: Colors.white),
-            decoration: InputDecoration(
-              labelText: ref.tr('static_template_text'),
-              hintText: ref.tr('static_text_hint'),
-              isDense: true,
+
+          // Content Data Type Selector: [ Texto | Número | Enum ]
+          _buildTextDataTypeSelector(context, ref, layer),
+          const SizedBox(height: 10),
+
+          // Mode-specific Value Editor
+          if (layer.textDataType == TextDataType.text) ...[
+            TextFormField(
+              key: ValueKey('text_${layer.id}'),
+              initialValue: layer.text,
+              style: const TextStyle(fontSize: 12, color: Colors.white),
+              decoration: InputDecoration(
+                labelText: ref.tr('static_template_text'),
+                hintText: ref.tr('static_text_hint'),
+                isDense: true,
+              ),
+              onChanged: (val) {
+                _updateTextAndActiveRow(ref, layer, val);
+              },
             ),
-            onChanged: (val) {
-              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(text: val));
-            },
-          ),
+          ] else if (layer.textDataType == TextDataType.number) ...[
+            _buildNumericLayerEditor(context, ref, layer),
+          ] else if (layer.textDataType == TextDataType.enumeration) ...[
+            _buildEnumLayerEditor(context, ref, layer),
+          ],
           const SizedBox(height: 12),
 
           // Typography / Font Selector Card
@@ -1017,7 +1029,7 @@ class InspectorPanel extends ConsumerWidget {
         // ============================================================
         if (layer.type == LayerType.shape) ...[
           const SizedBox(height: 16),
-          _buildSectionHeader('GEOMETRÍA Y DESARROLLO DE FORMA'),
+          _buildSectionHeader(ref.tr('shape_geometry_and_path')),
           const SizedBox(height: 10),
           _buildShapePresetSelectorSection(context, ref, layer),
           const SizedBox(height: 16),
@@ -1511,9 +1523,9 @@ class InspectorPanel extends ConsumerWidget {
   // --- Background Fill Mode Selector (Solid / Gradient / Full Image) ---
   Widget _buildBackgroundFillModeSelector(BuildContext context, WidgetRef ref, LayerItem layer) {
     final modes = [
-      (LayerFillMode.solid, 'Color Sólido', Icons.palette_outlined),
-      (LayerFillMode.gradient, 'Gradiente', Icons.gradient),
-      (LayerFillMode.image, 'Imagen', Icons.image_outlined),
+      (LayerFillMode.solid, ref.tr('solid_color'), Icons.palette_outlined),
+      (LayerFillMode.gradient, ref.tr('gradient'), Icons.gradient),
+      (LayerFillMode.image, ref.tr('image_layer'), Icons.image_outlined),
     ];
 
     return Container(
@@ -1673,9 +1685,9 @@ class InspectorPanel extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Preajustes de Gradiente',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              Text(
+                ref.tr('gradient_presets'),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -2056,10 +2068,10 @@ class InspectorPanel extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.polyline_outlined, size: 16, color: Color(0xFFE9D5FF)),
-              label: const Text(
-                'Desarrollo de Forma Personalizada (Editor de Nodos)',
+              label: Text(
+                ref.tr('custom_shape_builder'),
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
               onPressed: () async {
                 final result = await CustomShapeBuilderDialog.show(
@@ -2136,7 +2148,7 @@ class InspectorPanel extends ConsumerWidget {
                   foregroundColor: const Color(0xFFE9D5FF),
                 ),
                 icon: const Icon(Icons.manage_search, size: 14),
-                label: const Text('Catálogo Completo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                label: Text(ref.tr('full_catalog'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 onPressed: () async {
                   final chosenFont = await GrimoireFontPickerDialog.show(
                     context,
@@ -3164,9 +3176,9 @@ class InspectorPanel extends ConsumerWidget {
             children: presets.map((p) {
               final isSelected = (currentRadius - p).abs() < 0.5;
               String label = '${p.toInt()} px';
-              if (p == 0) label = '0 (Recto)';
-              if (p == 12) label = '12 (TCG)';
-              if (p == 16) label = '16 (Póker)';
+              if (p == 0) label = ref.tr('corner_radius_preset_straight');
+              if (p == 12) label = ref.tr('corner_radius_preset_tcg');
+              if (p == 16) label = ref.tr('corner_radius_preset_poker');
               return InkWell(
                 onTap: () => onChanged(p),
                 borderRadius: BorderRadius.circular(6),
@@ -3869,6 +3881,471 @@ class InspectorPanel extends ConsumerWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  void _updateTextAndActiveRow(WidgetRef ref, LayerItem layer, String newValue) {
+    final notifier = ref.read(editorProvider.notifier);
+    final project = ref.read(editorProvider).project;
+    final activeRow = project.activeRow;
+    if (layer.bindingKey.isNotEmpty && activeRow.containsKey(layer.bindingKey)) {
+      notifier.updateActiveRowData(layer.bindingKey, newValue);
+      if (!layer.text.contains('{{')) {
+        notifier.updateLayer(layer.copyWith(text: newValue));
+      }
+    } else {
+      notifier.updateLayer(layer.copyWith(text: newValue));
+    }
+  }
+
+  Widget _buildTextDataTypeSelector(BuildContext context, WidgetRef ref, LayerItem layer) {
+    final types = [
+      (TextDataType.text, ref.tr('data_type_text'), Icons.text_fields),
+      (TextDataType.number, ref.tr('data_type_number'), Icons.pin),
+      (TextDataType.enumeration, ref.tr('data_type_enum'), Icons.list_alt),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F111D),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.borderSubtle),
+      ),
+      child: Row(
+        children: types.map((item) {
+          final isSelected = layer.textDataType == item.$1;
+          return Expanded(
+            child: InkWell(
+              onTap: () {
+                if (item.$1 == TextDataType.number) {
+                  final parsed = double.tryParse(layer.text.trim());
+                  final defaultNum = parsed != null ? layer.text : (layer.text.isEmpty ? '1' : layer.text);
+                  ref.read(editorProvider.notifier).updateLayer(
+                    layer.copyWith(
+                      textDataType: TextDataType.number,
+                      text: defaultNum,
+                    ),
+                  );
+                } else if (item.$1 == TextDataType.enumeration) {
+                  final defaultOptions = layer.enumValues.isNotEmpty
+                      ? layer.enumValues
+                      : (layer.text.isNotEmpty && !layer.text.contains('{{')
+                          ? [layer.text, 'Opción 2']
+                          : ['Criatura', 'Hechizo', 'Reliquia']);
+                  final currentText = layer.text.isNotEmpty && !layer.text.contains('{{')
+                      ? layer.text
+                      : defaultOptions.first;
+                  ref.read(editorProvider.notifier).updateLayer(
+                    layer.copyWith(
+                      textDataType: TextDataType.enumeration,
+                      enumValues: defaultOptions,
+                      text: currentText,
+                    ),
+                  );
+                } else {
+                  ref.read(editorProvider.notifier).updateLayer(
+                    layer.copyWith(textDataType: TextDataType.text),
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(7),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? GrimoireTheme.accentPurple : Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      item.$3,
+                      size: 13,
+                      color: isSelected ? Colors.white : GrimoireTheme.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        item.$2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? Colors.white : GrimoireTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildNumericLayerEditor(BuildContext context, WidgetRef ref, LayerItem layer) {
+    final curVal = double.tryParse(layer.text.trim()) ?? 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111424),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.pin, size: 14, color: GrimoireTheme.accentPurple),
+                  const SizedBox(width: 6),
+                  Text(
+                    ref.tr('numeric_stepper_title'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+              if (layer.numberPrefix.isNotEmpty || layer.numberSuffix.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    layer.formatDisplayValue(layer.text),
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFD8B4FE), fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Stepper: [-]  [ Input ]  [+]
+          Row(
+            children: [
+              IconButton(
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF1C223A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.all(8),
+                ),
+                icon: const Icon(Icons.remove, size: 16, color: Colors.white),
+                tooltip: 'Decrementar',
+                onPressed: () {
+                  var next = curVal - layer.numberStep;
+                  if (layer.numberMin != null && next < layer.numberMin!) {
+                    next = layer.numberMin!;
+                  }
+                  final nextStr = next % 1 == 0 ? next.toInt().toString() : next.toString();
+                  _updateTextAndActiveRow(ref, layer, nextStr);
+                },
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('num_${layer.id}_${layer.text}'),
+                  initialValue: layer.text,
+                  textAlign: TextAlign.center,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    fillColor: const Color(0xFF0F1220),
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onChanged: (val) {
+                    _updateTextAndActiveRow(ref, layer, val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF1C223A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.all(8),
+                ),
+                icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                tooltip: 'Incrementar',
+                onPressed: () {
+                  var next = curVal + layer.numberStep;
+                  if (layer.numberMax != null && next > layer.numberMax!) {
+                    next = layer.numberMax!;
+                  }
+                  final nextStr = next % 1 == 0 ? next.toInt().toString() : next.toString();
+                  _updateTextAndActiveRow(ref, layer, nextStr);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Prefix & Suffix
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('prefix_${layer.id}_${layer.numberPrefix}'),
+                  initialValue: layer.numberPrefix,
+                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: ref.tr('number_prefix'),
+                    hintText: '+ o \$',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                  onChanged: (val) {
+                    ref.read(editorProvider.notifier).updateLayer(layer.copyWith(numberPrefix: val));
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('suffix_${layer.id}_${layer.numberSuffix}'),
+                  initialValue: layer.numberSuffix,
+                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: ref.tr('number_suffix'),
+                    hintText: 'HP, MP, etc.',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                  onChanged: (val) {
+                    ref.read(editorProvider.notifier).updateLayer(layer.copyWith(numberSuffix: val));
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Step / Increment
+          _buildNumberInput(ref.tr('number_step'), layer.numberStep, (val) {
+            if (val > 0) {
+              ref.read(editorProvider.notifier).updateLayer(layer.copyWith(numberStep: val));
+            }
+          }, keyPrefix: 'step_${layer.id}'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnumLayerEditor(BuildContext context, WidgetRef ref, LayerItem layer) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111424),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.list_alt, size: 14, color: GrimoireTheme.accentPurple),
+              const SizedBox(width: 6),
+              Text(
+                ref.tr('enum_allowed_values'),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Dropdown selector for current value
+          if (layer.enumValues.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1220),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: GrimoireTheme.borderSubtle),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: layer.enumValues.contains(layer.text) ? layer.text : null,
+                  hint: Text(
+                    ref.tr('select_enum_placeholder'),
+                    style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                  ),
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF141828),
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                  items: layer.enumValues.map((opt) {
+                    final isSel = opt == layer.text;
+                    return DropdownMenuItem<String>(
+                      value: opt,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: isSel ? GrimoireTheme.accentPurple : GrimoireTheme.textMuted,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Text(opt),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      _updateTextAndActiveRow(ref, layer, val);
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          // Clickable Chips
+          if (layer.enumValues.isNotEmpty) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: layer.enumValues.map((opt) {
+                final isSelected = opt == layer.text;
+                return InkWell(
+                  onTap: () {
+                    _updateTextAndActiveRow(ref, layer, opt);
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.35) : const Color(0xFF1C2136),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.borderSubtle,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          opt,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () {
+                            final updated = List<String>.from(layer.enumValues)..remove(opt);
+                            final newText = layer.text == opt ? (updated.isNotEmpty ? updated.first : '') : layer.text;
+                            ref.read(editorProvider.notifier).updateLayer(
+                              layer.copyWith(enumValues: updated, text: newText),
+                            );
+                          },
+                          child: const Icon(Icons.close, size: 12, color: GrimoireTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+          // Add Enum Option Input Row
+          _AddEnumOptionWidget(
+            onAdd: (newOption) {
+              if (!layer.enumValues.contains(newOption)) {
+                final updated = List<String>.from(layer.enumValues)..add(newOption);
+                final newText = layer.text.isEmpty ? newOption : layer.text;
+                ref.read(editorProvider.notifier).updateLayer(
+                  layer.copyWith(enumValues: updated, text: newText),
+                );
+              }
+            },
+            hint: ref.tr('add_enum_option_hint'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddEnumOptionWidget extends StatefulWidget {
+  final ValueChanged<String> onAdd;
+  final String hint;
+
+  const _AddEnumOptionWidget({required this.onAdd, required this.hint});
+
+  @override
+  State<_AddEnumOptionWidget> createState() => _AddEnumOptionWidgetState();
+}
+
+class _AddEnumOptionWidgetState extends State<_AddEnumOptionWidget> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      widget.onAdd(text);
+      _controller.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _controller,
+            style: const TextStyle(fontSize: 11, color: Colors.white),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              fillColor: const Color(0xFF0F1220),
+              filled: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onFieldSubmitted: (_) => _submit(),
+          ),
+        ),
+        const SizedBox(width: 6),
+        IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: GrimoireTheme.accentPurple,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.all(8),
+          ),
+          icon: const Icon(Icons.add, size: 16, color: Colors.white),
+          tooltip: 'Añadir opción',
+          onPressed: _submit,
+        ),
       ],
     );
   }

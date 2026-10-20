@@ -170,7 +170,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                         // Quick Previous Card Button
                         IconButton(
                           key: const Key('editor_prev_card_button'),
-                          tooltip: 'Carta anterior',
+                          tooltip: ref.tr('prev_card'),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                           icon: Icon(
@@ -190,7 +190,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                                 ? null
                                 : activeRowIndex,
                             hint: Text(
-                              rows.isEmpty ? 'Sin cartas' : 'Seleccionar carta',
+                              rows.isEmpty ? ref.tr('no_cards') : ref.tr('select_card'),
                               style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -232,7 +232,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                         // Quick Next Card Button
                         IconButton(
                           key: const Key('editor_next_card_button'),
-                          tooltip: 'Siguiente carta',
+                          tooltip: ref.tr('next_card'),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                           icon: Icon(
@@ -313,7 +313,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ),
                 PopupMenuButton<String>(
                   key: const Key('template_actions_menu'),
-                  tooltip: 'Gestionar Plantillas y Tamaño',
+                  tooltip: ref.tr('manage_templates_and_size'),
                   color: GrimoireTheme.surfaceElevated,
                   icon: const Icon(Icons.more_vert, size: 16, color: GrimoireTheme.textSecondary),
                   padding: EdgeInsets.zero,
@@ -331,140 +331,140 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'new_template',
                       child: Row(
                         children: [
-                          Icon(Icons.add_box_outlined, size: 15, color: GrimoireTheme.accentCyan),
-                          SizedBox(width: 8),
-                          Text('Nueva Plantilla', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.add_box_outlined, size: 15, color: GrimoireTheme.accentCyan),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('new_template'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'duplicate_template',
                       child: Row(
                         children: [
-                          Icon(Icons.copy_outlined, size: 15, color: GrimoireTheme.accentIndigo),
-                          SizedBox(width: 8),
-                          Text('Duplicar Plantilla Activa', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.copy_outlined, size: 15, color: GrimoireTheme.accentIndigo),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('duplicate_active_template'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'rename_template',
                       child: Row(
                         children: [
-                          Icon(Icons.drive_file_rename_outline, size: 15, color: GrimoireTheme.accentAmber),
-                          SizedBox(width: 8),
-                          Text('Renombrar Plantilla', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.drive_file_rename_outline, size: 15, color: GrimoireTheme.accentAmber),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('rename_template'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
                     if (editorState.project.templates.length > 1)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete_template',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, size: 15, color: GrimoireTheme.accentPink),
-                            SizedBox(width: 8),
-                            Text('Eliminar Plantilla', style: TextStyle(fontSize: 12, color: GrimoireTheme.accentPink)),
+                            const Icon(Icons.delete_outline, size: 15, color: GrimoireTheme.accentPink),
+                            const SizedBox(width: 8),
+                            Text(ref.tr('delete_template'), style: const TextStyle(fontSize: 12, color: GrimoireTheme.accentPink)),
                           ],
                         ),
                       ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       enabled: false,
                       height: 24,
                       child: Text(
-                        'PLANTILLAS PREDEFINIDAS',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted),
+                        ref.tr('predefined_templates_section'),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_default',
                       child: Row(
                         children: [
-                          Icon(Icons.dashboard_outlined, size: 15, color: GrimoireTheme.accentEmerald),
-                          SizedBox(width: 8),
-                          Text('Default (Estándar)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.dashboard_outlined, size: 15, color: GrimoireTheme.accentEmerald),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_default_standard'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_tcg_fantasy',
                       child: Row(
                         children: [
-                          Icon(Icons.auto_awesome, size: 15, color: GrimoireTheme.accentPurple),
-                          SizedBox(width: 8),
-                          Text('TCG Fantasía / Criatura', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.auto_awesome, size: 15, color: GrimoireTheme.accentPurple),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_tcg_fantasy'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_boardgame_action',
                       child: Row(
                         children: [
-                          Icon(Icons.flash_on, size: 15, color: GrimoireTheme.accentCyan),
-                          SizedBox(width: 8),
-                          Text('Juego de Mesa / Acción', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.flash_on, size: 15, color: GrimoireTheme.accentCyan),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_boardgame_action'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_tarot_hero',
                       child: Row(
                         children: [
-                          Icon(Icons.shield, size: 15, color: GrimoireTheme.accentAmber),
-                          SizedBox(width: 8),
-                          Text('Tarot / Héroe Legendario', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.shield, size: 15, color: GrimoireTheme.accentAmber),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_tarot_hero'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_cyberpunk',
                       child: Row(
                         children: [
-                          Icon(Icons.memory, size: 15, color: GrimoireTheme.accentPink),
-                          SizedBox(width: 8),
-                          Text('Cyberpunk Neón', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.memory, size: 15, color: GrimoireTheme.accentPink),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_cyberpunk'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'preset_minimalist',
                       child: Row(
                         children: [
-                          Icon(Icons.crop_portrait_outlined, size: 15, color: Color(0xFF818CF8)),
-                          SizedBox(width: 8),
-                          Text('Minimalista Moderno', style: TextStyle(fontSize: 12, color: Colors.white)),
+                          const Icon(Icons.crop_portrait_outlined, size: 15, color: Color(0xFF818CF8)),
+                          const SizedBox(width: 8),
+                          Text(ref.tr('template_minimalist'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                         ],
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       enabled: false,
                       height: 24,
                       child: Text(
-                        'TAMAÑO FÍSICO DE CARTA',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted),
+                        ref.tr('physical_card_size'),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'size_poker',
-                      child: Text('Poker Estándar (63.5 × 88.9 mm)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      child: Text(ref.tr('size_poker_standard'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'size_japanese',
-                      child: Text('Japonés / Yu-Gi-Oh (59 × 86 mm)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      child: Text(ref.tr('size_japanese'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'size_tarot',
-                      child: Text('Tarot Grande (70 × 120 mm)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      child: Text(ref.tr('size_tarot'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'size_minieuro',
-                      child: Text('Mini Euro (44 × 68 mm)', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      child: Text(ref.tr('size_minieuro'), style: const TextStyle(fontSize: 12, color: Colors.white)),
                     ),
                   ],
                 ),
@@ -482,7 +482,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     size: 16,
                     color: editorState.canUndo ? Colors.white : GrimoireTheme.textMuted.withValues(alpha: 0.4),
                   ),
-                  tooltip: 'Deshacer (Ctrl+Z)',
+                  tooltip: ref.tr('undo_tooltip'),
                   onPressed: editorState.canUndo ? () => ref.read(editorProvider.notifier).undo() : null,
                 ),
                 IconButton(
@@ -494,7 +494,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     size: 16,
                     color: editorState.canRedo ? Colors.white : GrimoireTheme.textMuted.withValues(alpha: 0.4),
                   ),
-                  tooltip: 'Rehacer (Ctrl+Y)',
+                  tooltip: ref.tr('redo_tooltip'),
                   onPressed: editorState.canRedo ? () => ref.read(editorProvider.notifier).redo() : null,
                 ),
                 const SizedBox(width: 6),

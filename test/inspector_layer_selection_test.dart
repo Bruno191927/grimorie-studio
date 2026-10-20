@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/features/editor/models/layer_item.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/widgets/inspector_panel.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 
 void main() {
   testWidgets('Inspector displays Ajustes de Imagen when an image layer is selected', (tester) async {
@@ -13,7 +14,7 @@ void main() {
 
     final container = ProviderContainer();
 
-    // 1. Initial state: No layer selected -> "Ajustes de Proyecto y Carta"
+    // 1. Initial state: No layer selected -> "Project & Card Settings"
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -26,9 +27,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Ajustes de Proyecto y Carta'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'project_card_settings')), findsOneWidget);
 
-    // 2. Select an image layer -> "Ajustes de Imagen"
+    // 2. Select an image layer -> "Image Settings"
     final notifier = container.read(editorProvider.notifier);
     final imageLayer = LayerItem(
       id: 'img_test_1',
@@ -44,13 +45,13 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Ajustes de Imagen'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_settings')), findsOneWidget);
     expect(find.textContaining('Arte Principal'), findsWidgets);
-    expect(find.text('ARTE Y ORIGEN DEL ASSET'), findsOneWidget);
-    expect(find.text('APARIENCIA Y ESCALA DE IMAGEN'), findsOneWidget);
-    expect(find.text('Ajustes de Proyecto y Carta'), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_origin_source').toUpperCase()), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_appearance_scale').toUpperCase()), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'project_card_settings')), findsNothing);
 
-    // 3. Select a text layer -> "Ajustes de Capa"
+    // 3. Select a text layer -> "Layer Settings"
     final textLayer = LayerItem(
       id: 'txt_test_1',
       name: 'Nombre de Criatura',
@@ -66,16 +67,16 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Ajustes de Capa'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'layer_settings')), findsOneWidget);
     expect(find.textContaining('Nombre de Criatura'), findsWidgets);
-    expect(find.text('Ajustes de Imagen'), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_settings')), findsNothing);
 
-    // 4. Deselect layer -> back to "Ajustes de Proyecto y Carta"
+    // 4. Deselect layer -> back to "Project & Card Settings"
     notifier.selectLayer(null);
     await tester.pumpAndSettle();
 
-    expect(find.text('Ajustes de Proyecto y Carta'), findsOneWidget);
-    expect(find.text('Ajustes de Imagen'), findsNothing);
-    expect(find.text('Ajustes de Capa'), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'project_card_settings')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_settings')), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'layer_settings')), findsNothing);
   });
 }

@@ -58,10 +58,10 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(container.read(localeProvider), AppLanguage.es);
-
-      container.read(localeProvider.notifier).setLanguage(AppLanguage.en);
       expect(container.read(localeProvider), AppLanguage.en);
+
+      container.read(localeProvider.notifier).setLanguage(AppLanguage.es);
+      expect(container.read(localeProvider), AppLanguage.es);
 
       container.read(localeProvider.notifier).setLanguage(AppLanguage.fr);
       expect(container.read(localeProvider), AppLanguage.fr);

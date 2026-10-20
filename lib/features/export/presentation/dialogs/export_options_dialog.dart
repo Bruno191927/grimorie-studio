@@ -384,35 +384,35 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                     children: [
                       _buildFormatTab(
                         format: ExportFormat.printAndPlaySheet,
-                        title: 'Print & Play 3×3',
+                        title: ref.tr('format_print_and_play'),
                         icon: Icons.grid_view_rounded,
                         color: GrimoireTheme.accentPink,
                       ),
                       const SizedBox(width: 6),
                       _buildFormatTab(
                         format: ExportFormat.pdfPrint,
-                        title: 'PDF Imprenta',
+                        title: ref.tr('format_pdf_print'),
                         icon: Icons.picture_as_pdf,
                         color: GrimoireTheme.accentPurple,
                       ),
                       const SizedBox(width: 6),
                       _buildFormatTab(
                         format: ExportFormat.htmlShowcase,
-                        title: 'Web 3D',
+                        title: ref.tr('format_web_3d'),
                         icon: Icons.view_in_ar,
                         color: GrimoireTheme.accentCyan,
                       ),
                       const SizedBox(width: 6),
                       _buildFormatTab(
                         format: ExportFormat.tabletopSimulator,
-                        title: 'TTS Sprite Sheet',
+                        title: ref.tr('format_tts'),
                         icon: Icons.casino,
                         color: GrimoireTheme.accentIndigo,
                       ),
                       const SizedBox(width: 6),
                       _buildFormatTab(
                         format: ExportFormat.pngZip,
-                        title: 'PNG Individual',
+                        title: ref.tr('format_png_zip'),
                         icon: Icons.folder_zip,
                         color: GrimoireTheme.accentEmerald,
                       ),
@@ -450,8 +450,8 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                     ),
                     const SizedBox(height: 10),
                     _buildSwitchOption(
-                      title: 'Guías de Corte (Grid 3×3)',
-                      description: 'Dibuja líneas guía alrededor de las 9 cartas por página para corte con tijera o guillotina.',
+                      title: ref.tr('crop_guides_3x3'),
+                      description: ref.tr('crop_guides_3x3_desc'),
                       value: _includeCropMarks,
                       icon: Icons.crop,
                       onChanged: _isProcessing ? null : (v) => setState(() => _includeCropMarks = v),
@@ -459,15 +459,15 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                     const SizedBox(height: 8),
                     _buildSwitchOption(
                       title: ref.tr('option_include_backs'),
-                      description: 'Genera página trasera espejada automáticamente para imprimir a doble cara.',
+                      description: ref.tr('option_include_backs_desc'),
                       value: _includeBacks,
                       icon: Icons.flip,
                       onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
                     ),
                     const SizedBox(height: 8),
                     _buildSwitchOption(
-                      title: 'Multiplicar por Columna Cantidad (qty)',
-                      description: 'Si una carta tiene qty=4 en la base de datos, imprime 4 copias en la hoja.',
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
                       value: _respectQuantityColumn,
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
@@ -506,31 +506,34 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: GrimoireTheme.accentCyan.withValues(alpha: 0.45)),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.view_in_ar, size: 16, color: GrimoireTheme.accentCyan),
-                              SizedBox(width: 8),
-                              Text(
-                                'Visor Web 3D Interactivo (100% Autónomo)',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              const Icon(Icons.view_in_ar, size: 16, color: GrimoireTheme.accentCyan),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  ref.tr('interactive_web_3d_viewer'),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
-                            'Genera un archivo .html único con visualización 3D reactiva al cursor del ratón, brillo holográfico, filtro de búsqueda instantánea y zoom modal con giro anverso/reverso. Abre directamente en cualquier navegador moderno sin requerir internet ni servidor.',
-                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                            ref.tr('interactive_web_3d_viewer_desc'),
+                            style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Wrap(
                             spacing: 14,
                             runSpacing: 6,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Row(
+                              const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
@@ -541,20 +544,20 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
-                                  SizedBox(width: 6),
-                                  Text('Giro Anverso / Reverso', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  const Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  const SizedBox(width: 6),
+                                  Text(ref.tr('flip_front_back'), style: const TextStyle(fontSize: 11, color: Colors.white)),
                                 ],
                               ),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
-                                  SizedBox(width: 6),
-                                  Text('Búsqueda en Vivo', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  const Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
+                                  const SizedBox(width: 6),
+                                  Text(ref.tr('live_search'), style: const TextStyle(fontSize: 11, color: Colors.white)),
                                 ],
                               ),
-                              Row(
+                              const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.check, size: 14, color: GrimoireTheme.accentCyan),
@@ -570,15 +573,15 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                     const SizedBox(height: 8),
                     _buildSwitchOption(
                       title: ref.tr('option_include_backs'),
-                      description: 'Permite voltear las cartas en 3D para inspeccionar el reverso en el navegador.',
+                      description: ref.tr('option_include_backs_desc'),
                       value: _includeBacks,
                       icon: Icons.flip,
                       onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
                     ),
                     const SizedBox(height: 8),
                     _buildSwitchOption(
-                      title: 'Multiplicar por Columna Cantidad (qty)',
-                      description: 'Incluye tantas copias de cada carta en la galería web como indique la columna qty.',
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
                       value: _respectQuantityColumn,
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
@@ -594,13 +597,16 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.auto_awesome, size: 16, color: GrimoireTheme.accentIndigo),
-                              SizedBox(width: 8),
-                              Text(
-                                'Tabletop Simulator (TTS) Ready',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              const Icon(Icons.auto_awesome, size: 16, color: GrimoireTheme.accentIndigo),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  ref.tr('tts_ready_title'),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -610,7 +616,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                             style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
                           ),
                           const SizedBox(height: 10),
-                          const Wrap(
+                          Wrap(
                             spacing: 14,
                             runSpacing: 6,
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -618,17 +624,17 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
-                                  SizedBox(width: 6),
-                                  Text('Hoja Frontal (Grid hasta 10x7)', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  const Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
+                                  const SizedBox(width: 6),
+                                  Text(ref.tr('tts_front_sheet'), style: const TextStyle(fontSize: 11, color: Colors.white)),
                                 ],
                               ),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
-                                  SizedBox(width: 6),
-                                  Text('Hoja de Reverso & Config TXT', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                  const Icon(Icons.check, size: 14, color: GrimoireTheme.accentEmerald),
+                                  const SizedBox(width: 6),
+                                  Text(ref.tr('tts_back_sheet'), style: const TextStyle(fontSize: 11, color: Colors.white)),
                                 ],
                               ),
                             ],
@@ -638,8 +644,8 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                     ),
                     const SizedBox(height: 8),
                     _buildSwitchOption(
-                      title: 'Multiplicar por Columna Cantidad (qty)',
-                      description: 'Genera copias múltiples en el Sprite Sheet según la columna qty.',
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
                       value: _respectQuantityColumn,
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
@@ -652,23 +658,23 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: GrimoireTheme.accentAmber.withValues(alpha: 0.45)),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.inventory_2_outlined, size: 16, color: GrimoireTheme.accentAmber),
-                              SizedBox(width: 8),
+                              const Icon(Icons.inventory_2_outlined, size: 16, color: GrimoireTheme.accentAmber),
+                              const SizedBox(width: 8),
                               Text(
-                                'Paquete de Proyecto Portable (.grimoire)',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                ref.tr('portable_project_pkg'),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                               ),
                             ],
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
-                            'Empaqueta todas tus plantillas, capas, reglas condicionales, archivos data.csv y carpetas de imágenes assets/ en un único archivo .grimoire listo para respaldo o para compartir con tu equipo.',
-                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                            ref.tr('portable_project_pkg_desc'),
+                            style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
                           ),
                         ],
                       ),
@@ -878,12 +884,13 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
       bleedEnabled: _includeBleed,
       cropMarksEnabled: _includeCropMarks,
       duplexEnabled: _includeBacks,
+      language: ref.watch(localeProvider),
     );
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF131726),
+        color: const Color(0xFF101426),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: report.warningCount > 0
@@ -902,10 +909,10 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                 color: report.warningCount > 0 ? GrimoireTheme.accentAmber : GrimoireTheme.accentEmerald,
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Pre-flight Imprenta & Perfil CMYK (PDF/X-1a)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ref.tr('preflight_checklist_title'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),
               Container(
@@ -920,7 +927,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                   ),
                 ),
                 child: Text(
-                  report.warningCount > 0 ? '${report.warningCount} Advertencia' : '100% Listo',
+                  report.warningCount > 0 ? '${report.warningCount} ${ref.tr('preflight_warnings')}' : ref.tr('preflight_ready'),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,

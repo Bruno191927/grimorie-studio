@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/core/widgets/keyboard_shortcuts_dialog.dart';
 import 'package:grimoire_studio/core/widgets/quick_card_search_dialog.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
@@ -18,11 +19,13 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () => KeyboardShortcutsDialog.show(context),
-              child: const Text('Open Shortcuts'),
+        ProviderScope(
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => KeyboardShortcutsDialog.show(context),
+                child: const Text('Open Shortcuts'),
+              ),
             ),
           ),
         ),
@@ -32,19 +35,19 @@ void main() {
       await tester.tap(find.text('Open Shortcuts'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Atajos de Teclado'), findsOneWidget);
-      expect(find.text('NAVEGACIÓN GLOBAL'), findsOneWidget);
-      expect(find.text('EDICIÓN & PROYECTO'), findsOneWidget);
-      expect(find.text('LIENZO & CAPAS'), findsOneWidget);
-      expect(find.text('MESA DE PLAYTEST'), findsOneWidget);
-      expect(find.text('Búsqueda rápida de cartas (Spotlight)'), findsOneWidget);
-      expect(find.text('Alternar guías de corte y sangrado (3mm)'), findsOneWidget);
+      expect(find.textContaining(AppStrings.get(AppLanguage.en, 'shortcuts_title')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'nav_global_section')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'edit_project_section')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'canvas_layers_section')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'playtest_section')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'shortcut_spotlight')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'shortcut_toggle_guides')), findsOneWidget);
 
       // Close dialog
-      await tester.tap(find.text('Entendido'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'close')));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Atajos de Teclado'), findsNothing);
+      expect(find.textContaining(AppStrings.get(AppLanguage.en, 'shortcuts_title')), findsNothing);
     });
 
     testWidgets('QuickCardSearchDialog searches cards and filters results', (tester) async {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/grimoire_theme.dart';
+import '../localization/locale_provider.dart';
 
 /// Interactive modal dialog displaying keyboard shortcuts and workflow productivity tips.
-class KeyboardShortcutsDialog extends StatelessWidget {
+class KeyboardShortcutsDialog extends ConsumerWidget {
   const KeyboardShortcutsDialog({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -13,7 +15,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Dialog(
       backgroundColor: GrimoireTheme.surfaceElevated,
       shape: RoundedRectangleBorder(
@@ -39,21 +41,21 @@ class KeyboardShortcutsDialog extends StatelessWidget {
                   child: const Icon(Icons.keyboard_outlined, color: GrimoireTheme.accentPurple, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Atajos de Teclado & Flujo Rápido',
-                        style: TextStyle(
+                        ref.tr('shortcuts_title'),
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
                       Text(
-                        'Aumenta tu velocidad de diseño en Grimoire Studio',
-                        style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                        ref.tr('shortcuts_subtitle'),
+                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                       ),
                     ],
                   ),
@@ -73,38 +75,38 @@ class KeyboardShortcutsDialog extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSection('NAVEGACIÓN GLOBAL', [
-                      _buildShortcutRow('Ctrl + K', 'Búsqueda rápida de cartas (Spotlight)'),
-                      _buildShortcutRow('Ctrl + 1', 'Ir a la Galería de Cartas'),
-                      _buildShortcutRow('Ctrl + 2', 'Ir al Editor de Diseño'),
-                      _buildShortcutRow('Ctrl + 3', 'Ir a la Base de Datos & CSV'),
-                      _buildShortcutRow('Ctrl + 4', 'Ir a la Mesa de Playtest Virtual'),
-                      _buildShortcutRow('Ctrl + /', 'Abrir esta guía de atajos'),
+                    _buildSection(ref.tr('nav_global_section'), [
+                      _buildShortcutRow('Ctrl + K', ref.tr('shortcut_spotlight')),
+                      _buildShortcutRow('Ctrl + 1', ref.tr('shortcut_gallery')),
+                      _buildShortcutRow('Ctrl + 2', ref.tr('shortcut_editor')),
+                      _buildShortcutRow('Ctrl + 3', ref.tr('shortcut_database')),
+                      _buildShortcutRow('Ctrl + 4', ref.tr('shortcut_playtest')),
+                      _buildShortcutRow('Ctrl + /', ref.tr('shortcut_help')),
                     ]),
                     const SizedBox(height: 16),
 
-                    _buildSection('EDICIÓN & PROYECTO', [
-                      _buildShortcutRow('Ctrl + S', 'Guardar proyecto activo y exportar CSV'),
-                      _buildShortcutRow('Ctrl + E', 'Exportar mazo a 300 DPI / PDF para imprenta'),
-                      _buildShortcutRow('Ctrl + O', 'Importar paquete .grimoire o zip'),
-                      _buildShortcutRow('Ctrl + Z', 'Deshacer último cambio de capa'),
-                      _buildShortcutRow('Ctrl + Y', 'Rehacer cambio'),
+                    _buildSection(ref.tr('edit_project_section'), [
+                      _buildShortcutRow('Ctrl + S', ref.tr('shortcut_save_export')),
+                      _buildShortcutRow('Ctrl + E', ref.tr('shortcut_export_300dpi')),
+                      _buildShortcutRow('Ctrl + O', ref.tr('shortcut_import_pkg')),
+                      _buildShortcutRow('Ctrl + Z', ref.tr('shortcut_undo')),
+                      _buildShortcutRow('Ctrl + Y', ref.tr('shortcut_redo')),
                     ]),
                     const SizedBox(height: 16),
 
-                    _buildSection('LIENZO & CAPAS', [
-                      _buildShortcutRow('Supr / Backspace', 'Eliminar capa seleccionada'),
-                      _buildShortcutRow('Flecha Izq / Der', 'Cambiar a carta anterior / siguiente'),
-                      _buildShortcutRow('Ctrl + Shift + B', 'Alternar guías de corte y sangrado (3mm)'),
-                      _buildShortcutRow('Rueda del Ratón', 'Zoom in / Zoom out en el lienzo'),
-                      _buildShortcutRow('Espacio + Arrastre', 'Desplazar lienzo (Pan)'),
+                    _buildSection(ref.tr('canvas_layers_section'), [
+                      _buildShortcutRow('Supr / Backspace', ref.tr('shortcut_delete_layer')),
+                      _buildShortcutRow('Flecha / Arrow', ref.tr('shortcut_prev_next_card')),
+                      _buildShortcutRow('Ctrl + Shift + B', ref.tr('shortcut_toggle_guides')),
+                      _buildShortcutRow('Scroll / Wheel', ref.tr('shortcut_zoom')),
+                      _buildShortcutRow('Space + Drag', ref.tr('shortcut_pan')),
                     ]),
                     const SizedBox(height: 16),
 
-                    _buildSection('MESA DE PLAYTEST', [
-                      _buildShortcutRow('Arrastrar carta', 'Jugar carta al campo de batalla'),
-                      _buildShortcutRow('Doble clic en carta', 'Girar / Agotar carta (Tap / Untap 90°)'),
-                      _buildShortcutRow('Clic derecho en mazo', 'Robar 1 carta a la mano'),
+                    _buildSection(ref.tr('playtest_section'), [
+                      _buildShortcutRow('Drag card', ref.tr('shortcut_play_card')),
+                      _buildShortcutRow('Double click', ref.tr('shortcut_tap_card')),
+                      _buildShortcutRow('Right click deck', ref.tr('shortcut_draw_card')),
                     ]),
                   ],
                 ),
@@ -123,7 +125,7 @@ class KeyboardShortcutsDialog extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Entendido', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                child: Text(ref.tr('close'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:archive/archive.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/localization/app_strings.dart';
 import '../../editor/services/game_folder_service.dart';
 
 class ExportProgress {
@@ -891,55 +892,99 @@ class ExportService {
     required bool bleedEnabled,
     required bool cropMarksEnabled,
     required bool duplexEnabled,
+    AppLanguage language = AppLanguage.es,
   }) {
+    final isEn = language == AppLanguage.en;
     final checks = <PreflightCheckItem>[
       PreflightCheckItem(
-        title: 'Resolución de Impresión 300 DPI',
-        description: 'Resolución calibrada para naipe físico de ${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm. Renderizado de alta definición con factor de escala 3.5×.',
+        title: isEn ? '300 DPI Print Resolution' : 'Resolución de Impresión 300 DPI',
+        description: isEn
+            ? 'Calibrated resolution for physical card of ${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm. High-definition rendering with 3.5× scale factor.'
+            : 'Resolución calibrada para naipe físico de ${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm. Renderizado de alta definición con factor de escala 3.5×.',
         status: PreflightStatus.pass,
-        recommendation: 'Cumple el estándar de imprenta offset comercial y digital profesional.',
+        recommendation: isEn
+            ? 'Meets commercial offset and professional digital printing standards.'
+            : 'Cumple el estándar de imprenta offset comercial y digital profesional.',
       ),
       PreflightCheckItem(
-        title: bleedEnabled ? 'Sangrado Exterior Activo (3.0 mm)' : 'Sangrado Exterior Desactivado',
-        description: bleedEnabled
-            ? 'El lienzo añade 3.0 mm perimetrales de desborde de arte más allá del borde de corte para absorber tolerancias mecánicas de guillotina.'
-            : 'Sin desborde perimetral: Si la guillotina tiene una desviación mecánica de 0.5-1.5 mm, aparecerá un filo blanco antiestético en los bordes de la carta.',
+        title: isEn
+            ? (bleedEnabled ? 'Active Outer Bleed (3.0 mm)' : 'Outer Bleed Disabled')
+            : (bleedEnabled ? 'Sangrado Exterior Activo (3.0 mm)' : 'Sangrado Exterior Desactivado'),
+        description: isEn
+            ? (bleedEnabled
+                ? 'Canvas adds 3.0 mm perimeter artwork bleed beyond trim edge to absorb mechanical guillotine tolerances.'
+                : 'No perimeter bleed: If guillotine shifts 0.5-1.5 mm, an unsightly white border will appear on card edges.')
+            : (bleedEnabled
+                ? 'El lienzo añade 3.0 mm perimetrales de desborde de arte más allá del borde de corte para absorber tolerancias mecánicas de guillotina.'
+                : 'Sin desborde perimetral: Si la guillotina tiene una desviación mecánica de 0.5-1.5 mm, aparecerá un filo blanco antiestético en los bordes de la carta.'),
         status: bleedEnabled ? PreflightStatus.pass : PreflightStatus.warning,
-        recommendation: bleedEnabled
-            ? 'Alineado con especificaciones de imprentas de naipes (MPC, Cartamundi, DriveThruCards).'
-            : 'Se recomienda activar el sangrado antes de enviar el archivo a imprenta.',
+        recommendation: isEn
+            ? (bleedEnabled
+                ? 'Aligned with card printer specifications (MPC, Cartamundi, DriveThruCards).'
+                : 'Activating bleed before sending files to print is recommended.')
+            : (bleedEnabled
+                ? 'Alineado con especificaciones de imprentas de naipes (MPC, Cartamundi, DriveThruCards).'
+                : 'Se recomienda activar el sangrado antes de enviar el archivo a imprenta.'),
       ),
       PreflightCheckItem(
-        title: cropMarksEnabled ? 'Marcas de Corte Vectoriales Activas' : 'Sin Marcas de Corte Guía',
-        description: cropMarksEnabled
-            ? '8 marcas vectoriales de registro exterior separadas a 1.0 mm de la línea de corte para alineación de guillotina o troquelado.'
-            : 'El documento PDF no contendrá guías perimetrales de corte.',
+        title: isEn
+            ? (cropMarksEnabled ? 'Active Vector Crop Marks' : 'No Guide Crop Marks')
+            : (cropMarksEnabled ? 'Marcas de Corte Vectoriales Activas' : 'Sin Marcas de Corte Guía'),
+        description: isEn
+            ? (cropMarksEnabled
+                ? '8 outer vector registration marks offset 1.0 mm from trim line for guillotine alignment or die-cutting.'
+                : 'The PDF document will not contain perimeter cutting guides.')
+            : (cropMarksEnabled
+                ? '8 marcas vectoriales de registro exterior separadas a 1.0 mm de la línea de corte para alineación de guillotina o troquelado.'
+                : 'El documento PDF no contendrá guías perimetrales de corte.'),
         status: cropMarksEnabled ? PreflightStatus.pass : PreflightStatus.info,
-        recommendation: cropMarksEnabled
-            ? 'Permite a los operarios de imprenta centrar el corte con precisión micrométrica.'
-            : 'Desactiva solo si la imprenta solicita el archivo recortado al tamaño trim exacto.',
+        recommendation: isEn
+            ? (cropMarksEnabled
+                ? 'Allows press operators to center cuts with micrometric precision.'
+                : 'Disable only if printer requests exact trimmed size.')
+            : (cropMarksEnabled
+                ? 'Permite a los operarios de imprenta centrar el corte con precisión micrométrica.'
+                : 'Desactiva solo si la imprenta solicita el archivo recortado al tamaño trim exacto.'),
       ),
       PreflightCheckItem(
-        title: 'Simulación de Perfil CMYK & Estándar PDF/X-1a',
-        description: 'Las pantallas emiten luz RGB (gama amplia), mientras las imprentas aplican tintas CMYK (cian, magenta, amarillo, negro) sobre papel físico. Los colores súper saturados o neones sufren desaturación natural en papel.',
+        title: isEn ? 'CMYK Profile Simulation & PDF/X-1a Standard' : 'Simulación de Perfil CMYK & Estándar PDF/X-1a',
+        description: isEn
+            ? 'Screens emit RGB light (wide gamut), while printers apply CMYK inks to physical paper. Ultra-saturated or neon colors naturally desaturate on paper.'
+            : 'Las pantallas emiten luz RGB (gama amplia), mientras las imprentas aplican tintas CMYK (cian, magenta, amarillo, negro) sobre papel físico. Los colores súper saturados o neones sufren desaturación natural en papel.',
         status: PreflightStatus.info,
-        recommendation: 'Aviso de Gamut: Para tiradas comerciales, evita colores neón 100% RGB puros (#00FF00, #00FFFF). Grimoire Studio optimiza los contrastes para FOGRA39 / GRACoL.',
+        recommendation: isEn
+            ? 'Gamut notice: For commercial runs, avoid 100% pure RGB neons (#00FF00, #00FFFF). Grimoire Studio optimizes contrasts for FOGRA39 / GRACoL.'
+            : 'Aviso de Gamut: Para tiradas comerciales, evita colores neón 100% RGB puros (#00FF00, #00FFFF). Grimoire Studio optimiza los contrastes para FOGRA39 / GRACoL.',
       ),
       PreflightCheckItem(
-        title: 'Zona de Seguridad Interior (3.0 mm)',
-        description: 'Todo el contenido crítico (textos, iconos de maná, estadísticas de ataque/defensa y números) debe estar a más de 3.0 mm del borde de corte.',
+        title: isEn ? 'Inner Safety Margin (3.0 mm)' : 'Zona de Seguridad Interior (3.0 mm)',
+        description: isEn
+            ? 'All critical content (text, mana icons, attack/defense stats, numbers) must be > 3.0 mm from the cut edge.'
+            : 'Todo el contenido crítico (textos, iconos de maná, estadísticas de ataque/defensa y números) debe estar a más de 3.0 mm del borde de corte.',
         status: PreflightStatus.pass,
-        recommendation: 'Garantiza que ningún texto quede guillotinado por el margen de error mecánico (±1.5 mm).',
+        recommendation: isEn
+            ? 'Ensures no text is cut off by mechanical margin of error (±1.5 mm).'
+            : 'Garantiza que ningún texto quede guillotinado por el margen de error mecánico (±1.5 mm).',
       ),
       PreflightCheckItem(
-        title: duplexEnabled ? 'Impresión Dúplex (Anverso + Reverso)' : 'Impresión Simple (Solo Anverso)',
-        description: duplexEnabled
-            ? 'El PDF intercala automáticamente las páginas pares con el reverso correspondiente para imprimir a doble cara.'
-            : 'Solo se exportarán las caras frontales del mazo.',
+        title: isEn
+            ? (duplexEnabled ? 'Duplex Printing (Front + Back)' : 'Single-Sided Printing (Front Only)')
+            : (duplexEnabled ? 'Impresión Dúplex (Anverso + Reverso)' : 'Impresión Simple (Solo Anverso)'),
+        description: isEn
+            ? (duplexEnabled
+                ? 'PDF automatically alternates even pages with corresponding card back for double-sided printing.'
+                : 'Only front card faces of the deck will be exported.')
+            : (duplexEnabled
+                ? 'El PDF intercala automáticamente las páginas pares con el reverso correspondiente para imprimir a doble cara.'
+                : 'Solo se exportarán las caras frontales del mazo.'),
         status: duplexEnabled ? PreflightStatus.pass : PreflightStatus.info,
-        recommendation: duplexEnabled
-            ? 'Asegúrate de configurar la impresora en "Voltear por el borde largo" (Long-Edge Binding).'
-            : 'Ideal para jugar con fundas protectoras opacas (card sleeves).',
+        recommendation: isEn
+            ? (duplexEnabled
+                ? 'Make sure printer is set to "Flip on Long Edge" (Long-Edge Binding).'
+                : 'Ideal when playing with opaque card sleeves.')
+            : (duplexEnabled
+                ? 'Asegúrate de configurar la impresora en "Voltear por el borde largo" (Long-Edge Binding).'
+                : 'Ideal para jugar con fundas protectoras opacas (card sleeves).'),
       ),
     ];
 

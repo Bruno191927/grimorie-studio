@@ -8,6 +8,7 @@ import 'package:grimoire_studio/features/editor/presentation/screens/editor_scre
 import 'package:grimoire_studio/features/editor/services/game_folder_service.dart';
 import 'package:grimoire_studio/core/widgets/grimoire_emoji_picker.dart';
 import 'package:grimoire_studio/features/gallery/presentation/screens/card_gallery_screen.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,10 +118,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check category label exists in toolbar
-      expect(find.text('Categoría:'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'category_label')), findsOneWidget);
 
       // Verify active card dropdown is present
-      expect(find.text('Carta Activa:'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'active_card')), findsOneWidget);
     });
 
     testWidgets('GrimoireEmojiPicker searches, categorizes, and selects emojis', (WidgetTester tester) async {
@@ -190,11 +191,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // With no layer selected, Project Settings shows corner radius & background controls
-      expect(find.text('Radio de Borde'), findsWidgets);
-      expect(find.text('FONDO Y BORDE DE LA CARTA'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'border_radius')), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'card_background_settings').toUpperCase()), findsOneWidget);
 
-      // Verify quick presets are available (e.g. 16 (Póker), 24 px)
-      expect(find.text('16 (Póker)'), findsOneWidget);
+      // Verify quick presets are available (e.g. 16 (Poker), 24 px)
+      expect(find.text('16 (Poker)'), findsOneWidget);
       expect(find.text('24 px'), findsOneWidget);
 
       // Tap 24 px preset
@@ -249,9 +250,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       // 1. Verify Assets panel is present between canvas and inspector
-      expect(find.text('Assets del Juego'), findsWidgets);
-      expect(find.textContaining('Subir Imág'), findsWidgets);
-      expect(find.text('Generar con IA'), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'game_assets')), findsWidgets);
+      expect(find.textContaining(AppStrings.get(AppLanguage.en, 'upload_asset')), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'generate_ai_asset')), findsWidgets);
 
       // 2. Verify sample Magic assets are displayed (e.g. black_lotus.png)
       expect(find.text('black_lotus.png'), findsOneWidget);
@@ -265,7 +266,7 @@ void main() {
       expect(find.text('ACTIVA'), findsWidgets);
 
       // 4. Test collapsing the panel via the chevron button
-      final collapseBtn = find.byTooltip('Plegar panel de assets');
+      final collapseBtn = find.byTooltip(AppStrings.get(AppLanguage.en, 'collapse_assets_panel'));
       expect(collapseBtn, findsWidgets);
       await tester.tap(collapseBtn.first);
       await tester.pump();
@@ -275,14 +276,14 @@ void main() {
       expect(find.textContaining('ASSETS'), findsWidgets);
 
       // 5. Expand it back by tapping the collapsed rail
-      final expandBtn = find.byTooltip('Desplegar panel de assets');
+      final expandBtn = find.byTooltip(AppStrings.get(AppLanguage.en, 'expand_assets_panel'));
       expect(expandBtn, findsWidgets);
       await tester.tap(expandBtn.first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
       // Title should be visible again
-      expect(find.text('Assets del Juego'), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'game_assets')), findsWidgets);
     });
 
     test('EditorNotifier.duplicateCategory clones category and creates preset card', () {
@@ -373,18 +374,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify the dedicated "Crear Modelo Preset de Carta" dialog is displayed
-      expect(find.text('Crear Modelo Preset de Carta'), findsOneWidget);
-      expect(find.text('Arquetipos Rápidos Recomendados:'), findsOneWidget);
-      expect(find.text('Criatura (TCG)'), findsOneWidget);
-      expect(find.text('Hechizo / Magia'), findsOneWidget);
-      expect(find.text('Héroe / Avatar'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'create_preset_card_model_title')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'starter_archetypes')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'archetype_creature_label')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'archetype_spell_label')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'archetype_hero_label')), findsOneWidget);
 
       // Change archetype to Hechizo / Magia
-      await tester.tap(find.text('Hechizo / Magia'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'archetype_spell_label')));
       await tester.pumpAndSettle();
 
       // Verify default type and rules updated
-      expect(find.text('Tormenta Arcana'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'archetype_spell_name')), findsOneWidget);
 
       // Enter a custom preset model name
       final nameInput = find.byKey(const Key('input_preset_model_name'));
@@ -409,7 +410,7 @@ void main() {
       expect(lastCard['category'], equals('Hechizo Cósmico'));
     });
 
-    testWidgets('Category Model Dialog hides manual attributes when a base card is selected', (tester) async {
+    testWidgets('Category Model Dialog shows clean category creation (Name, Icon, Type, Color) without hardcoded RPG stats', (tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -435,57 +436,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final state = container.read(editorProvider);
-      final firstGame = state.gameCategories.keys.firstWhere((g) => !state.deletedGames.contains(g));
-      final firstGameCard = state.project.rows.firstWhere((r) => (r['game'] ?? '').toString() == firstGame)['card_name'].toString();
-
       // Open new category dialog for first game
       final newCatBtn = find.byKey(const Key('btn_add_category_model')).first;
       await tester.tap(newCatBtn);
       await tester.pumpAndSettle();
 
       final dialogFinder = find.byType(AlertDialog);
+      expect(dialogFinder, findsOneWidget);
 
-      // Initially, with blank template ("Ninguna"), manual attributes container is visible
-      expect(find.descendant(of: dialogFinder, matching: find.text('Atributos de esta Plantilla / Carta Predefinida:')), findsOneWidget);
-      expect(find.descendant(of: dialogFinder, matching: find.textContaining('Atributos heredados de')), findsNothing);
+      // Verify that category identity fields exist
+      expect(find.descendant(of: dialogFinder, matching: find.byType(TextField)), findsWidgets);
 
-      // Select a base card from the dropdown inside the dialog
-      final dropdown = find.descendant(of: dialogFinder, matching: find.text('Ninguna (Plantilla en blanco)'));
-      await tester.tap(dropdown);
-      await tester.pumpAndSettle();
-
-      // Pick the card from the open dropdown menu
-      final cardItem = find.descendant(
-        of: find.byType(DropdownMenuItem<int?>),
-        matching: find.textContaining(firstGameCard),
-      ).last;
-      await tester.tap(cardItem);
-      await tester.pumpAndSettle();
-
-      // Verify that manual attribute switches are now HIDDEN and inherited attributes banner is shown
+      // Verify that the forced RPG combat stats block is NOT present
       expect(find.descendant(of: dialogFinder, matching: find.text('Atributos de esta Plantilla / Carta Predefinida:')), findsNothing);
-      expect(find.descendant(of: dialogFinder, matching: find.textContaining('Atributos heredados de "$firstGameCard"')), findsOneWidget);
-
-      // Re-open the dropdown
-      final cardDropdown = find.descendant(
-        of: dialogFinder,
-        matching: find.textContaining(firstGameCard),
-      ).first;
-      await tester.tap(cardDropdown);
-      await tester.pumpAndSettle();
-
-      // Re-select blank template
-      final blankItem = find.descendant(
-        of: find.byType(DropdownMenuItem<int?>),
-        matching: find.text('Ninguna (Plantilla en blanco)'),
-      ).last;
-      await tester.tap(blankItem);
-      await tester.pumpAndSettle();
-
-      // Verify manual attributes container reappears
-      expect(find.descendant(of: dialogFinder, matching: find.text('Atributos de esta Plantilla / Carta Predefinida:')), findsOneWidget);
-      expect(find.descendant(of: dialogFinder, matching: find.textContaining('Atributos heredados de')), findsNothing);
+      expect(find.descendant(of: dialogFinder, matching: find.text('Ataque (⚔️)')), findsNothing);
+      expect(find.descendant(of: dialogFinder, matching: find.text('Defensa (🛡️)')), findsNothing);
     });
   });
 }

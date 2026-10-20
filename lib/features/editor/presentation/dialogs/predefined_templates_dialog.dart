@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/card_template.dart';
-import '../../models/card_project.dart';
 import '../providers/editor_provider.dart';
 import '../widgets/card_renderer_widget.dart';
 import '../../../../core/theme/grimoire_theme.dart';
@@ -206,7 +205,7 @@ class _PredefinedTemplatesDialogState extends ConsumerState<PredefinedTemplatesD
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     itemCount: presets.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    separatorBuilder: (_, _) => const SizedBox(width: 16),
                     itemBuilder: (context, index) {
                       final preset = presets[index];
                       final isSelected = preset.id == _selectedPresetId;

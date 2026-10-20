@@ -154,6 +154,7 @@ class GrimoireToast {
       padding: EdgeInsets.zero,
       width: toastWidth,
       duration: duration,
+      showCloseIcon: false,
       content: GrimoireToastCard(
         message: message,
         title: title,

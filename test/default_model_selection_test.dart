@@ -5,6 +5,8 @@ import 'package:grimoire_studio/features/editor/models/game_category.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/widgets/inspector_panel.dart';
 
+import 'package:grimoire_studio/core/localization/app_strings.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -89,7 +91,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Modelos Predefinidos'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'predefined_models')), findsOneWidget);
       expect(find.byKey(const Key('btn_mark_game_default')), findsOneWidget);
       expect(find.byKey(const Key('btn_mark_category_default')), findsOneWidget);
 
@@ -97,7 +99,7 @@ void main() {
       await tester.tap(find.byKey(const Key('btn_mark_game_default')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Predefinida para policritics'), findsOneWidget);
+      expect(find.text('${AppStrings.get(AppLanguage.en, 'general_model_for')} policritics'), findsOneWidget);
     });
   });
 }

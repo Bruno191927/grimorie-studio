@@ -35,9 +35,9 @@ class LayerDeleteDialog {
     // Check if the only target is a background layer
     if (targetLayers.length == 1 && targetLayers.first.type == LayerType.background) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF1E1B4B),
-          content: Text('La capa de fondo no se puede eliminar (solo editar).'),
+        SnackBar(
+          backgroundColor: const Color(0xFF1E1B4B),
+          content: Text(ref.tr('cannot_delete_background_layer')),
         ),
       );
       return false;
@@ -49,6 +49,13 @@ class LayerDeleteDialog {
 
     final isSingle = deletableLayers.length == 1;
     final layerName = deletableLayers.first.name;
+
+    final titleText = isSingle
+        ? ref.tr('delete_layer_title')
+        : ref.tr('delete_layers_multiple_title').replaceAll('{count}', deletableLayers.length.toString());
+    final descText = isSingle
+        ? ref.tr('delete_layer_desc_single').replaceAll('{name}', layerName)
+        : ref.tr('delete_layer_desc_multi').replaceAll('{count}', deletableLayers.length.toString());
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -71,16 +78,14 @@ class LayerDeleteDialog {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isSingle ? '¿Eliminar capa?' : '¿Eliminar ${deletableLayers.length} capas?',
+                titleText,
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
         ),
         content: Text(
-          isSingle
-              ? '¿Estás seguro de que deseas borrar la capa "$layerName"?\n\nEsta acción quitará la capa de la plantilla activa.'
-              : '¿Estás seguro de que deseas borrar las ${deletableLayers.length} capas seleccionadas?\n\nEsta acción quitará las capas de la plantilla activa.',
+          descText,
           style: const TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
         ),
         actions: [
@@ -115,8 +120,8 @@ class LayerDeleteDialog {
           backgroundColor: GrimoireTheme.accentEmerald,
           content: Text(
             isSingle
-                ? 'Capa "$layerName" eliminada.'
-                : '${deletableLayers.length} capas eliminadas.',
+                ? '$layerName - ${ref.tr('delete_layer')}.'
+                : '${deletableLayers.length} ${ref.tr('layers_deleted_toast')}.',
           ),
           duration: const Duration(seconds: 2),
         ),

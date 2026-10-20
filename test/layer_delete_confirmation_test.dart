@@ -6,6 +6,7 @@ import 'package:grimoire_studio/features/editor/presentation/providers/editor_pr
 import 'package:grimoire_studio/features/editor/models/layer_item.dart';
 import 'package:grimoire_studio/features/editor/presentation/dialogs/layer_delete_dialog.dart';
 import 'package:grimoire_studio/features/editor/presentation/screens/editor_screen.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -53,13 +54,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify popup content
-      expect(find.text('¿Eliminar capa?'), findsOneWidget);
-      expect(find.textContaining('¿Estás seguro de que deseas borrar la capa "Marco Heroico"?'), findsOneWidget);
-      expect(find.text('Cancelar'), findsOneWidget);
-      expect(find.text('Eliminar'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete_layer_title')), findsOneWidget);
+      expect(find.textContaining('Marco Heroico'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'cancel')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete')), findsOneWidget);
 
       // Tap Cancel
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'cancel')));
       await tester.pumpAndSettle();
 
       expect(dialogResult, isFalse);
@@ -110,11 +111,11 @@ void main() {
       await tester.tap(find.text('Open Dialog'));
       await tester.pumpAndSettle();
 
-      expect(find.text('¿Eliminar capa?'), findsOneWidget);
-      expect(find.textContaining('¿Estás seguro de que deseas borrar la capa "Icono Espada"?'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete_layer_title')), findsOneWidget);
+      expect(find.textContaining('Icono Espada'), findsOneWidget);
 
       // Click Delete
-      await tester.tap(find.text('Eliminar'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'delete')));
       await tester.pumpAndSettle();
 
       expect(dialogResult, isTrue);
@@ -155,8 +156,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // No confirmation popup should be shown for background layer
-      expect(find.text('¿Eliminar capa?'), findsNothing);
-      expect(find.text('La capa de fondo no se puede eliminar (solo editar).'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete_layer_title')), findsNothing);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'cannot_delete_background_layer')), findsOneWidget);
     });
 
     testWidgets('Pressing Delete key in EditorScreen opens confirmation popup for selected layer', (tester) async {
@@ -198,11 +199,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Confirmation dialog must appear
-      expect(find.text('¿Eliminar capa?'), findsOneWidget);
-      expect(find.textContaining('¿Estás seguro de que deseas borrar la capa "Texto Leyenda"?'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete_layer_title')), findsOneWidget);
+      expect(find.descendant(of: find.byType(AlertDialog), matching: find.textContaining('Texto Leyenda')), findsOneWidget);
 
       // Confirm delete
-      await tester.tap(find.text('Eliminar'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'delete')));
       await tester.pumpAndSettle();
 
       // Layer deleted
@@ -249,11 +250,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Confirmation dialog must appear
-      expect(find.text('¿Eliminar capa?'), findsOneWidget);
-      expect(find.textContaining('¿Estás seguro de que deseas borrar la capa "Marco Dorado"?'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'delete_layer_title')), findsOneWidget);
+      expect(find.descendant(of: find.byType(AlertDialog), matching: find.textContaining('Marco Dorado')), findsOneWidget);
 
       // Confirm delete
-      await tester.tap(find.text('Eliminar'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'delete')));
       await tester.pumpAndSettle();
 
       // Layer deleted
@@ -296,7 +297,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Enter inline text editing
-      final editButton = find.text('Editar texto (2x clic)');
+      final editButton = find.text(AppStrings.get(AppLanguage.en, 'edit_text_hint'));
       expect(editButton, findsOneWidget);
       await tester.tap(editButton);
       await tester.pumpAndSettle();

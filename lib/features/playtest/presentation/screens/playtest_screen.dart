@@ -182,40 +182,46 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
       case TableDivisionMode.none:
         return [];
       case TableDivisionMode.duel:
+        final pz = ref.tr('player_zone');
         return [
-          PlayerZoneSpec(player: 1, position: Offset(center.dx, h - 180), label: 'Zona Jugador 1'),
-          PlayerZoneSpec(player: 2, position: Offset(center.dx, 180), label: 'Zona Jugador 2'),
+          PlayerZoneSpec(player: 1, position: Offset(center.dx, h - 180), label: '$pz 1'),
+          PlayerZoneSpec(player: 2, position: Offset(center.dx, 180), label: '$pz 2'),
         ];
       case TableDivisionMode.twoSideBySide:
+        final pz = ref.tr('player_zone');
         return [
-          PlayerZoneSpec(player: 1, position: Offset(w * 0.25, center.dy), label: 'Zona Jugador 1'),
-          PlayerZoneSpec(player: 2, position: Offset(w * 0.75, center.dy), label: 'Zona Jugador 2'),
+          PlayerZoneSpec(player: 1, position: Offset(w * 0.25, center.dy), label: '$pz 1'),
+          PlayerZoneSpec(player: 2, position: Offset(w * 0.75, center.dy), label: '$pz 2'),
         ];
       case TableDivisionMode.threeRadial:
+        final pz = ref.tr('player_zone');
         return [
-          PlayerZoneSpec(player: 1, position: Offset(center.dx, h - 180), label: 'Zona Jugador 1'),
-          PlayerZoneSpec(player: 2, position: Offset(w * 0.28, h * 0.30), label: 'Zona Jugador 2'),
-          PlayerZoneSpec(player: 3, position: Offset(w * 0.72, h * 0.30), label: 'Zona Jugador 3'),
+          PlayerZoneSpec(player: 1, position: Offset(center.dx, h - 180), label: '$pz 1'),
+          PlayerZoneSpec(player: 2, position: Offset(w * 0.28, h * 0.30), label: '$pz 2'),
+          PlayerZoneSpec(player: 3, position: Offset(w * 0.72, h * 0.30), label: '$pz 3'),
         ];
       case TableDivisionMode.fourCross:
+        final pz = ref.tr('player_zone');
         return [
-          PlayerZoneSpec(player: 1, position: Offset(w * 0.26, h * 0.78), label: 'Zona Jugador 1'),
-          PlayerZoneSpec(player: 2, position: Offset(w * 0.26, h * 0.22), label: 'Zona Jugador 2'),
-          PlayerZoneSpec(player: 3, position: Offset(w * 0.74, h * 0.22), label: 'Zona Jugador 3'),
-          PlayerZoneSpec(player: 4, position: Offset(w * 0.74, h * 0.78), label: 'Zona Jugador 4'),
+          PlayerZoneSpec(player: 1, position: Offset(w * 0.26, h * 0.78), label: '$pz 1'),
+          PlayerZoneSpec(player: 2, position: Offset(w * 0.26, h * 0.22), label: '$pz 2'),
+          PlayerZoneSpec(player: 3, position: Offset(w * 0.74, h * 0.22), label: '$pz 3'),
+          PlayerZoneSpec(player: 4, position: Offset(w * 0.74, h * 0.78), label: '$pz 4'),
         ];
       case TableDivisionMode.sixRadial:
         const double r = 520.0;
+        final pz = ref.tr('player_zone');
         return [
-          PlayerZoneSpec(player: 1, position: Offset(center.dx, center.dy + 480), label: 'Zona Jugador 1'),
-          PlayerZoneSpec(player: 2, position: Offset(center.dx + r * 0.866, center.dy + r * 0.5), label: 'Zona Jugador 2'),
-          PlayerZoneSpec(player: 3, position: Offset(center.dx + r * 0.866, center.dy - r * 0.5), label: 'Zona Jugador 3'),
-          PlayerZoneSpec(player: 4, position: Offset(center.dx, center.dy - 480), label: 'Zona Jugador 4'),
-          PlayerZoneSpec(player: 5, position: Offset(center.dx - r * 0.866, center.dy - r * 0.5), label: 'Zona Jugador 5'),
-          PlayerZoneSpec(player: 6, position: Offset(center.dx - r * 0.866, center.dy + r * 0.5), label: 'Zona Jugador 6'),
+          PlayerZoneSpec(player: 1, position: Offset(center.dx, center.dy + 480), label: '$pz 1'),
+          PlayerZoneSpec(player: 2, position: Offset(center.dx + r * 0.866, center.dy + r * 0.5), label: '$pz 2'),
+          PlayerZoneSpec(player: 3, position: Offset(center.dx + r * 0.866, center.dy - r * 0.5), label: '$pz 3'),
+          PlayerZoneSpec(player: 4, position: Offset(center.dx, center.dy - 480), label: '$pz 4'),
+          PlayerZoneSpec(player: 5, position: Offset(center.dx - r * 0.866, center.dy - r * 0.5), label: '$pz 5'),
+          PlayerZoneSpec(player: 6, position: Offset(center.dx - r * 0.866, center.dy + r * 0.5), label: '$pz 6'),
         ];
       case TableDivisionMode.eightRadial:
         const double r = 520.0;
+        final pz = ref.tr('player_zone');
         final list = <PlayerZoneSpec>[];
         for (int i = 0; i < 8; i++) {
           final angle = (22.5 + i * 45.0) * math.pi / 180.0;
@@ -223,7 +229,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
             PlayerZoneSpec(
               player: i + 1,
               position: Offset(center.dx + r * math.cos(angle), center.dy + r * math.sin(angle)),
-              label: 'Zona Jugador ${i + 1}',
+              label: '$pz ${i + 1}',
             ),
           );
         }
@@ -268,7 +274,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isDuel ? '⚔️ LÍNEA DE COMBATE' : '🎲 ZONA COMÚN',
+                      isDuel ? ref.tr('combat_line') : ref.tr('common_area'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -444,9 +450,9 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Pan Hint Tooltip
-          const Tooltip(
-            message: 'Controles de Mesa:\n• Rueda del ratón: Zoom suave\n• Arrastrar fondo: Paneo libre\n• Botones: Zoom rápido / Ajustar',
-            child: Icon(Icons.pan_tool_alt_outlined, size: 14, color: GrimoireTheme.textMuted),
+          Tooltip(
+            message: ref.tr('table_controls_tooltip'),
+            child: const Icon(Icons.pan_tool_alt_outlined, size: 14, color: GrimoireTheme.textMuted),
           ),
           const SizedBox(width: 6),
           const SizedBox(height: 14, child: VerticalDivider(width: 1, color: GrimoireTheme.borderSubtle)),
@@ -454,7 +460,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
           // Zoom Out
           IconButton(
-            tooltip: 'Reducir Zoom (-)',
+            tooltip: '${ref.tr('zoom_out')} (-)',
             icon: const Icon(Icons.remove, size: 15, color: Colors.white),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
@@ -463,7 +469,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
           // Current Zoom Percentage (click to reset to 100%)
           Tooltip(
-            message: 'Clic para resetear al 100%',
+            message: ref.tr('zoom_reset'),
             child: InkWell(
               onTap: () => _setZoom(1.0),
               borderRadius: BorderRadius.circular(4),
@@ -479,7 +485,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
           // Zoom In
           IconButton(
-            tooltip: 'Aumentar Zoom (+)',
+            tooltip: '${ref.tr('zoom_in')} (+)',
             icon: const Icon(Icons.add, size: 15, color: Colors.white),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
@@ -492,7 +498,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
           // Fit / Center Table Button
           IconButton(
-            tooltip: 'Ajustar mesa al centro (Fit Table)',
+            tooltip: ref.tr('fit_table'),
             icon: const Icon(Icons.fit_screen_outlined, size: 15, color: GrimoireTheme.accentEmerald),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
@@ -1223,7 +1229,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                           Icon(Icons.sports_martial_arts, size: 14, color: _isDuelMode ? GrimoireTheme.accentPurple : GrimoireTheme.textMuted),
                           const SizedBox(width: 6),
                           Text(
-                            _isDuelMode ? 'Duelo (J1 vs J2)' : 'Solitario',
+                            _isDuelMode ? ref.tr('duel_mode') : ref.tr('solo_mode'),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -1264,7 +1270,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                         ),
                       ),
                       child: PopupMenuButton<TableDivisionMode>(
-                        tooltip: 'Dividir mesa para ver cómo queda con más jugadores',
+                        tooltip: ref.tr('divide_table_tooltip'),
                         color: GrimoireTheme.surfaceElevated,
                         elevation: 8,
                         constraints: const BoxConstraints(minWidth: 280, maxWidth: 340),
@@ -1400,7 +1406,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                         minimumSize: const Size(0, 30),
                       ),
                       icon: const Icon(Icons.toll, size: 13, color: Color(0xFFEAB308)),
-                      label: const Text('Fichas', style: TextStyle(fontSize: 11)),
+                      label: Text(ref.tr('tokens'), style: const TextStyle(fontSize: 11)),
                       onPressed: () {
                         TokenSpawnerDialog.show(
                           context,
@@ -1421,7 +1427,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                         minimumSize: const Size(0, 30),
                       ),
                       icon: const Icon(Icons.analytics_outlined, size: 13, color: GrimoireTheme.accentPurple),
-                      label: const Text('Analítica', style: TextStyle(fontSize: 11)),
+                      label: Text(ref.tr('analytics'), style: const TextStyle(fontSize: 11)),
                       onPressed: () {
                         PlaytestAnalyticsDialog.show(
                           context,
@@ -2179,7 +2185,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('JUGADOR 2', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF67E8F9))),
+                Text(ref.tr('player_2'), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF67E8F9))),
                 const SizedBox(height: 2),
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2376,7 +2382,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(_isDuelMode ? 'JUGADOR 1' : 'RECURSOS',
+                Text(_isDuelMode ? ref.tr('player_1') : ref.tr('resources'),
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GrimoireTheme.accentPurple)),
                 const SizedBox(height: 6),
                 // Mana Counter

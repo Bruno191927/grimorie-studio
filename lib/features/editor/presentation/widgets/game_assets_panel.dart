@@ -599,9 +599,9 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
 
           // Main Content: Grid or Empty State
           Expanded(
-            child: filteredAssets.isEmpty
+            child: (filteredAssets.isEmpty && (_selectedFolder != '' || folders.isEmpty))
                 ? _buildEmptyState(context, gameName)
-                : _buildAssetsGrid(context, gameName, filteredAssets, currentArtUrl),
+                : _buildAssetsGrid(context, gameName, folders, filteredAssets, currentArtUrl),
           ),
         ],
       ),
@@ -1290,13 +1290,258 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
     );
   }
 
+  Widget _buildFolderGridCard(BuildContext context, String gameName, String folder) {
+    final folderCount = GameFolderService.listGameAssetImages(gameName, subfolder: folder, recursive: false).length;
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) {
+        final assetPath = details.data;
+        if (assetPath.isEmpty) return false;
+        final file = GameFolderService.resolveCardImageFile(gameName, assetPath);
+        if (file == null) return false;
+        final currentSub = GameFolderService.getAssetSubfolder(gameName, file);
+        return currentSub != folder;
+      },
+      onAcceptWithDetails: (details) {
+        final assetPath = details.data;
+        final file = GameFolderService.resolveCardImageFile(gameName, assetPath);
+        final fileName = file?.uri.pathSegments.last ?? assetPath.split('/').last;
+        final ok = ref.read(editorProvider.notifier).moveAsset(
+              gameName: gameName,
+              relativeOrFileName: assetPath,
+              targetSubfolder: folder,
+            );
+        if (ok && mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: GrimoireTheme.accentPurple,
+              content: Text('Asset "$fileName" movido a "$folder".'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovered = candidateData.isNotEmpty;
+        return InkWell(
+          onTap: () => setState(() => _selectedFolder = folder),
+          borderRadius: BorderRadius.circular(10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: isHovered
+                  ? GrimoireTheme.accentPurple.withValues(alpha: 0.28)
+                  : const Color(0xFF16192E),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isHovered ? GrimoireTheme.accentPurple : const Color(0xFF2A2E4D),
+                width: isHovered ? 2.0 : 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isHovered
+                      ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
+                      : Colors.black.withValues(alpha: 0.25),
+                  blurRadius: isHovered ? 10 : 5,
+                  spreadRadius: isHovered ? 1 : 0,
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: GrimoireTheme.accentPurple.withValues(alpha: isHovered ? 0.3 : 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isHovered ? Icons.drive_file_move : Icons.folder_rounded,
+                          size: 34,
+                          color: isHovered ? Colors.white : const Color(0xFFC084FC),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          folder,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isHovered ? Colors.white : const Color(0xFFF1F5F9),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F111D),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: GrimoireTheme.borderSubtle, width: 0.8),
+                        ),
+                        child: Text(
+                          '$folderCount ${folderCount == 1 ? "archivo" : "archivos"}',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: GrimoireTheme.textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 14, color: GrimoireTheme.textMuted),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    color: GrimoireTheme.surfaceElevated,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                    ),
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'rename',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.drive_file_rename_outline, size: 14, color: Color(0xFF93C5FD)),
+                            const SizedBox(width: 8),
+                            Text(ref.tr('rename_folder'), style: const TextStyle(fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'open',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.folder_open, size: 14, color: GrimoireTheme.accentEmerald),
+                            const SizedBox(width: 8),
+                            Text(ref.tr('open_assets_folder'), style: const TextStyle(fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline, size: 14, color: Colors.redAccent),
+                            const SizedBox(width: 8),
+                            Text(ref.tr('delete'), style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (action) async {
+                      if (action == 'rename') {
+                        final newName = await AssetFolderDialogs.showRenameFolderDialog(context, gameName, folder);
+                        if (newName != null && mounted) {
+                          if (_selectedFolder == folder) {
+                            setState(() => _selectedFolder = newName);
+                          } else {
+                            setState(() {});
+                          }
+                        }
+                      } else if (action == 'open') {
+                        GameFolderService.openGameAssetsFolderInExplorer(gameName, subfolder: folder);
+                      } else if (action == 'delete') {
+                        final deleted = await AssetFolderDialogs.showDeleteFolderConfirm(context, gameName, folder);
+                        if (deleted && mounted) {
+                          if (_selectedFolder == folder) {
+                            setState(() => _selectedFolder = null);
+                          } else {
+                            setState(() {});
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBackToRootGridCard() {
+    return InkWell(
+      onTap: () => setState(() => _selectedFolder = ''),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF141728),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: GrimoireTheme.borderSubtle, width: 1.2),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 26,
+                  color: GrimoireTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '.. Volver a Raíz',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: GrimoireTheme.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAssetsGrid(
     BuildContext context,
     String gameName,
+    List<String> folders,
     List<File> assets,
     String currentArtUrl,
   ) {
     final selectedAssetPath = ref.watch(editorProvider.select((s) => s.selectedAssetPath));
+
+    // When viewing Raíz ('') or Todos (null with no query), subfolders matching the filter can be displayed
+    final showFoldersInGrid = (_selectedFolder == '' || _selectedFolder == null);
+    final displayedFolders = showFoldersInGrid
+        ? (_searchFilter.isEmpty
+            ? folders
+            : folders.where((f) => f.toLowerCase().contains(_searchFilter.toLowerCase())).toList())
+        : <String>[];
+
+    final isInsideSubfolder = _selectedFolder != null && _selectedFolder!.isNotEmpty;
+    final int backCardCount = isInsideSubfolder ? 1 : 0;
+    final int folderCount = displayedFolders.length;
+    final int totalCount = backCardCount + folderCount + assets.length;
 
     return GridView.builder(
       padding: const EdgeInsets.all(10),
@@ -1306,9 +1551,20 @@ class _GameAssetsCollapsiblePanelState extends ConsumerState<GameAssetsCollapsib
         mainAxisSpacing: 8,
         childAspectRatio: 0.9,
       ),
-      itemCount: assets.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final file = assets[index];
+        if (backCardCount > 0 && index == 0) {
+          return _buildBackToRootGridCard();
+        }
+
+        final folderIndex = index - backCardCount;
+        if (folderIndex < folderCount) {
+          final folderName = displayedFolders[folderIndex];
+          return _buildFolderGridCard(context, gameName, folderName);
+        }
+
+        final assetIndex = folderIndex - folderCount;
+        final file = assets[assetIndex];
         final fileName = file.uri.pathSegments.last;
         final relativeUrl = GameFolderService.getRelativeAssetPath(gameName, file);
         final assetSubfolder = GameFolderService.getAssetSubfolder(gameName, file);

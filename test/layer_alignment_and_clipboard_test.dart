@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/editor/models/layer_item.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/screens/editor_screen.dart';
@@ -217,7 +218,7 @@ void main() {
       expect(rowsAfter, rowsBefore + 1);
 
       // SnackBar confirmation is displayed
-      expect(find.text('Carta duplicada con éxito'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'card_duplicated_toast')), findsOneWidget);
     });
   });
 }

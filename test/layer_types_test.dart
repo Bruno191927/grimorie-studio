@@ -9,6 +9,7 @@ import 'package:grimoire_studio/features/editor/utils/shape_path_builder.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/presentation/widgets/custom_shape_builder_dialog.dart';
 import 'package:grimoire_studio/core/widgets/grimoire_font_picker.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/main.dart';
 
 void main() {
@@ -220,73 +221,73 @@ void main() {
     await tester.pumpAndSettle();
 
     // Navigate to Editor de Lienzo tab
-    await tester.tap(find.text('Editor de Lienzo'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'nav_editor')));
     await tester.pumpAndSettle();
 
     // Open the '+' Add Layer PopupMenuButton
-    final addLayerBtn = find.byTooltip('Añadir Capa');
+    final addLayerBtn = find.byTooltip(AppStrings.get(AppLanguage.en, 'add_layer'));
     expect(addLayerBtn, findsOneWidget);
     await tester.tap(addLayerBtn);
     await tester.pumpAndSettle();
 
     // Verify all 4 layer types appear in the menu
-    expect(find.text('Capa de Fondo (Background)'), findsOneWidget);
-    expect(find.text('Capa de Forma / Marco'), findsOneWidget);
-    expect(find.text('Capa de Texto'), findsOneWidget);
-    expect(find.text('Capa de Imagen'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'background_layer')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'shape_layer')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'text_layer')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'image_layer')), findsOneWidget);
 
     // 1. Select 'Capa de Fondo (Background)'
-    await tester.tap(find.text('Capa de Fondo (Background)'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'background_layer')));
     await tester.pumpAndSettle();
 
     // Verify Background Inspector controls appear
-    expect(find.text('ESTILO DE FONDO (BACKGROUND)'), findsOneWidget);
-    expect(find.text('Color Sólido'), findsOneWidget);
-    expect(find.text('Gradiente'), findsOneWidget);
-    expect(find.text('Preajustes de Gradiente'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'background_style')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'solid_color')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'gradient')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'gradient_presets')), findsOneWidget);
 
     // 2. Open '+' menu and add 'Capa de Forma / Marco'
     await tester.tap(addLayerBtn);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Capa de Forma / Marco'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'shape_layer')));
     await tester.pumpAndSettle();
 
     // Verify Shape Inspector controls and Custom Shape Builder button appear
-    expect(find.text('GEOMETRÍA Y DESARROLLO DE FORMA'), findsOneWidget);
-    expect(find.text('Desarrollo de Forma Personalizada (Editor de Nodos)'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'shape_geometry_and_path')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'custom_shape_builder')), findsOneWidget);
     // Shape layer must NEVER display image assets section or AI art buttons
-    expect(find.text('Subir Imagen desde PC'), findsNothing);
-    expect(find.text('Generar Arte IA para Capa'), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'upload_local_image')), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'generate_ai_for_layer')), findsNothing);
 
     // Tap the Custom Shape Builder button to open the interactive node editor dialog
-    await tester.ensureVisible(find.text('Desarrollo de Forma Personalizada (Editor de Nodos)'));
+    await tester.ensureVisible(find.text(AppStrings.get(AppLanguage.en, 'custom_shape_builder')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Desarrollo de Forma Personalizada (Editor de Nodos)'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'custom_shape_builder')));
     await tester.pumpAndSettle();
     expect(find.byType(CustomShapeBuilderDialog), findsOneWidget);
-    expect(find.text('Aplicar Forma Personalizada'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'apply_custom_shape')), findsOneWidget);
 
     // Apply the custom shape
-    await tester.tap(find.text('Aplicar Forma Personalizada'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'apply_custom_shape')));
     await tester.pumpAndSettle();
 
     // 3. Open '+' menu and add 'Capa de Texto'
     await tester.tap(addLayerBtn);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Capa de Texto'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'text_layer')));
     await tester.pumpAndSettle();
 
     // Text layer must NEVER display image assets section or AI art buttons
-    expect(find.text('Subir Imagen desde PC'), findsNothing);
-    expect(find.text('Generar Arte IA para Capa'), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'upload_local_image')), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'generate_ai_for_layer')), findsNothing);
 
     // Verify Typography selector and open full Font Catalog dialog
-    expect(find.text('Catálogo Completo'), findsOneWidget);
-    await tester.tap(find.text('Catálogo Completo'));
+    expect(find.text(AppStrings.get(AppLanguage.en, 'full_catalog')), findsOneWidget);
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'full_catalog')));
     await tester.pumpAndSettle();
     expect(find.byType(GrimoireFontPickerDialog), findsOneWidget);
-    expect(find.textContaining('Aplicar "'), findsOneWidget);
-    await tester.tap(find.textContaining('Aplicar "'));
+    expect(find.textContaining('Apply "'), findsOneWidget);
+    await tester.tap(find.textContaining('Apply "'));
     await tester.pumpAndSettle();
 
     // 4. Verify 8 resize handles are rendered on the selected Text layer and drag to resize
@@ -298,14 +299,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // 5. Verify inline text editing on the card canvas
-    expect(find.text('Editar texto (2x clic)'), findsOneWidget);
-    await tester.tap(find.text('Editar texto (2x clic)'));
+    expect(find.text(AppStrings.get(AppLanguage.en, 'edit_text_hint')), findsOneWidget);
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'edit_text_hint')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('canvas_inline_text_editor')), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('canvas_inline_text_editor')), 'Título Épico Editado');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Listo'));
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'done')));
     await tester.pumpAndSettle();
     expect(find.text('Título Épico Editado'), findsWidgets);
 

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:archive/archive.dart';
 import 'package:grimoire_studio/main.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/editor/models/card_template.dart';
 import 'package:grimoire_studio/features/editor/models/layer_item.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
@@ -195,16 +196,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Navigate to Canvas Editor tab
-      final editorNavTab = find.text('Editor de Lienzo');
+      final editorNavTab = find.text(AppStrings.get(AppLanguage.en, 'nav_editor'));
       expect(editorNavTab, findsOneWidget);
       await tester.tap(editorNavTab);
       await tester.pumpAndSettle();
 
       // Verify Front side is initially selected
-      expect(find.text('Anverso (Frontal)'), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'card_side_front')), findsWidgets);
 
       // Tap on Back side toggle button
-      final backSideToggle = find.text('Reverso (Trasera)').first;
+      final backSideToggle = find.text(AppStrings.get(AppLanguage.en, 'card_side_back')).first;
       await tester.tap(backSideToggle);
       await tester.pumpAndSettle();
 
@@ -213,37 +214,37 @@ void main() {
       expect(find.text('Inner Rune Border'), findsOneWidget);
 
       // Tap 300 DPI Export Button to open ExportOptionsDialog
-      final exportBtn = find.text('Renderizar Carta 300 DPI');
+      final exportBtn = find.text(AppStrings.get(AppLanguage.en, 'render_300dpi_card'));
       expect(exportBtn, findsOneWidget);
       await tester.tap(exportBtn);
       await tester.pumpAndSettle();
 
       // Verify Export Modal Dialog opens with high-priority export options
-      expect(find.text('Exportar Lote & Configuración'), findsOneWidget);
-      expect(find.text('PDF Imprenta'), findsOneWidget);
-      expect(find.text('TTS Sprite Sheet'), findsOneWidget);
-      expect(find.text('PNG Individual'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'export_options_title')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'format_pdf_print')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'format_tts')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'format_png_zip')), findsOneWidget);
 
       // Verify Sangrado (Bleed 3mm) and Crop Marks switches
-      expect(find.text('Sangrado de Imprenta (Bleed 3mm)'), findsOneWidget);
-      expect(find.text('Marcas de Corte de Guillotina'), findsOneWidget);
-      expect(find.text('Impresión Dúplex (Incluir Reverso)'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'option_bleed')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'option_crop_marks')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'option_include_backs')), findsOneWidget);
 
       // Switch to Tabletop Simulator format in dialog
-      final ttsTab = find.text('TTS Sprite Sheet');
+      final ttsTab = find.text(AppStrings.get(AppLanguage.en, 'format_tts'));
       await tester.tap(ttsTab);
       await tester.pumpAndSettle();
 
       // Verify TTS info card appears
-      expect(find.text('Tabletop Simulator (TTS) Ready'), findsOneWidget);
-      expect(find.text('Hoja Frontal (Grid hasta 10x7)'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'tts_ready_title')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'tts_front_sheet')), findsOneWidget);
 
       // Close dialog
-      final cancelBtn = find.text('Cancelar');
+      final cancelBtn = find.text(AppStrings.get(AppLanguage.en, 'cancel'));
       await tester.tap(cancelBtn);
       await tester.pumpAndSettle();
 
-      expect(find.text('Exportar Lote & Configuración'), findsNothing);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'export_options_title')), findsNothing);
     });
   });
 }

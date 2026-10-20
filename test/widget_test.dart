@@ -32,20 +32,20 @@ void main() {
     expect(find.text('Grimoire '), findsOneWidget);
     expect(find.text('Studio'), findsOneWidget);
 
-    // Initial language is Spanish
-    expect(find.text('Galería de Cartas'), findsOneWidget);
+    // Initial language is English by default
+    expect(find.text(AppStrings.get(AppLanguage.en, 'nav_gallery')), findsOneWidget);
 
     // App starts empty with No Games Empty State
-    expect(find.text('No tienes juegos creados'), findsOneWidget);
-    expect(find.text('Crear mi Primer Juego'), findsOneWidget);
-    expect(find.text('Restaurar Juegos de Ejemplo'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'no_games_title')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'create_first_game_btn')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn')), findsOneWidget);
 
-    // Tap Restaurar Juegos de Ejemplo to populate sample games
-    await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    // Tap Restore Sample Games to populate sample games
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn')));
     await tester.pumpAndSettle();
 
-    // Verify Board Game groups are present in Spanish
-    expect(find.text('Todos los Juegos'), findsOneWidget);
+    // Verify Board Game groups are present in English
+    expect(find.text(AppStrings.get(AppLanguage.en, 'all_games')), findsOneWidget);
     expect(find.text('Magic'), findsWidgets);
     expect(find.text('Unstable Unicorns'), findsWidgets);
 
@@ -55,15 +55,15 @@ void main() {
     await tester.tap(categoryPill.first);
     await tester.pumpAndSettle();
 
-    // Switch to English via provider
-    container.read(localeProvider.notifier).setLanguage(AppLanguage.en);
+    // Switch to Spanish via provider
+    container.read(localeProvider.notifier).setLanguage(AppLanguage.es);
     await tester.pumpAndSettle();
 
-    // Verify UI switched to English
-    expect(find.text('Card Gallery'), findsOneWidget);
-    expect(find.text('Batch 300 DPI'), findsOneWidget);
-    expect(find.text('All Games'), findsOneWidget);
-    expect(find.text('Board Game'), findsWidgets);
+    // Verify UI switched to Spanish
+    expect(find.text(AppStrings.get(AppLanguage.es, 'nav_gallery')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.es, 'btn_batch_export')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.es, 'all_games')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.es, 'group_by_game')), findsWidgets);
   });
 
   testWidgets('Card tile three-dots menu contains Eliminar option and deletes card', (WidgetTester tester) async {
@@ -79,8 +79,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Restore sample games to test card deletion
-    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    final restoreBtn = find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn'));
+    if (restoreBtn.evaluate().isNotEmpty) {
+      await tester.tap(restoreBtn);
       await tester.pumpAndSettle();
     }
 
@@ -92,19 +93,19 @@ void main() {
     await tester.tap(moreVertButton);
     await tester.pumpAndSettle();
 
-    // Verify popup menu displays Eliminar Carta
-    final deleteOption = find.text('Eliminar Carta');
+    // Verify popup menu displays Delete Card
+    final deleteOption = find.text(AppStrings.get(AppLanguage.en, 'delete_card'));
     expect(deleteOption, findsOneWidget);
 
-    // Tap Eliminar Carta
+    // Tap Delete Card
     await tester.tap(deleteOption);
     await tester.pumpAndSettle();
 
     // Verify Confirmation Dialog appears
-    expect(find.text('¿Eliminar Carta?'), findsOneWidget);
+    expect(find.text('${AppStrings.get(AppLanguage.en, 'delete_card')}?'), findsOneWidget);
 
     // Tap confirm delete in dialog
-    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, 'Eliminar Carta');
+    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, AppStrings.get(AppLanguage.en, 'delete_card'));
     await tester.tap(confirmDeleteBtn);
     await tester.pumpAndSettle();
 
@@ -125,8 +126,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Restore sample games to test game deletion
-    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    final restoreBtn = find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn'));
+    if (restoreBtn.evaluate().isNotEmpty) {
+      await tester.tap(restoreBtn);
       await tester.pumpAndSettle();
     }
 
@@ -134,8 +136,8 @@ void main() {
     expect(find.text('Magic'), findsWidgets);
     expect(find.text('"Black Lotus"'), findsOneWidget);
 
-    // Find the Eliminar Juego button for Magic
-    final deleteGameButtons = find.widgetWithText(OutlinedButton, 'Eliminar Juego');
+    // Find the Delete Game button for Magic
+    final deleteGameButtons = find.widgetWithText(OutlinedButton, AppStrings.get(AppLanguage.en, 'delete_game'));
     expect(deleteGameButtons, findsWidgets);
 
     // Tap the delete game button for Magic
@@ -143,11 +145,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Confirmation Dialog appears
-    expect(find.text('¿Eliminar Juego de Mesa?'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'confirm_delete_game_title')), findsOneWidget);
     expect(find.textContaining('Magic'), findsWidgets);
 
     // Tap confirm delete in dialog
-    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, 'Eliminar Juego');
+    final confirmDeleteBtn = find.widgetWithText(ElevatedButton, AppStrings.get(AppLanguage.en, 'delete_game'));
     await tester.tap(confirmDeleteBtn);
     await tester.pumpAndSettle();
 
@@ -167,13 +169,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. Verify No Games Empty State appears initially on start
-    expect(find.text('No tienes juegos creados'), findsOneWidget);
-    expect(find.text('Crear mi Primer Juego'), findsOneWidget);
-    expect(find.text('Restaurar Juegos de Ejemplo'), findsOneWidget);
+    // 1. Verify No Games Empty State appears initially on start (English default)
+    expect(find.text(AppStrings.get(AppLanguage.en, 'no_games_title')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'create_first_game_btn')), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn')), findsOneWidget);
 
-    // 2. Tap Restaurar Juegos de Ejemplo
-    await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    // 2. Tap Restore Sample Games
+    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn')));
     await tester.pumpAndSettle();
 
     // 3. Verify games are restored
@@ -200,15 +202,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify "Ninguna carta coincide con los filtros" is NOT shown
-    expect(find.text('Ninguna carta coincide con los filtros.'), findsNothing);
-    expect(find.text('Restablecer'), findsNothing);
+    // Verify "No cards match active filters" is NOT shown
+    expect(find.text(AppStrings.get(AppLanguage.en, 'no_cards_match_filter')), findsNothing);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'filter_reset')), findsNothing);
 
-    // Verify "Aún no tienes cartas creadas" empty state is shown
-    expect(find.text('Aún no tienes cartas creadas'), findsOneWidget);
-    expect(find.text('Añadir Primera Carta a "policritics"'), findsOneWidget);
-    expect(find.text('+ Modelo Preset'), findsWidgets);
+    // Verify "No cards created yet" empty state is shown
+    expect(find.text(AppStrings.get(AppLanguage.en, 'no_cards_in_studio_title')), findsOneWidget);
+    expect(find.text('${AppStrings.get(AppLanguage.en, 'add_first_card_to')} "policritics"'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'create_preset_card_model')), findsWidgets);
   });
 }
-
-

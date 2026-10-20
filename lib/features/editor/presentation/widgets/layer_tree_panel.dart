@@ -610,10 +610,14 @@ class _LayerTreePanelState extends ConsumerState<LayerTreePanel> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${layers.length} ${ref.tr('layers_count')}',
-                  style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                Expanded(
+                  child: Text(
+                    '${layers.length} ${ref.tr('layers_count')}',
+                    style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: 4),
                 Text(
                   '${editorState.project.widthMm.toStringAsFixed(1)} x ${editorState.project.heightMm.toStringAsFixed(1)} mm',
                   style: const TextStyle(

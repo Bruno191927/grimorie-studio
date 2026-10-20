@@ -224,10 +224,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Creación en Lote'), findsOneWidget);
-      expect(find.text('Por Lista de Nombres'), findsOneWidget);
-      expect(find.text('Por Cantidad Numérica'), findsOneWidget);
-      expect(find.text('Generar Cartas'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'batch_card_creator')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'generate_by_names')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'generate_by_count')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'generate_cards_btn')), findsOneWidget);
     });
   });
 

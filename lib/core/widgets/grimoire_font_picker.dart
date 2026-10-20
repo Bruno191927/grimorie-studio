@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../localization/locale_provider.dart';
 import '../theme/grimoire_theme.dart';
 
 class FontOptionItem {
@@ -133,7 +135,7 @@ class GrimoireFontHelper {
   }
 }
 
-class GrimoireFontPickerDialog extends StatefulWidget {
+class GrimoireFontPickerDialog extends ConsumerStatefulWidget {
   final String currentFontFamily;
   final String sampleText;
   final ValueChanged<String>? onLiveChanged;
@@ -162,10 +164,10 @@ class GrimoireFontPickerDialog extends StatefulWidget {
   }
 
   @override
-  State<GrimoireFontPickerDialog> createState() => _GrimoireFontPickerDialogState();
+  ConsumerState<GrimoireFontPickerDialog> createState() => _GrimoireFontPickerDialogState();
 }
 
-class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
+class _GrimoireFontPickerDialogState extends ConsumerState<GrimoireFontPickerDialog> {
   late String _selectedFont;
   late TextEditingController _searchController;
   String _selectedCategory = 'Todas';
@@ -237,18 +239,18 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                         child: const Icon(Icons.font_download_outlined, color: GrimoireTheme.accentIndigo, size: 20),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Selector de Tipografía (Google Fonts & Sistema)',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                              ref.tr('font_selector_title'),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Elige una fuente curada para cartas o escribe el nombre de cualquier tipografía.',
-                              style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                              ref.tr('font_selector_desc'),
+                              style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -280,9 +282,9 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'VISTA PREVIA EN VIVO:',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted, letterSpacing: 0.7),
+                      Text(
+                        ref.tr('live_preview'),
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: GrimoireTheme.textMuted, letterSpacing: 0.7),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -323,7 +325,7 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                       controller: _searchController,
                       style: const TextStyle(fontSize: 12, color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Buscar fuente o escribir cualquier tipografía (ej. Cinzel, Bebas Neue, Arial)...',
+                        hintText: ref.tr('font_search_hint'),
                         prefixIcon: const Icon(Icons.search, size: 16, color: GrimoireTheme.accentPurple),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
@@ -352,7 +354,7 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                     ),
                     icon: const Icon(Icons.check, size: 14),
                     label: Text(
-                      'Usar "${_searchController.text.trim()}"',
+                      '${ref.tr('use_font')} "${_searchController.text.trim()}"',
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () => _selectFont(_searchController.text.trim()),
@@ -372,7 +374,7 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                     padding: const EdgeInsets.only(right: 6),
                     child: ChoiceChip(
                       label: Text(
-                        cat,
+                        cat == 'Todas' ? ref.tr('all_cards_in_game') : cat,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
@@ -482,7 +484,7 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar', style: TextStyle(color: GrimoireTheme.textMuted)),
+                  child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton.icon(
@@ -493,7 +495,7 @@ class _GrimoireFontPickerDialogState extends State<GrimoireFontPickerDialog> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(Icons.check, size: 16),
-                  label: Text('Aplicar "$_selectedFont"', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text('${ref.tr('apply_font')} "$_selectedFont"', style: const TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () => Navigator.pop(context, _selectedFont),
                 ),
               ],

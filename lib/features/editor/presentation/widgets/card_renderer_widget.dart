@@ -79,11 +79,16 @@ class CardRendererWidget extends StatelessWidget {
 
     if (!isVisibleByRule) return const SizedBox.shrink();
 
+    final baseCanvasWidth = cardWidth;
+    final baseCanvasHeight = cardHeight;
+    final scaleX = cardWidth / baseCanvasWidth;
+    final scaleY = cardHeight / baseCanvasHeight;
+
     final isBackgroundType = layer.type == LayerType.background;
-    final effectiveLeft = isBackgroundType ? 0.0 : layer.x;
-    final effectiveTop = isBackgroundType ? 0.0 : layer.y;
-    final effectiveWidth = isBackgroundType ? cardWidth : layer.width;
-    final effectiveHeight = isBackgroundType ? cardHeight : layer.height;
+    final effectiveLeft = isBackgroundType ? 0.0 : (layer.x * scaleX);
+    final effectiveTop = isBackgroundType ? 0.0 : (layer.y * scaleY);
+    final effectiveWidth = isBackgroundType ? cardWidth : (layer.width * scaleX);
+    final effectiveHeight = isBackgroundType ? cardHeight : (layer.height * scaleY);
 
     return Positioned(
       left: effectiveLeft,

@@ -237,14 +237,14 @@ class _BatchCardCreationDialogState extends ConsumerState<BatchCardCreationDialo
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Prefijo del Nombre', style: TextStyle(fontSize: 11, color: GrimoireTheme.textSecondary)),
+                        Text(ref.tr('name_prefix_label'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textSecondary)),
                         const SizedBox(height: 6),
                         TextField(
                           controller: _prefixController,
                           style: const TextStyle(fontSize: 12, color: Colors.white),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText: 'Ej: Monstruo, Hechizo, Héroe',
+                            hintText: ref.tr('name_prefix_hint'),
                             filled: true,
                             fillColor: GrimoireTheme.surfaceCard,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white12)),
@@ -259,7 +259,7 @@ class _BatchCardCreationDialogState extends ConsumerState<BatchCardCreationDialo
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Cantidad a Crear', style: TextStyle(fontSize: 11, color: GrimoireTheme.textSecondary)),
+                        Text(ref.tr('quantity_to_create'), style: const TextStyle(fontSize: 11, color: GrimoireTheme.textSecondary)),
                         const SizedBox(height: 6),
                         Row(
                           children: [
@@ -315,7 +315,7 @@ class _BatchCardCreationDialogState extends ConsumerState<BatchCardCreationDialo
                     border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
                   ),
                   child: Text(
-                    'Total a crear: $count cartas',
+                    '${ref.tr('total_to_create')}: $count ${ref.tr('cards_unit')}',
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GrimoireTheme.accentPurple),
                   ),
                 ),
@@ -324,7 +324,7 @@ class _BatchCardCreationDialogState extends ConsumerState<BatchCardCreationDialo
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar', style: TextStyle(color: GrimoireTheme.textMuted)),
+                      child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
                     ),
                     const SizedBox(width: 10),
                     ElevatedButton.icon(
@@ -348,7 +348,7 @@ class _BatchCardCreationDialogState extends ConsumerState<BatchCardCreationDialo
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: GrimoireTheme.accentEmerald,
-                                  content: Text('Se crearon $count cartas exitosamente en "$_selectedGame"'),
+                                  content: Text('${ref.tr('batch_created_success_1')} $count ${ref.tr('batch_created_success_2')} "$_selectedGame"'),
                                 ),
                               );
                             },

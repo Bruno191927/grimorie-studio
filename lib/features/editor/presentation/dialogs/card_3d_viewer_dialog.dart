@@ -227,6 +227,10 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
       (-_tiltX * 3.0).clamp(-1.0, 1.0),
     );
 
+    // Native canvas dimensions (1 mm = 4.0 px)
+    final baseCanvasW = widget.widthMm * 4.0;
+    final baseCanvasH = widget.heightMm * 4.0;
+
     return AnimatedBuilder(
       animation: _flipAnimation,
       builder: (context, _) {
@@ -257,26 +261,40 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
               borderRadius: BorderRadius.circular(widget.template.cornerRadius),
               child: Stack(
                 children: [
-                  // 1. The Core Card Renderer (Front or Back)
+                  // 1. The Core Card Renderer (Front or Back) scaled to fit cardW x cardH
                   if (!_isBackSide)
-                    CardRendererWidget(
-                      template: widget.template,
-                      cardData: widget.cardData,
-                      side: CardSide.front,
-                      cardWidth: cardW,
-                      cardHeight: cardH,
+                    SizedBox(
+                      width: cardW,
+                      height: cardH,
+                      child: FittedBox(
+                        fit: BoxFit.fill,
+                        child: CardRendererWidget(
+                          template: widget.template,
+                          cardData: widget.cardData,
+                          side: CardSide.front,
+                          cardWidth: baseCanvasW,
+                          cardHeight: baseCanvasH,
+                        ),
+                      ),
                     )
                   else
                     // Invert horizontally so back is not mirrored
                     Transform(
                       transform: Matrix4.identity()..rotateY(math.pi),
                       alignment: FractionalOffset.center,
-                      child: CardRendererWidget(
-                        template: widget.template,
-                        cardData: widget.cardData,
-                        side: CardSide.back,
-                        cardWidth: cardW,
-                        cardHeight: cardH,
+                      child: SizedBox(
+                        width: cardW,
+                        height: cardH,
+                        child: FittedBox(
+                          fit: BoxFit.fill,
+                          child: CardRendererWidget(
+                            template: widget.template,
+                            cardData: widget.cardData,
+                            side: CardSide.back,
+                            cardWidth: baseCanvasW,
+                            cardHeight: baseCanvasH,
+                          ),
+                        ),
                       ),
                     ),
 

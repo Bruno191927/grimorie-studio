@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/main.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
 import 'package:grimoire_studio/features/editor/models/game_category.dart';
@@ -81,8 +82,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Initial state is empty; restore sample games to test
-    if (find.text('Restaurar Juegos de Ejemplo').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Restaurar Juegos de Ejemplo'));
+    final restoreBtn = find.text(AppStrings.get(AppLanguage.en, 'restore_sample_games_btn'));
+    if (restoreBtn.evaluate().isNotEmpty) {
+      await tester.tap(restoreBtn);
       await tester.pumpAndSettle();
     }
 
@@ -115,33 +117,33 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Canvas Editor is open and Unicorn Stable Frame template is auto-activated
-    expect(find.text('Plantilla Activa'), findsWidgets);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'active_template')), findsWidgets);
     expect(find.text('Unicorn Stable Frame (Kawaii Chaos)'), findsWidgets);
 
     // Verify rules text is bound in canvas
     expect(find.textContaining('Al entrar a tu establo, roba 1 carta de Unicornio'), findsWidgets);
 
     // 4. Navigate to Playtest Screen
-    final playtestNavTab = find.text('Mesa de Playtest');
+    final playtestNavTab = find.text(AppStrings.get(AppLanguage.en, 'nav_playtest'));
     expect(playtestNavTab, findsOneWidget);
     await tester.tap(playtestNavTab);
     await tester.pumpAndSettle();
 
     // Verify Playtest screen loads Unstable Unicorns deck
     expect(find.text('Unstable Unicorns'), findsWidgets);
-    expect(find.text('Tapete de Juego Tabletop'), findsOneWidget);
+    expect(find.text(AppStrings.get(AppLanguage.en, 'playtest_title')), findsOneWidget);
 
     // Verify player has cards in hand
     expect(find.byType(Draggable<Map<String, dynamic>>), findsWidgets);
 
     // Tap on "Robar Carta" to draw another unicorn card
-    final drawDeckButton = find.text('Robar');
+    final drawDeckButton = find.text(AppStrings.get(AppLanguage.en, 'draw'));
     expect(drawDeckButton, findsOneWidget);
     await tester.tap(drawDeckButton);
     await tester.pumpAndSettle();
 
     // Tap on Next Turn
-    final nextTurnButton = find.textContaining('Siguiente Turno');
+    final nextTurnButton = find.textContaining(AppStrings.get(AppLanguage.en, 'next_turn'));
     expect(nextTurnButton, findsOneWidget);
     await tester.tap(nextTurnButton);
     await tester.pumpAndSettle();

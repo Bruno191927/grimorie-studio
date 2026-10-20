@@ -16,6 +16,8 @@ import 'features/export/presentation/dialogs/export_options_dialog.dart';
 import 'core/widgets/keyboard_shortcuts_dialog.dart';
 import 'core/widgets/quick_card_search_dialog.dart';
 import 'core/widgets/grimoire_toast.dart';
+import 'features/onboarding/services/onboarding_service.dart';
+import 'features/onboarding/presentation/dialogs/grimoire_onboarding_dialog.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +52,23 @@ class GrimoireMainShell extends ConsumerStatefulWidget {
 class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
   int _currentTab = 0; // 0: Gallery, 1: Editor, 2: Database, 3: Playtest
   final GlobalKey _repaintBoundaryKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!OnboardingService.hasSeenOnboarding()) {
+        GrimoireOnboardingDialog.show(
+          context,
+          onNavigateToTab: (tabIndex) {
+            if (mounted) {
+              setState(() => _currentTab = tabIndex);
+            }
+          },
+        );
+      }
+    });
+  }
 
   Future<void> _handleBatchExport() async {
     final project = ref.read(editorProvider).project;
@@ -231,10 +250,10 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                                   children: [
                                     const Icon(Icons.search, size: 16, color: GrimoireTheme.textMuted),
                                     const SizedBox(width: 8),
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
-                                        'Buscar cartas o tags...',
-                                        style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                                        ref.tr('search_cards_tags'),
+                                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -254,13 +273,34 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
 
                             const SizedBox(width: 16),
 
-                            // Right Section: Shortcuts Helper & Language Selector
+                            // Right Section: Onboarding Guide, Shortcuts Helper & Language Selector
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // Interactive Onboarding Tour Button
+                                IconButton(
+                                  tooltip: ref.tr('app_tour_tooltip'),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(0xFF141726),
+                                    side: const BorderSide(color: GrimoireTheme.borderSubtle),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.all(8),
+                                  ),
+                                  icon: const Icon(Icons.school_outlined, size: 16, color: GrimoireTheme.accentPurple),
+                                  onPressed: () => GrimoireOnboardingDialog.show(
+                                    context,
+                                    onNavigateToTab: (tabIndex) {
+                                      if (mounted) {
+                                        setState(() => _currentTab = tabIndex);
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
                                 // Keyboard Shortcuts Helper Button
                                 IconButton(
-                                  tooltip: 'Atajos de Teclado (Ctrl+/)',
+                                  tooltip: ref.tr('keyboard_shortcuts'),
                                   style: IconButton.styleFrom(
                                     backgroundColor: const Color(0xFF141726),
                                     side: const BorderSide(color: GrimoireTheme.borderSubtle),

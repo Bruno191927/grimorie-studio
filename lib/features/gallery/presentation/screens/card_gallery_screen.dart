@@ -609,7 +609,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             if (val == '__new_category__') {
                               _showNewCategoryDialog(entry.key);
                             } else if (val == '__basic__') {
-                              ref.read(editorProvider.notifier).addCardToGame(entry.key);
+                              ref.read(editorProvider.notifier).addCardToGame(
+                                entry.key,
+                                cardName: '${ref.tr('default_card_name')} (${entry.key})',
+                                type: ref.tr('default_card_type'),
+                                rulesText: ref.tr('default_rules_text').replaceAll('{game}', entry.key),
+                              );
                               GrimoireToast.success(
                                 context,
                                 'Nueva carta estándar añadida a "${entry.key}".',
@@ -1160,11 +1165,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     ),
                     icon: const Icon(Icons.add, size: 17),
                     label: Text(
-                      '${ref.tr('add_first_card_to_game')} a "$targetGame"',
+                      '${ref.tr('add_first_card_to')} "$targetGame"',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
-                      ref.read(editorProvider.notifier).addCardToGame(targetGame);
+                      ref.read(editorProvider.notifier).addCardToGame(
+                        targetGame,
+                        cardName: '${ref.tr('default_card_name')} ($targetGame)',
+                        type: ref.tr('default_card_type'),
+                        rulesText: ref.tr('default_rules_text').replaceAll('{game}', targetGame),
+                      );
                       GrimoireToast.success(
                         context,
                         'Primera carta añadida al juego "$targetGame".',
@@ -1271,11 +1281,16 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       ),
                       icon: const Icon(Icons.add, size: 16),
                       label: Text(
-                        '${ref.tr('add_first_card_to_game')} a "$gameName"',
+                        '${ref.tr('add_first_card_to')} "$gameName"',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       onPressed: () {
-                        ref.read(editorProvider.notifier).addCardToGame(gameName);
+                        ref.read(editorProvider.notifier).addCardToGame(
+                          gameName,
+                          cardName: '${ref.tr('default_card_name')} ($gameName)',
+                          type: ref.tr('default_card_type'),
+                          rulesText: ref.tr('default_rules_text').replaceAll('{game}', gameName),
+                        );
                         GrimoireToast.success(
                           context,
                           'Primera carta añadida al juego "$gameName".',
@@ -1408,6 +1423,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     count: allRows.where((r) => (r['game'] ?? '').toString() == game && !_isModelCard(r)).length,
                     isSelected: _selectedGame == game,
                     onTap: () => setState(() => _selectedGame = game),
+                    onDelete: () => _confirmDeleteGame(
+                      game,
+                      allRows.where((r) => (r['game'] ?? '').toString() == game && !_isModelCard(r)).length,
+                    ),
                   ),
                   const SizedBox(height: 4),
                 ],
@@ -1495,69 +1514,15 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     required int count,
     required bool isSelected,
     required VoidCallback onTap,
+    VoidCallback? onDelete,
   }) {
-    return InkWell(
+    return _SidebarGameTileItem(
+      title: title,
+      icon: icon,
+      count: count,
+      isSelected: isSelected,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.8) : Colors.transparent,
-            width: 1.2,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: GrimoireTheme.accentPurple.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textSecondary,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.white : GrimoireTheme.textSecondary,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
-                    : const Color(0xFF1E2235),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : GrimoireTheme.textMuted,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      onDelete: onDelete,
     );
   }
 
@@ -2254,7 +2219,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                   ? (isCatDefault ? 'Modelo • $category' : 'Modelo • $game')
                                   : ((category.isNotEmpty && category.toLowerCase() != 'general')
                                       ? category
-                                      : (type.isNotEmpty && type.toLowerCase() != 'creature' ? type : game)),
+                                      : ((type.isNotEmpty && type.toLowerCase() != 'creature' && type.toLowerCase() != 'criatura')
+                                          ? type
+                                          : (type.toLowerCase() == 'creature' || type.toLowerCase() == 'criatura'
+                                              ? ref.tr('default_card_type')
+                                              : game))),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -2800,17 +2769,25 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
               onPressed: () {
                 final gameName = textController.text.trim();
                 if (gameName.isNotEmpty) {
+                  final cardNameLocalized = '${ref.tr('default_card_name')} ($gameName)';
+                  final cardTypeLocalized = ref.tr('default_card_type');
+                  final rulesLocalized = ref.tr('default_rules_text').replaceAll('{game}', gameName);
+
                   ref.read(editorProvider.notifier).addCardToGame(
                     gameName,
+                    cardName: cardNameLocalized,
+                    type: cardTypeLocalized,
+                    rulesText: rulesLocalized,
                     presetTemplateId: selectedPresetId,
                   );
                   setState(() {
                     _selectedGame = gameName;
                   });
                   Navigator.pop(ctx);
+                  final toastMsg = ref.tr('game_created_toast').replaceAll('{game}', gameName);
                   GrimoireToast.success(
                     context,
-                    '¡Juego de mesa "$gameName" creado con su primera carta!',
+                    toastMsg,
                   );
                 }
               },
@@ -3400,9 +3377,15 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           ? 'Copia de ${existingCategory?.name ?? ''}'
           : (existingCategory?.name ?? ''),
     );
-    final iconController = TextEditingController(text: existingCategory?.icon ?? '🦄');
-    final typeController = TextEditingController(text: existingCategory?.defaultType ?? '');
-    final costController = TextEditingController(text: existingCategory?.defaultCost ?? '3');
+    final iconController = TextEditingController(text: existingCategory?.icon ?? '🃏');
+    
+    // Ensure defaultType never defaults to 'Criatura'
+    String initialType = existingCategory?.defaultType ?? '';
+    if (initialType.toLowerCase() == 'criatura') {
+      initialType = ref.tr('default_card_type');
+    }
+    final typeController = TextEditingController(text: initialType);
+    final costController = TextEditingController(text: existingCategory?.defaultCost ?? '');
     final attackController = TextEditingController(text: existingCategory?.defaultAttack ?? '');
     final defenseController = TextEditingController(text: existingCategory?.defaultDefense ?? '');
     final rarityController = TextEditingController(text: existingCategory?.defaultRarity ?? 'Común');
@@ -3411,10 +3394,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final customKeyCtrl = TextEditingController();
     final customValCtrl = TextEditingController();
 
-    bool hasCost = existingCategory?.hasCost ?? (!chosenGame.toLowerCase().contains('unicorn'));
-    bool hasCombatStats = existingCategory?.hasCombatStats ?? (!chosenGame.toLowerCase().contains('unicorn'));
-    bool hasRarity = existingCategory?.hasRarity ?? true;
-    bool hasRules = existingCategory?.hasRules ?? true;
+    bool hasCost = existingCategory?.hasCost ?? false;
+    bool hasCombatStats = existingCategory?.hasCombatStats ?? false;
+    bool hasRarity = existingCategory?.hasRarity ?? false;
+    bool hasRules = existingCategory?.hasRules ?? false;
     Map<String, String> customFields = Map<String, String>.from(existingCategory?.customFields ?? {});
     bool showAddCustom = false;
     bool createPresetCard = !isEditing;
@@ -3815,297 +3798,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Atributos de la plantilla / carta predefinida
-                  // Si ya se eligió una carta base, no es necesario mostrar los controles manuales porque se heredan de esa carta.
-                  if (selectedBaseCard != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: GrimoireTheme.accentPurple.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: GrimoireTheme.accentPurple.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.auto_awesome, size: 18, color: GrimoireTheme.accentPurple),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Atributos heredados de "${selectedBaseCard!['card_name'] ?? 'Carta Base'}"',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'El coste, combate, rareza, reglas y capas de diseño se toman directamente de esta carta.',
-                                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75), height: 1.25),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ] else ...[
-                    // Predefined Card Attributes & Modular Feature Toggles (solo si es plantilla en blanco)
-                    Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F121E),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: GrimoireTheme.borderSubtle),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Atributos de esta Plantilla / Carta Predefinida:',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 8),
 
-                        // Toggle Coste / Maná
-                        _buildDialogToggleRow(
-                          title: ref.tr('include_cost'),
-                          subtitle: 'Actívalo si las cartas de esta categoría usan coste de maná/recursos',
-                          value: hasCost,
-                          onChanged: (v) => setDialogState(() => hasCost = v),
-                        ),
-                        if (hasCost) ...[
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 28, bottom: 8),
-                            child: SizedBox(
-                              width: 140,
-                              child: TextField(
-                                controller: costController,
-                                style: const TextStyle(fontSize: 12, color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: ref.tr('default_cost'),
-                                  hintText: 'ej. 2 o {1}{U}',
-                                  isDense: true,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        // Toggle Estadísticas de Combate
-                        _buildDialogToggleRow(
-                          title: ref.tr('include_combat_stats'),
-                          subtitle: 'Ataque y defensa para criaturas o combatientes',
-                          value: hasCombatStats,
-                          onChanged: (v) => setDialogState(() => hasCombatStats = v),
-                        ),
-                        if (hasCombatStats) ...[
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 28, bottom: 8),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 110,
-                                  child: TextField(
-                                    controller: attackController,
-                                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Ataque (⚔️)',
-                                      hintText: '2',
-                                      isDense: true,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: 110,
-                                  child: TextField(
-                                    controller: defenseController,
-                                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Defensa (🛡️)',
-                                      hintText: '2',
-                                      isDense: true,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        // Toggle Rareza
-                        _buildDialogToggleRow(
-                          title: ref.tr('include_rarity'),
-                          subtitle: 'Nivel o categoría de rareza',
-                          value: hasRarity,
-                          onChanged: (v) => setDialogState(() => hasRarity = v),
-                        ),
-                        if (hasRarity) ...[
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 28, bottom: 8),
-                            child: SizedBox(
-                              width: 160,
-                              child: TextField(
-                                controller: rarityController,
-                                style: const TextStyle(fontSize: 12, color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: ref.tr('default_rarity'),
-                                  hintText: 'Común, Rara...',
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        // Toggle Reglas Preestablecidas
-                        _buildDialogToggleRow(
-                          title: ref.tr('include_rules'),
-                          subtitle: 'Texto de regla o habilidad por defecto',
-                          value: hasRules,
-                          onChanged: (v) => setDialogState(() => hasRules = v),
-                        ),
-                        if (hasRules) ...[
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 28, bottom: 8),
-                            child: TextField(
-                              controller: rulesController,
-                              maxLines: 2,
-                              style: const TextStyle(fontSize: 12, color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: 'ej. Al entrar a tu Establo, puedes activar...',
-                                isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        // Custom Attributes / Magic / Extras
-                        const Divider(height: 16, color: GrimoireTheme.borderSubtle),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                ref.tr('custom_attributes'),
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                minimumSize: const Size(0, 30),
-                              ),
-                              icon: Icon(showAddCustom ? Icons.close : Icons.add, size: 14, color: GrimoireTheme.accentPurple),
-                              label: Text(
-                                ref.tr('add_custom_field'),
-                                style: const TextStyle(fontSize: 11, color: GrimoireTheme.accentPurple, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () => setDialogState(() => showAddCustom = !showAddCustom),
-                            ),
-                          ],
-                        ),
-                        if (customFields.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: customFields.entries.map((e) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1A1D2E),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: GrimoireTheme.borderSubtle),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('${e.key}: ', style: const TextStyle(fontSize: 11, color: Color(0xFFC7D2FE), fontWeight: FontWeight.bold)),
-                                  Text(e.value, style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                  const SizedBox(width: 6),
-                                  InkWell(
-                                    onTap: () => setDialogState(() => customFields.remove(e.key)),
-                                    child: const Icon(Icons.close, size: 12, color: GrimoireTheme.accentPink),
-                                  ),
-                                ],
-                              ),
-                            )).toList(),
-                          ),
-                        ],
-                        if (showAddCustom) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: customKeyCtrl,
-                                  style: const TextStyle(fontSize: 11, color: Colors.white),
-                                  decoration: InputDecoration(
-                                    hintText: ref.tr('field_name'),
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: TextField(
-                                  controller: customValCtrl,
-                                  style: const TextStyle(fontSize: 11, color: Colors.white),
-                                  decoration: InputDecoration(
-                                    hintText: ref.tr('field_value'),
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: GrimoireTheme.accentPurple,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  minimumSize: const Size(0, 36),
-                                ),
-                                onPressed: () {
-                                  final k = customKeyCtrl.text.trim();
-                                  final v = customValCtrl.text.trim();
-                                  if (k.isNotEmpty && v.isNotEmpty) {
-                                    setDialogState(() {
-                                      customFields[k] = v;
-                                      customKeyCtrl.clear();
-                                      customValCtrl.clear();
-                                      showAddCustom = false;
-                                    });
-                                  }
-                                },
-                                child: const Text('OK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
 
                   // Theme Color
                   Text(ref.tr('category_color'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -4169,7 +3862,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                         ? existingCategory.id
                         : 'cat_${DateTime.now().millisecondsSinceEpoch}',
                     name: catName,
-                    icon: iconController.text.trim().isEmpty ? '🦄' : iconController.text.trim(),
+                    icon: iconController.text.trim().isEmpty ? '🃏' : iconController.text.trim(),
                     defaultType: typeController.text.trim().isEmpty ? catName : typeController.text.trim(),
                     defaultColor: selectedColor,
                     hasCost: hasCost,
@@ -4293,12 +3986,12 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
 
     final isFromCard = fromExistingCard != null;
 
-    final starterArchetypes = const [
+    final starterArchetypes = [
       _StarterCardArchetype(
-        label: 'Criatura (TCG)',
+        label: ref.tr('archetype_creature_label'),
         icon: '⚔️',
-        defaultName: 'Guerrero Rúnico',
-        defaultType: 'Criatura',
+        defaultName: ref.tr('archetype_creature_name'),
+        defaultType: ref.tr('archetype_creature_type'),
         defaultColor: 0xFFEF4444,
         hasCost: true,
         defaultCost: '3',
@@ -4308,14 +4001,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: true,
         defaultRarity: 'Común',
         hasRules: true,
-        defaultRules: 'Cuando esta criatura entra al campo de batalla, inflige 1 daño a un objetivo.',
+        defaultRules: ref.tr('archetype_creature_rules'),
         layoutPreset: 'tcgFantasy',
       ),
       _StarterCardArchetype(
-        label: 'Hechizo / Magia',
+        label: ref.tr('archetype_spell_label'),
         icon: '⚡',
-        defaultName: 'Tormenta Arcana',
-        defaultType: 'Hechizo',
+        defaultName: ref.tr('archetype_spell_name'),
+        defaultType: ref.tr('archetype_spell_type'),
         defaultColor: 0xFF3B82F6,
         hasCost: true,
         defaultCost: '2',
@@ -4325,14 +4018,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: true,
         defaultRarity: 'Rara',
         hasRules: true,
-        defaultRules: 'Destruye una criatura objetivo o contrarresta el siguiente efecto del oponente.',
+        defaultRules: ref.tr('archetype_spell_rules'),
         layoutPreset: 'tcgFantasy',
       ),
       _StarterCardArchetype(
-        label: 'Héroe / Avatar',
+        label: ref.tr('archetype_hero_label'),
         icon: '👑',
-        defaultName: 'Paladín Sagrado',
-        defaultType: 'Héroe',
+        defaultName: ref.tr('archetype_hero_name'),
+        defaultType: ref.tr('archetype_hero_type'),
         defaultColor: 0xFFF59E0B,
         hasCost: true,
         defaultCost: '5',
@@ -4342,14 +4035,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: true,
         defaultRarity: 'Legendaria',
         hasRules: true,
-        defaultRules: 'Aura protectora: todas tus criaturas aliadas ganan +1/+1 y protección contra daño.',
+        defaultRules: ref.tr('archetype_hero_rules'),
         layoutPreset: 'tarotHero',
       ),
       _StarterCardArchetype(
-        label: 'Evento / Mesa',
+        label: ref.tr('archetype_event_label'),
         icon: '🎲',
-        defaultName: 'Giro del Destino',
-        defaultType: 'Evento',
+        defaultName: ref.tr('archetype_event_name'),
+        defaultType: ref.tr('archetype_event_type'),
         defaultColor: 0xFF10B981,
         hasCost: false,
         defaultCost: '',
@@ -4359,14 +4052,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: false,
         defaultRarity: '',
         hasRules: true,
-        defaultRules: 'Todos los jugadores avanzan 2 casillas o roban 1 carta de la reserva.',
+        defaultRules: ref.tr('archetype_event_rules'),
         layoutPreset: 'boardgameAction',
       ),
       _StarterCardArchetype(
-        label: 'Objeto / Equipo',
+        label: ref.tr('archetype_item_label'),
         icon: '🗡️',
-        defaultName: 'Amuleto de Poder',
-        defaultType: 'Artefacto',
+        defaultName: ref.tr('archetype_item_name'),
+        defaultType: ref.tr('archetype_item_type'),
         defaultColor: 0xFF8B5CF6,
         hasCost: true,
         defaultCost: '2',
@@ -4376,14 +4069,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: true,
         defaultRarity: 'Poco Común',
         hasRules: true,
-        defaultRules: 'Equipar a un aliado: le otorga +2 de ataque adicional en cada combate.',
+        defaultRules: ref.tr('archetype_item_rules'),
         layoutPreset: 'tcgFantasy',
       ),
       _StarterCardArchetype(
-        label: 'Ubicación / Entorno',
+        label: ref.tr('archetype_location_label'),
         icon: '🏛️',
-        defaultName: 'Santuario Olvidado',
-        defaultType: 'Terreno',
+        defaultName: ref.tr('archetype_location_name'),
+        defaultType: ref.tr('archetype_location_type'),
         defaultColor: 0xFF06B6D4,
         hasCost: false,
         defaultCost: '',
@@ -4393,14 +4086,14 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
         hasRarity: true,
         defaultRarity: 'Rara',
         hasRules: true,
-        defaultRules: 'Genera 1 recurso sagrado al comienzo del turno de cada jugador.',
+        defaultRules: ref.tr('archetype_location_rules'),
         layoutPreset: 'tcgFantasy',
       ),
       _StarterCardArchetype(
-        label: 'Personalizado',
+        label: ref.tr('archetype_custom_label'),
         icon: '🃏',
-        defaultName: 'Nuevo Modelo',
-        defaultType: 'Carta',
+        defaultName: ref.tr('archetype_custom_name'),
+        defaultType: ref.tr('archetype_custom_type'),
         defaultColor: 0xFF6B7280,
         hasCost: true,
         defaultCost: '1',
@@ -5486,4 +5179,126 @@ class _StarterCardArchetype {
     required this.defaultRules,
     required this.layoutPreset,
   });
+}
+
+class _SidebarGameTileItem extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback? onDelete;
+
+  const _SidebarGameTileItem({
+    required this.title,
+    required this.icon,
+    required this.count,
+    required this.isSelected,
+    required this.onTap,
+    this.onDelete,
+  });
+
+  @override
+  State<_SidebarGameTileItem> createState() => _SidebarGameTileItemState();
+}
+
+class _SidebarGameTileItemState extends State<_SidebarGameTileItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? GrimoireTheme.accentPurple.withValues(alpha: 0.18)
+                : (_isHovered ? Colors.white.withValues(alpha: 0.04) : Colors.transparent),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: widget.isSelected ? GrimoireTheme.accentPurple.withValues(alpha: 0.8) : Colors.transparent,
+              width: 1.2,
+            ),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: GrimoireTheme.accentPurple.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 16,
+                color: widget.isSelected ? GrimoireTheme.accentPurple : GrimoireTheme.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: widget.isSelected ? Colors.white : GrimoireTheme.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Card count badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: widget.isSelected
+                      ? GrimoireTheme.accentPurple.withValues(alpha: 0.35)
+                      : const Color(0xFF1E2235),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${widget.count}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: widget.isSelected ? Colors.white : GrimoireTheme.textMuted,
+                  ),
+                ),
+              ),
+              // Delete game icon button on hover or selection (if deletable)
+              if (widget.onDelete != null && (_isHovered || widget.isSelected)) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Eliminar juego',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(4),
+                      onTap: widget.onDelete,
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 15,
+                          color: Colors.red.shade400.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

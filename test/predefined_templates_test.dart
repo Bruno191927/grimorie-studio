@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/editor/models/card_template.dart';
 import 'package:grimoire_studio/features/editor/models/layer_item.dart';
 import 'package:grimoire_studio/features/editor/presentation/providers/editor_provider.dart';
@@ -163,8 +164,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       // Verify Title and Subtitle
-      expect(find.text('Agregar plantilla predefinida'), findsOneWidget);
-      expect(find.textContaining('Selecciona un estilo base'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'add_predefined_template')), findsOneWidget);
+      expect(find.textContaining(AppStrings.get(AppLanguage.en, 'add_predefined_template_desc')), findsOneWidget);
 
       // Verify Default card with badge
       expect(find.text('Default'), findsWidgets);
@@ -205,7 +206,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       // 1. Quick button on toolbar
-      final quickBtnFinder = find.byTooltip('Agregar plantilla predefinida');
+      final quickBtnFinder = find.byTooltip(AppStrings.get(AppLanguage.en, 'add_predefined_template'));
       expect(quickBtnFinder, findsOneWidget);
 
       // 2. Open template actions popup menu
@@ -216,9 +217,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       // Verify menu contains "Agregar plantilla predefinida" and presets
-      expect(find.text('Agregar plantilla predefinida'), findsWidgets);
-      expect(find.text('Default (Estándar)'), findsOneWidget);
-      expect(find.text('TCG Fantasía / Criatura'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'add_predefined_template')), findsWidgets);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'template_default_standard')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'template_tcg_fantasy')), findsOneWidget);
     });
   });
 }

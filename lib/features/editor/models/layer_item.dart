@@ -7,6 +7,12 @@ enum LayerType {
   shape,
 }
 
+enum TextDataType {
+  text,
+  number,
+  enumeration,
+}
+
 enum LayerFillMode {
   solid,
   gradient,
@@ -65,6 +71,15 @@ class LayerItem {
   final Color fontColor;
   final TextAlign textAlign;
 
+  // Text Data Type & Schema Options
+  final TextDataType textDataType;
+  final String numberPrefix;
+  final String numberSuffix;
+  final double? numberMin;
+  final double? numberMax;
+  final double numberStep;
+  final List<String> enumValues;
+
   // Fill, Image & Gradient properties (used by background, shape, and image layers)
   final String? imagePath;
   final BoxFit imageFit;
@@ -106,6 +121,13 @@ class LayerItem {
     this.letterSpacing = 0.2,
     this.fontColor = Colors.white,
     this.textAlign = TextAlign.left,
+    this.textDataType = TextDataType.text,
+    this.numberPrefix = '',
+    this.numberSuffix = '',
+    this.numberMin,
+    this.numberMax,
+    this.numberStep = 1.0,
+    this.enumValues = const [],
     this.imagePath,
     this.imageFit = BoxFit.cover,
     this.fillMode = LayerFillMode.solid,
@@ -145,6 +167,15 @@ class LayerItem {
     double? letterSpacing,
     Color? fontColor,
     TextAlign? textAlign,
+    TextDataType? textDataType,
+    String? numberPrefix,
+    String? numberSuffix,
+    double? numberMin,
+    bool clearNumberMin = false,
+    double? numberMax,
+    bool clearNumberMax = false,
+    double? numberStep,
+    List<String>? enumValues,
     String? imagePath,
     bool clearImagePath = false,
     BoxFit? imageFit,
@@ -184,6 +215,13 @@ class LayerItem {
       letterSpacing: letterSpacing ?? this.letterSpacing,
       fontColor: fontColor ?? this.fontColor,
       textAlign: textAlign ?? this.textAlign,
+      textDataType: textDataType ?? this.textDataType,
+      numberPrefix: numberPrefix ?? this.numberPrefix,
+      numberSuffix: numberSuffix ?? this.numberSuffix,
+      numberMin: clearNumberMin ? null : (numberMin ?? this.numberMin),
+      numberMax: clearNumberMax ? null : (numberMax ?? this.numberMax),
+      numberStep: numberStep ?? this.numberStep,
+      enumValues: enumValues ?? this.enumValues,
       imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
       imageFit: imageFit ?? this.imageFit,
       fillMode: fillMode ?? this.fillMode,
@@ -200,6 +238,18 @@ class LayerItem {
       borderWidth: borderWidth ?? this.borderWidth,
       borderRadius: borderRadius ?? this.borderRadius,
     );
+  }
+
+  /// Formats raw text according to the text data type (e.g. adding prefix/suffix for numbers).
+  String formatDisplayValue(String rawValue) {
+    if (textDataType == TextDataType.number) {
+      final parsed = double.tryParse(rawValue.trim());
+      if (parsed != null) {
+        final numStr = parsed % 1 == 0 ? parsed.toInt().toString() : parsed.toString();
+        return '$numberPrefix$numStr$numberSuffix';
+      }
+    }
+    return rawValue;
   }
 
   Map<String, dynamic> toJson() {
@@ -225,6 +275,13 @@ class LayerItem {
       'letterSpacing': letterSpacing,
       'fontColor': fontColor.toARGB32(),
       'textAlign': textAlign.name,
+      'textDataType': textDataType.name,
+      'numberPrefix': numberPrefix,
+      'numberSuffix': numberSuffix,
+      'numberMin': numberMin,
+      'numberMax': numberMax,
+      'numberStep': numberStep,
+      'enumValues': enumValues,
       'imagePath': imagePath,
       'imageFit': imageFit.name,
       'fillMode': fillMode.name,
@@ -283,6 +340,16 @@ class LayerItem {
         (a) => a.name == json['textAlign'],
         orElse: () => TextAlign.left,
       ),
+      textDataType: TextDataType.values.firstWhere(
+        (t) => t.name == json['textDataType'],
+        orElse: () => TextDataType.text,
+      ),
+      numberPrefix: json['numberPrefix'] as String? ?? '',
+      numberSuffix: json['numberSuffix'] as String? ?? '',
+      numberMin: (json['numberMin'] as num?)?.toDouble(),
+      numberMax: (json['numberMax'] as num?)?.toDouble(),
+      numberStep: (json['numberStep'] as num?)?.toDouble() ?? 1.0,
+      enumValues: (json['enumValues'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       imagePath: json['imagePath'] as String?,
       imageFit: BoxFit.values.firstWhere(
         (f) => f.name == json['imageFit'],

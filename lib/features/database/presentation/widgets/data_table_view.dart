@@ -191,7 +191,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                 controller: _searchController,
                 style: const TextStyle(fontSize: 11, color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Filtrar tabla...',
+                  hintText: ref.tr('filter_table_hint'),
                   hintStyle: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                   prefixIcon: const Icon(Icons.search, size: 14, color: GrimoireTheme.textMuted),
                   suffixIcon: _searchFilter.isNotEmpty
@@ -227,21 +227,21 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
             TextButton.icon(
               style: TextButton.styleFrom(foregroundColor: GrimoireTheme.accentIndigo),
               icon: const Icon(Icons.tune, size: 15),
-              label: Text('Columnas (${extraKeys.length})', style: const TextStyle(fontSize: 12)),
+              label: Text('${ref.tr('columns')} (${extraKeys.length})', style: const TextStyle(fontSize: 12)),
               onPressed: () => _showManageColumnsDialog(context, ref, extraKeys.toList()),
             ),
           // Add custom column button
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: GrimoireTheme.accentAmber),
             icon: const Icon(Icons.view_column_outlined, size: 15),
-            label: const Text('Nueva Columna', style: TextStyle(fontSize: 12)),
+            label: Text(ref.tr('new_column'), style: const TextStyle(fontSize: 12)),
             onPressed: () => _showAddColumnDialog(context, ref),
           ),
           const SizedBox(width: 4),
           // Export CSV button
           IconButton(
             icon: const Icon(Icons.file_download_outlined, color: GrimoireTheme.accentEmerald),
-            tooltip: _selectedGame == 'all' ? 'Exportar CSV actual' : 'Exportar CSV ($_selectedGame)',
+            tooltip: _selectedGame == 'all' ? ref.tr('export_current_csv') : '${ref.tr('export_csv')} ($_selectedGame)',
             onPressed: () => _exportCsvFile(context, ref),
           ),
           // Import CSV/JSON
@@ -263,7 +263,12 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                   : (activeRow?['game']?.toString().isNotEmpty == true
                       ? activeRow!['game'].toString()
                       : (sortedGames.isNotEmpty ? sortedGames.first : 'Magic'));
-              ref.read(editorProvider.notifier).addCardToGame(targetGame);
+              ref.read(editorProvider.notifier).addCardToGame(
+                targetGame,
+                cardName: '${ref.tr('default_card_name')} ($targetGame)',
+                type: ref.tr('default_card_type'),
+                rulesText: ref.tr('default_rules_text').replaceAll('{game}', targetGame),
+              );
             },
           ),
           const SizedBox(width: 12),
@@ -459,7 +464,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GrimoireTheme.surfaceElevated,
-        title: const Text('Añadir Nueva Columna', style: TextStyle(fontSize: 14, color: Colors.white)),
+        title: Text(ref.tr('add_new_column_title'), style: const TextStyle(fontSize: 14, color: Colors.white)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -479,7 +484,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Añadir'),
+            child: Text(ref.tr('add')),
           ),
         ],
       ),
@@ -543,7 +548,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       GrimoireToast.success(
         context,
         file.path,
-        title: 'CSV exportado con éxito',
+        title: ref.tr('csv_exported_success'),
       );
     }
   }
@@ -629,7 +634,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
           GrimoireToast.success(
             context,
             'Se han importado y alineado las cartas en el proyecto.',
-            title: 'Cartas importadas con éxito',
+            title: ref.tr('cards_imported_success'),
           );
         }
       }
@@ -678,7 +683,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.edit_outlined, size: 16, color: GrimoireTheme.accentAmber),
-                            tooltip: 'Renombrar columna',
+                            tooltip: ref.tr('rename_column'),
                             onPressed: () {
                               Navigator.pop(ctx);
                               _showRenameColumnDialog(context, ref, col);
@@ -686,7 +691,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 16, color: GrimoireTheme.accentPink),
-                            tooltip: 'Eliminar columna',
+                            tooltip: ref.tr('delete_column'),
                             onPressed: () {
                               Navigator.pop(ctx);
                               _confirmDeleteColumn(context, ref, col);
@@ -701,7 +706,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
+            child: Text(ref.tr('close')),
           ),
         ],
       ),
@@ -714,12 +719,12 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GrimoireTheme.surfaceElevated,
-        title: Text('Renombrar Columna "$oldKey"', style: const TextStyle(fontSize: 14, color: Colors.white)),
+        title: Text('${ref.tr('rename_column')} "$oldKey"', style: const TextStyle(fontSize: 14, color: Colors.white)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(fontSize: 12, color: Colors.white),
-          decoration: const InputDecoration(labelText: 'Nuevo nombre de columna'),
+          decoration: InputDecoration(labelText: ref.tr('new_column_name')),
         ),
         actions: [
           TextButton(
@@ -734,7 +739,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Guardar'),
+            child: Text(ref.tr('save')),
           ),
         ],
       ),
@@ -746,9 +751,9 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GrimoireTheme.surfaceElevated,
-        title: const Text('¿Eliminar Columna?', style: TextStyle(fontSize: 14, color: Colors.white)),
+        title: Text(ref.tr('delete_column_title'), style: const TextStyle(fontSize: 14, color: Colors.white)),
         content: Text(
-          'Se eliminará el campo "$colKey" de todas las cartas de la base de datos.',
+          '${ref.tr('delete_column_confirm')} ("$colKey")',
           style: const TextStyle(fontSize: 12, color: GrimoireTheme.textMuted),
         ),
         actions: [
@@ -762,7 +767,7 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
               ref.read(editorProvider.notifier).removeCustomColumnFromDatabase(colKey);
               Navigator.pop(ctx);
             },
-            child: const Text('Eliminar'),
+            child: Text(ref.tr('delete')),
           ),
         ],
       ),

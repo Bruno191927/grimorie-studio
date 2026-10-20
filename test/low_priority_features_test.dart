@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/main.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/export/services/export_service.dart';
 
 Future<Uint8List> createSampleCardImage({Color color = const Color(0xFF06B6D4)}) async {
@@ -114,37 +115,37 @@ void main() {
       await tester.pumpAndSettle();
 
       // Open Canvas Editor
-      await tester.tap(find.text('Editor de Lienzo'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'nav_editor')));
       await tester.pumpAndSettle();
 
       // Tap 300 DPI button to open dialog
-      await tester.tap(find.text('Renderizar Carta 300 DPI'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'render_300dpi_card')));
       await tester.pumpAndSettle();
 
       // Verify Pre-flight Checklist is rendered under default PDF Imprenta
-      expect(find.text('PDF Imprenta'), findsOneWidget);
-      expect(find.text('Pre-flight Imprenta & Perfil CMYK (PDF/X-1a)'), findsOneWidget);
-      expect(find.text('Resolución de Impresión 300 DPI'), findsOneWidget);
-      expect(find.text('Sangrado Exterior Activo (3.0 mm)'), findsOneWidget);
-      expect(find.text('Marcas de Corte Vectoriales Activas'), findsOneWidget);
-      expect(find.text('100% Listo'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'format_pdf_print')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'preflight_checklist_title')), findsOneWidget);
+      expect(find.text('300 DPI Print Resolution'), findsOneWidget);
+      expect(find.text('Active Outer Bleed (3.0 mm)'), findsOneWidget);
+      expect(find.text('Active Vector Crop Marks'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'preflight_ready')), findsOneWidget);
 
       // Verify Web 3D Showcase tab is present and selectable
-      final web3dTab = find.text('Web 3D');
+      final web3dTab = find.text(AppStrings.get(AppLanguage.en, 'format_web_3d'));
       expect(web3dTab, findsOneWidget);
       await tester.tap(web3dTab);
       await tester.pumpAndSettle();
 
       // Verify Web 3D information card appears
-      expect(find.text('Visor Web 3D Interactivo (100% Autónomo)'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'interactive_web_3d_viewer')), findsOneWidget);
       expect(find.text('Tilt 3D & Holographic Sheen'), findsOneWidget);
-      expect(find.text('Giro Anverso / Reverso'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'flip_front_back')), findsOneWidget);
       expect(find.text('100% Offline'), findsOneWidget);
 
       // Close modal
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'cancel')));
       await tester.pumpAndSettle();
-      expect(find.text('Visor Web 3D Interactivo (100% Autónomo)'), findsNothing);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'interactive_web_3d_viewer')), findsNothing);
     });
   });
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/playtest/models/playtest_models.dart';
 import 'package:grimoire_studio/features/playtest/presentation/screens/playtest_screen.dart';
 import 'package:grimoire_studio/features/export/services/export_service.dart';
@@ -96,9 +97,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check toolbar buttons exist
-      expect(find.text('Fichas'), findsOneWidget);
-      expect(find.text('Analítica'), findsOneWidget);
-      expect(find.text('Solitario'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'tokens')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'analytics')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'solo_mode')), findsOneWidget);
 
       // Toggle Duel Mode
       final switchFinder = find.byType(Switch);
@@ -107,9 +108,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Should show Duel label
-      expect(find.text('Duelo (J1 vs J2)'), findsOneWidget);
-      expect(find.text('JUGADOR 2'), findsOneWidget);
-      expect(find.text('JUGADOR 1'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'duel_mode')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'player_2')), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'player_1')), findsOneWidget);
     });
 
     testWidgets('6. PlaytestScreen allows toggling combat mode for non-combat games', (tester) async {
@@ -175,7 +176,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Table Division Popup Menu
-      final divisionMenuFinder = find.byTooltip('Dividir mesa para ver cómo queda con más jugadores');
+      final divisionMenuFinder = find.byTooltip(AppStrings.get(AppLanguage.en, 'divide_table_tooltip'));
       expect(divisionMenuFinder, findsOneWidget);
       await tester.tap(divisionMenuFinder);
       await tester.pumpAndSettle();
@@ -195,7 +196,7 @@ void main() {
       expect(find.text('J6'), findsWidgets);
 
       // Verify Center Hub reflects 6 players
-      expect(find.text('🎲 ZONA COMÚN'), findsOneWidget);
+      expect(find.text(AppStrings.get(AppLanguage.en, 'common_area')), findsOneWidget);
     });
   });
 }

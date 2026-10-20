@@ -1141,16 +1141,42 @@ class EditorNotifier extends StateNotifier<EditorState> {
           activeRowIndex: clampedRowIndex,
         );
 
+        // Clean up any orphaned categories that belong to deleted games or games with 0 rows
+        final activeGameNamesExact = combinedRows
+            .map((r) => (r['game'] ?? '').toString().trim().toLowerCase())
+            .where((k) => k.isNotEmpty)
+            .toSet();
+        final activeGameNormKeys = combinedRows
+            .map((r) => GameFolderService.normalizeGameKey((r['game'] ?? '').toString()))
+            .where((k) => k.isNotEmpty)
+            .toSet();
+        final deletedExactKeys = persisted.deletedGames
+            .map((g) => g.trim().toLowerCase())
+            .toSet();
+        final deletedNormKeys = persisted.deletedGames
+            .map(GameFolderService.normalizeGameKey)
+            .toSet();
+        final cleanedCategories = Map<String, List<GameCategory>>.from(persisted.gameCategories)
+          ..removeWhere((k, _) {
+            final lowerK = k.trim().toLowerCase();
+            final normK = GameFolderService.normalizeGameKey(k);
+            // If this exact key was deleted and there are no rows with this exact name, purge it
+            if (deletedExactKeys.contains(lowerK) && !activeGameNamesExact.contains(lowerK)) {
+              return true;
+            }
+            return deletedNormKeys.contains(normK) || !activeGameNormKeys.contains(normK);
+          });
+
         GameFolderService.saveWorkspaceStateSync(
           project: mergedProject,
-          gameCategories: persisted.gameCategories,
+          gameCategories: cleanedCategories,
           deletedGames: persisted.deletedGames,
           customRootDir: customPersistenceDir,
         );
 
         return EditorState(
           project: mergedProject,
-          gameCategories: persisted.gameCategories,
+          gameCategories: cleanedCategories,
           deletedGames: persisted.deletedGames,
         );
       }
@@ -2057,9 +2083,17 @@ class EditorNotifier extends StateNotifier<EditorState> {
     bool isCategoryDefault = false,
     Map<String, dynamic>? baseCard,
   }) {
-    if (state.deletedGames.contains(gameName)) {
-      final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
-      state = state.copyWith(deletedGames: updatedDeleted);
+    final normTarget = GameFolderService.normalizeGameKey(gameName);
+    if (state.deletedGames.any((g) => GameFolderService.normalizeGameKey(g) == normTarget)) {
+      final updatedDeleted = state.deletedGames
+          .where((g) => GameFolderService.normalizeGameKey(g) != normTarget)
+          .toSet();
+      final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories)
+        ..removeWhere((k, _) => GameFolderService.normalizeGameKey(k) == normTarget);
+      state = state.copyWith(
+        deletedGames: updatedDeleted,
+        gameCategories: updatedCategories,
+      );
     }
 
     String assignedTemplateId;
@@ -2117,7 +2151,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final finalCost = category.hasCost && category.defaultCost.isNotEmpty
         ? category.defaultCost
         : (category.hasCost ? '1' : '');
-    final finalType = category.defaultType.isNotEmpty ? category.defaultType : 'Criatura';
+    final finalType = category.defaultType.isNotEmpty ? category.defaultType : 'Carta Normal';
     final finalRarity = category.hasRarity && category.defaultRarity.isNotEmpty
         ? category.defaultRarity
         : (category.hasRarity ? 'Común' : '');
@@ -2127,7 +2161,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final finalDefense = category.hasCombatStats && category.defaultDefense.isNotEmpty
         ? category.defaultDefense
         : (category.hasCombatStats ? '0' : '');
-    final finalRules = category.hasRules && category.defaultRules.isNotEmpty
+    final finalRules = category.defaultRules.isNotEmpty
         ? category.defaultRules
         : (category.hasRules ? 'Habilidad especial de ${category.name}.' : '');
 
@@ -2633,9 +2667,21 @@ class EditorNotifier extends StateNotifier<EditorState> {
     String? rulesText,
     String? presetTemplateId,
   }) {
-    if (state.deletedGames.contains(gameName)) {
-      final updatedDeleted = state.deletedGames.where((g) => g != gameName).toSet();
-      state = state.copyWith(deletedGames: updatedDeleted);
+    final normTarget = GameFolderService.normalizeGameKey(gameName);
+    final hasExistingCardsForGame = state.project.rows
+        .any((r) => GameFolderService.normalizeGameKey((r['game'] ?? '').toString()) == normTarget);
+
+    if (state.deletedGames.any((g) => GameFolderService.normalizeGameKey(g) == normTarget) ||
+        (!hasExistingCardsForGame && category == null)) {
+      final updatedDeleted = state.deletedGames
+          .where((g) => GameFolderService.normalizeGameKey(g) != normTarget)
+          .toSet();
+      final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories)
+        ..removeWhere((k, _) => GameFolderService.normalizeGameKey(k) == normTarget);
+      state = state.copyWith(
+        deletedGames: updatedDeleted,
+        gameCategories: updatedCategories,
+      );
     }
 
     // 1. Look for category default card first
@@ -2661,17 +2707,17 @@ class EditorNotifier extends StateNotifier<EditorState> {
         id: 'cat_general_${DateTime.now().millisecondsSinceEpoch}',
         name: 'General',
         icon: '🃏',
-        defaultType: 'Criatura',
-        defaultCost: '1',
+        defaultType: type ?? 'Carta Normal',
+        defaultCost: '',
         defaultRarity: 'Común',
-        defaultAttack: '1',
-        defaultDefense: '1',
-        defaultRules: 'Habilidad especial para el juego $gameName.',
+        defaultAttack: '',
+        defaultDefense: '',
+        defaultRules: rulesText ?? '',
         defaultColor: 0xFF7C3AED,
-        hasCost: true,
-        hasCombatStats: true,
-        hasRarity: true,
-        hasRules: true,
+        hasCost: false,
+        hasCombatStats: false,
+        hasRarity: false,
+        hasRules: false,
       );
       final updatedCats = Map<String, List<GameCategory>>.from(state.gameCategories);
       updatedCats[gameName] = [defaultCat];
@@ -2692,7 +2738,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
     final finalType = type ?? (preferModel && modelCard['type']?.toString().isNotEmpty == true
         ? modelCard['type'].toString()
-        : (hasValidCat && chosenCategory.defaultType.isNotEmpty ? chosenCategory.defaultType : 'Criatura'));
+        : (hasValidCat && chosenCategory.defaultType.isNotEmpty ? chosenCategory.defaultType : 'Carta Normal'));
 
     final finalColor = artColor ??
         (preferModel && modelCard['art_color'] != null
@@ -2734,7 +2780,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
             : (hasValidCat && chosenCategory.defaultDefense.isNotEmpty ? chosenCategory.defaultDefense : '1'));
 
     final existingGameCards = state.project.rows
-        .where((r) => (r['game'] ?? '').toString().toLowerCase().trim() == gameName.toLowerCase().trim())
+        .where((r) => GameFolderService.normalizeGameKey((r['game'] ?? '').toString()) == normTarget)
         .toList();
 
     CardTemplate sourceTpl;
@@ -2757,7 +2803,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final cardTplId = 'tpl_card_${uuid.v4().substring(0, 8)}';
     final cardTpl = CardTemplate(
       id: cardTplId,
-      name: '${cardName ?? 'Nueva Carta'} Plantilla',
+      name: '${cardName ?? 'Carta Normal'} Plantilla',
       layers: sourceTpl.layers.map((l) => l.copyWith(id: uuid.v4())).toList(),
       backLayers: sourceTpl.backLayers.map((l) => l.copyWith(id: uuid.v4())).toList(),
       backgroundColor: sourceTpl.backgroundColor,
@@ -2770,12 +2816,12 @@ class EditorNotifier extends StateNotifier<EditorState> {
     );
 
     final newCard = <String, dynamic>{
-      'card_name': cardName ?? 'Nueva Carta ($gameName)',
+      'card_name': cardName ?? 'Carta Normal ($gameName)',
       'game': gameName,
       'category': finalCatName.isNotEmpty ? finalCatName : 'General',
       'qty': '1',
       'cost': finalCost,
-      'type': finalType.isNotEmpty ? finalType : 'Criatura',
+      'type': finalType.isNotEmpty ? finalType : 'Carta Normal',
       'rarity': finalRarity.isNotEmpty ? finalRarity : 'Común',
       'attack': finalAtk,
       'defense': finalDef,
@@ -2847,22 +2893,76 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void deleteGame(String gameName) {
-    final rows = state.project.rows
-        .where((r) => (r['game'] ?? '').toString().toLowerCase() != gameName.toLowerCase())
-        .toList();
+    _recordHistory();
+    final normTarget = GameFolderService.normalizeGameKey(gameName);
+    final safeGame = gameName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+
+    final deletedRowTemplateIds = <String>{};
+    final rows = <Map<String, dynamic>>[];
+    for (final r in state.project.rows) {
+      final rGame = (r['game'] ?? '').toString();
+      if (GameFolderService.normalizeGameKey(rGame) == normTarget) {
+        final tplId = (r['template_id'] ?? '').toString().trim();
+        if (tplId.isNotEmpty) {
+          deletedRowTemplateIds.add(tplId);
+        }
+      } else {
+        rows.add(r);
+      }
+    }
+
+    // Keep track of template IDs still used by remaining rows
+    final remainingTemplateIds = rows
+        .map((r) => (r['template_id'] ?? '').toString().trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    var updatedTemplates = state.project.templates.where((t) {
+      if (remainingTemplateIds.contains(t.id)) return true;
+      if (deletedRowTemplateIds.contains(t.id)) return false;
+      final lowerId = t.id.toLowerCase();
+      if (lowerId.startsWith('tpl_${safeGame}_') ||
+          lowerId.startsWith('tpl_${normTarget}_') ||
+          lowerId.startsWith('tpl_cat_${safeGame}_') ||
+          lowerId.startsWith('tpl_cat_${normTarget}_')) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    if (updatedTemplates.isEmpty) {
+      updatedTemplates = [CardTemplate.createDefault()];
+    }
+
     final newIndex = state.project.activeRowIndex >= rows.length
         ? (rows.isEmpty ? 0 : rows.length - 1)
         : state.project.activeRowIndex;
+    final newTplIndex = state.project.activeTemplateIndex >= updatedTemplates.length
+        ? (updatedTemplates.isEmpty ? 0 : updatedTemplates.length - 1)
+        : state.project.activeTemplateIndex;
+
     final updatedDeletedGames = {...state.deletedGames, gameName};
+
+    // Remove categories associated with this game (using normalized key matching)
+    final updatedCategories = Map<String, List<GameCategory>>.from(state.gameCategories)
+      ..removeWhere((k, _) => GameFolderService.normalizeGameKey(k) == normTarget);
 
     state = state.copyWith(
       project: state.project.copyWith(
+        templates: updatedTemplates,
+        activeTemplateIndex: newTplIndex,
         rows: rows,
         activeRowIndex: newIndex,
       ),
+      gameCategories: updatedCategories,
       deletedGames: updatedDeletedGames,
     );
-    _persistWorkspace(syncGameName: gameName);
+
+    // Completely delete the physical folder games/<gameName> from disk
+    if (enableDiskPersistence) {
+      GameFolderService.deleteGameFolderSync(gameName, customRootDir: customPersistenceDir);
+    }
+    _persistWorkspace();
   }
 
   void restoreSampleGames() {

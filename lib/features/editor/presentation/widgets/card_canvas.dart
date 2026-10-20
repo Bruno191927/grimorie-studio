@@ -966,7 +966,7 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isInlineEditing ? 'Listo' : 'Editar texto (2x clic)',
+                        isInlineEditing ? ref.tr('done') : ref.tr('edit_text_hint'),
                         style: const TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -1657,7 +1657,7 @@ class _CardCanvasState extends ConsumerState<CardCanvas> {
           }
         }
 
-        final displayText = TemplateParser.parse(rawText, activeRow);
+        final displayText = layer.formatDisplayValue(TemplateParser.parse(rawText, activeRow));
 
         return SizedBox(
           width: effectiveWidth,

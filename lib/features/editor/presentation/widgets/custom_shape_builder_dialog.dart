@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/localization/locale_provider.dart';
 import '../../../../core/theme/grimoire_theme.dart';
 import '../../models/layer_item.dart';
 import '../../utils/shape_path_builder.dart';
@@ -18,7 +20,7 @@ class CustomShapeBuilderResult {
   });
 }
 
-class CustomShapeBuilderDialog extends StatefulWidget {
+class CustomShapeBuilderDialog extends ConsumerStatefulWidget {
   final LayerItem layer;
   final ValueChanged<CustomShapeBuilderResult>? onLiveChanged;
 
@@ -43,10 +45,10 @@ class CustomShapeBuilderDialog extends StatefulWidget {
   }
 
   @override
-  State<CustomShapeBuilderDialog> createState() => _CustomShapeBuilderDialogState();
+  ConsumerState<CustomShapeBuilderDialog> createState() => _CustomShapeBuilderDialogState();
 }
 
-class _CustomShapeBuilderDialogState extends State<CustomShapeBuilderDialog> {
+class _CustomShapeBuilderDialogState extends ConsumerState<CustomShapeBuilderDialog> {
   late List<Offset> _points;
   late double _borderRadius;
   late bool _closePath;
@@ -191,18 +193,18 @@ class _CustomShapeBuilderDialogState extends State<CustomShapeBuilderDialog> {
                           child: const Icon(Icons.polyline_outlined, color: GrimoireTheme.accentAmber, size: 20),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Desarrollo de Forma Personalizada (Editor Vectorial)',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                                ref.tr('custom_shape_builder_title'),
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Arrastra los nodos morados para esculpir tu marco, o haz clic en el lienzo para añadir vértices.',
-                                style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                                ref.tr('custom_shape_builder_desc'),
+                                style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -563,7 +565,7 @@ class _CustomShapeBuilderDialogState extends State<CustomShapeBuilderDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar', style: TextStyle(color: GrimoireTheme.textMuted)),
+                    child: Text(ref.tr('cancel'), style: const TextStyle(color: GrimoireTheme.textMuted)),
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
@@ -574,7 +576,7 @@ class _CustomShapeBuilderDialogState extends State<CustomShapeBuilderDialog> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: const Icon(Icons.check, size: 16),
-                    label: const Text('Aplicar Forma Personalizada', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(ref.tr('apply_custom_shape'), style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
                       Navigator.pop(
                         context,

@@ -74,6 +74,11 @@ class GameFolderService {
         .trim();
   }
 
+  /// Normalizes a game name for case/hyphen/underscore/space-insensitive comparisons
+  static String normalizeGameKey(String name) {
+    return name.trim().toLowerCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+  }
+
   /// Returns the folder directory for a specific game
   static Directory getGameDir(String gameName, {Directory? customRootDir}) {
     final root = customRootDir ?? getGamesRootDir();
@@ -127,7 +132,7 @@ class GameFolderService {
     card['qty'] = (qty != null && qty.isNotEmpty) ? qty : '1';
 
     if (!card.containsKey('cost')) card['cost'] = '';
-    if (!card.containsKey('type')) card['type'] = 'Criatura';
+    if (!card.containsKey('type') || card['type']?.toString().trim().isEmpty == true) card['type'] = 'Carta Normal';
     if (!card.containsKey('rarity')) card['rarity'] = 'Común';
     if (!card.containsKey('attack')) card['attack'] = '';
     if (!card.containsKey('defense')) card['defense'] = '';
@@ -198,7 +203,7 @@ class GameFolderService {
         card['category']?.toString() ?? 'General',
         card['qty']?.toString() ?? '1',
         card['cost']?.toString() ?? '',
-        card['type']?.toString() ?? 'Criatura',
+        card['type']?.toString() ?? 'Carta Normal',
         card['rarity']?.toString() ?? 'Común',
         card['attack']?.toString() ?? '',
         card['defense']?.toString() ?? '',
@@ -352,14 +357,24 @@ class GameFolderService {
         }
       }
 
+      final deletedNormKeys = loadedDeletedGames.map(normalizeGameKey).toSet();
+
       // Also scan subdirectories in games/ for any existing <GameName>/data.csv
       final existingGameNamesInProject = <String>{};
       if (loadedProject != null) {
-        for (final r in loadedProject.rows) {
+        final filteredRows = loadedProject.rows.where((r) {
           final g = (r['game'] ?? '').toString().trim();
-          if (g.isNotEmpty) existingGameNamesInProject.add(g.toLowerCase());
+          return !deletedNormKeys.contains(normalizeGameKey(g));
+        }).toList();
+        loadedProject = loadedProject.copyWith(rows: filteredRows);
+        for (final r in filteredRows) {
+          final g = (r['game'] ?? '').toString().trim();
+          if (g.isNotEmpty) existingGameNamesInProject.add(normalizeGameKey(g));
         }
       }
+
+      // Purge any categories belonging to deleted games that do not have active rows
+      loadedCategories.removeWhere((k, _) => deletedNormKeys.contains(normalizeGameKey(k)));
 
       final discoveredRows = <Map<String, dynamic>>[];
       final subDirs = root.listSync().whereType<Directory>();
@@ -367,16 +382,19 @@ class GameFolderService {
         final dirName = dir.uri.pathSegments.where((s) => s.isNotEmpty).last;
         if (dirName.startsWith('.')) continue;
 
-        final isDeleted = loadedDeletedGames.any((d) => d.toLowerCase() == dirName.toLowerCase());
+        final isDeleted = deletedNormKeys.contains(normalizeGameKey(dirName));
         if (isDeleted) continue;
 
         final csvCards = loadGameDataCsvSync(dirName, customRootDir: customRootDir);
         if (csvCards.isEmpty) continue;
 
         final canonicalGameName = (csvCards.first['game'] ?? dirName).toString().trim();
-        if (!existingGameNamesInProject.contains(canonicalGameName.toLowerCase())) {
+        final canonicalNorm = normalizeGameKey(canonicalGameName);
+        if (deletedNormKeys.contains(canonicalNorm)) continue;
+
+        if (!existingGameNamesInProject.contains(canonicalNorm)) {
           discoveredRows.addAll(csvCards);
-          existingGameNamesInProject.add(canonicalGameName.toLowerCase());
+          existingGameNamesInProject.add(canonicalNorm);
         }
 
         // Reconstruct category models from CSV cards if not already present in loadedCategories
@@ -802,5 +820,33 @@ class GameFolderService {
       debugPrint('Error deleting game asset: $e');
     }
     return false;
+  }
+
+  /// Deletes the entire game directory `games/<gameName>/` (data.csv, assets, etc.) from disk
+  static bool deleteGameFolderSync(String gameName, {Directory? customRootDir}) {
+    bool deletedAny = false;
+    try {
+      final gameDir = getGameDir(gameName, customRootDir: customRootDir);
+      if (gameDir.existsSync()) {
+        gameDir.deleteSync(recursive: true);
+        deletedAny = true;
+      }
+      final root = customRootDir ?? getGamesRootDir();
+      if (root.existsSync()) {
+        final targetNorm = normalizeGameKey(gameName);
+        if (targetNorm.isNotEmpty) {
+          for (final dir in root.listSync().whereType<Directory>()) {
+            final dirName = dir.uri.pathSegments.where((s) => s.isNotEmpty).last;
+            if (normalizeGameKey(dirName) == targetNorm && dir.existsSync()) {
+              dir.deleteSync(recursive: true);
+              deletedAny = true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting game folder for $gameName: $e');
+    }
+    return deletedAny;
   }
 }
