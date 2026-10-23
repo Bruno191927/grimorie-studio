@@ -38,6 +38,59 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
   final Map<String, String?> _gameCategoryFilter = {};
   final Set<String> _selectedFileTypes = {'type_300dpi'};
   final Map<String, bool> _showDefaultModelsForGame = {};
+  final Map<String, ScrollController> _categoryScrollControllers = {};
+  final Map<String, ScrollController> _modelsScrollControllers = {};
+
+  ScrollController _getCategoryScrollController(String gameName) =>
+      _categoryScrollControllers.putIfAbsent(gameName, () => ScrollController());
+
+  ScrollController _getModelsScrollController(String gameName) =>
+      _modelsScrollControllers.putIfAbsent(gameName, () => ScrollController());
+
+  void _scrollHorizontally(ScrollController controller, double delta) {
+    if (!controller.hasClients) return;
+    final target = (controller.offset + delta).clamp(0.0, controller.position.maxScrollExtent);
+    controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _buildScrollArrowButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: GrimoireTheme.surfaceElevated,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: GrimoireTheme.borderSubtle),
+          ),
+          child: Icon(icon, size: 16, color: GrimoireTheme.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final c in _categoryScrollControllers.values) {
+      c.dispose();
+    }
+    for (final c in _modelsScrollControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   Future<void> _handleImportGrimoire() async {
     try {
@@ -1764,45 +1817,69 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
           const SizedBox(height: 12),
 
           // Scrollable Category Archetype Chips (Enlarged & Visual)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // "Todas" chip
-                _buildArchetypePill(
-                  title: ref.tr('all_cards_in_game'),
-                  icon: '✨',
-                  count: allGameCards.where((r) => !_isModelCard(r)).length,
-                  color: GrimoireTheme.accentPurple,
-                  isSelected: currentCatFilter == null || currentCatFilter == 'All',
-                  onTap: () => setState(() => _gameCategoryFilter[gameName] = null),
-                ),
-                const SizedBox(width: 10),
+          Row(
+            children: [
+              _buildScrollArrowButton(
+                icon: Icons.chevron_left,
+                tooltip: 'Desplazar categorías a la izquierda',
+                onPressed: () => _scrollHorizontally(_getCategoryScrollController(gameName), -260),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Scrollbar(
+                  controller: _getCategoryScrollController(gameName),
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _getCategoryScrollController(gameName),
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        // "Todas" chip
+                        _buildArchetypePill(
+                          title: ref.tr('all_cards_in_game'),
+                          icon: '✨',
+                          count: allGameCards.where((r) => !_isModelCard(r)).length,
+                          color: GrimoireTheme.accentPurple,
+                          isSelected: currentCatFilter == null || currentCatFilter == 'All',
+                          onTap: () => setState(() => _gameCategoryFilter[gameName] = null),
+                        ),
+                        const SizedBox(width: 10),
 
-                // Predefined archetype chips
-                for (final cat in categories) ...[
-                  _buildArchetypeCategoryPill(
-                    gameName: gameName,
-                    category: cat,
-                    count: allGameCards.where((c) => (c['category'] ?? '').toString().toLowerCase() == cat.name.toLowerCase() && !_isModelCard(c)).length,
-                    isSelected: currentCatFilter?.toLowerCase() == cat.name.toLowerCase(),
-                    onTap: () {
-                      setState(() {
-                        if (currentCatFilter?.toLowerCase() == cat.name.toLowerCase()) {
-                          _gameCategoryFilter[gameName] = null;
-                        } else {
-                          _gameCategoryFilter[gameName] = cat.name;
-                        }
-                      });
-                    },
-                    onGenerateCard: () => _generateCardFromModel(gameName, cat),
-                    onEditModel: () => _showCategoryModelDialog(gameName, existingCategory: cat),
-                    onDelete: () => _confirmDeleteCategory(gameName, cat.name),
+                        // Predefined archetype chips
+                        for (final cat in categories) ...[
+                          _buildArchetypeCategoryPill(
+                            gameName: gameName,
+                            category: cat,
+                            count: allGameCards.where((c) => (c['category'] ?? '').toString().toLowerCase() == cat.name.toLowerCase() && !_isModelCard(c)).length,
+                            isSelected: currentCatFilter?.toLowerCase() == cat.name.toLowerCase(),
+                            onTap: () {
+                              setState(() {
+                                if (currentCatFilter?.toLowerCase() == cat.name.toLowerCase()) {
+                                  _gameCategoryFilter[gameName] = null;
+                                } else {
+                                  _gameCategoryFilter[gameName] = cat.name;
+                                }
+                              });
+                            },
+                            onGenerateCard: () => _generateCardFromModel(gameName, cat),
+                            onEditModel: () => _showCategoryModelDialog(gameName, existingCategory: cat),
+                            onDelete: () => _confirmDeleteCategory(gameName, cat.name),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                ],
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildScrollArrowButton(
+                icon: Icons.chevron_right,
+                tooltip: 'Desplazar categorías a la derecha',
+                onPressed: () => _scrollHorizontally(_getCategoryScrollController(gameName), 260),
+              ),
+            ],
           ),
 
           // Dedicated Section: Default Card Models Blueprint Carousel (Only shown if predefined models exist)
@@ -1820,38 +1897,65 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.dashboard_customize_outlined, size: 16, color: GrimoireTheme.accentPurple),
-                      const SizedBox(width: 8),
-                      Text(
-                        ref.tr('default_card_models'),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      Row(
+                        children: [
+                          const Icon(Icons.dashboard_customize_outlined, size: 16, color: GrimoireTheme.accentPurple),
+                          const SizedBox(width: 8),
+                          Text(
+                            ref.tr('default_card_models'),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '($totalPredefined ${totalPredefined == 1 ? "plantilla configurada" : "plantillas configuradas"})',
+                            style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '($totalPredefined ${totalPredefined == 1 ? "plantilla configurada" : "plantillas configuradas"})',
-                        style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildScrollArrowButton(
+                            icon: Icons.chevron_left,
+                            tooltip: 'Desplazar modelos a la izquierda',
+                            onPressed: () => _scrollHorizontally(_getModelsScrollController(gameName), -428),
+                          ),
+                          const SizedBox(width: 6),
+                          _buildScrollArrowButton(
+                            icon: Icons.chevron_right,
+                            tooltip: 'Desplazar modelos a la derecha',
+                            onPressed: () => _scrollHorizontally(_getModelsScrollController(gameName), 428),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (int i = 0; i < predefinedCards.length; i++) ...[
-                          SizedBox(
-                            width: 200,
-                            height: 295,
-                            child: _buildGalleryCardTile(
-                              predefinedCards[i],
-                              allRows.indexOf(predefinedCards[i]),
+                  Scrollbar(
+                    controller: _getModelsScrollController(gameName),
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _getModelsScrollController(gameName),
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (int i = 0; i < predefinedCards.length; i++) ...[
+                            SizedBox(
+                              width: 200,
+                              height: 295,
+                              child: _buildGalleryCardTile(
+                                predefinedCards[i],
+                                allRows.indexOf(predefinedCards[i]),
+                              ),
                             ),
-                          ),
-                          if (i < predefinedCards.length - 1) const SizedBox(width: 14),
+                            if (i < predefinedCards.length - 1) const SizedBox(width: 14),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -4251,10 +4355,13 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFDE68A)),
                     ),
                     const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: starterArchetypes.asMap().entries.map((entry) {
+                    Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: starterArchetypes.asMap().entries.map((entry) {
                           final idx = entry.key;
                           final arch = entry.value;
                           final isSel = selectedArchetypeIndex == idx;
@@ -4311,6 +4418,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                             ),
                           );
                         }).toList(),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),

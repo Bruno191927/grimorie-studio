@@ -74,6 +74,19 @@ class GrimoireTheme {
         thickness: 1,
         space: 1,
       ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStateProperty.all(true),
+        thickness: WidgetStateProperty.all(6.0),
+        radius: const Radius.circular(8),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered) || states.contains(WidgetState.dragged)) {
+            return accentPurple.withValues(alpha: 0.85);
+          }
+          return accentPurple.withValues(alpha: 0.45);
+        }),
+        trackColor: WidgetStateProperty.all(const Color(0xFF131522)),
+        trackBorderColor: WidgetStateProperty.all(borderSubtle),
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: surfaceElevated,

@@ -27,21 +27,35 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
   late TextEditingController _nvidiaKeyController;
   late TextEditingController _geminiKeyController;
   late TextEditingController _geminiModelController;
+  late TextEditingController _openAiKeyController;
+  late TextEditingController _openAiModelController;
   final List<String> _geminiPresetModels = [
     'imagen-3.0-generate-002',
     'imagen-3.0-generate-001',
     'imagen-3.0-fast-generate-001',
   ];
+  final List<String> _openAiPresetModels = [
+    'gpt-image-1',
+    'dall-e-3',
+    'dall-e-2',
+  ];
   List<String> _geminiFetchedModels = [];
+  List<String> _openAiFetchedModels = [];
   bool _isFetchingGeminiModels = false;
+  bool _isFetchingOpenAiModels = false;
   bool _isCustomGeminiModel = false;
-  AiProviderType _selectedProvider = AiProviderType.googleGemini;
+  bool _isCustomOpenAiModel = false;
+  AiProviderType _selectedProvider = AiProviderType.openAi;
   String _selectedGeminiAspectRatio = '3:4';
+  String _selectedOpenAiSize = '1024x1536';
+  String _selectedOpenAiQuality = 'high';
+  final String _selectedOpenAiStyle = 'vivid';
   bool _isLoading = false;
   String? _statusMessage;
   bool _showNegativePrompt = false;
   bool _obscureNvidiaKey = true;
   bool _obscureGeminiKey = true;
+  bool _obscureOpenAiKey = true;
   bool _autoRemoveBg = false;
   final AiService _aiService = AiService();
 
@@ -61,6 +75,14 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
     final currentModel = AiService.getGeminiModel();
     _geminiModelController = TextEditingController(text: currentModel);
     _isCustomGeminiModel = !_geminiPresetModels.contains(currentModel);
+
+    _openAiKeyController = TextEditingController(text: AiService.getOpenAiApiKey());
+    final currentOpenAiModel = AiService.getOpenAiModel();
+    _openAiModelController = TextEditingController(text: currentOpenAiModel);
+    _isCustomOpenAiModel = !_openAiPresetModels.contains(currentOpenAiModel);
+    if (AiService.getOpenAiApiKey().isEmpty && AiService.getGeminiApiKey().isNotEmpty) {
+      _selectedProvider = AiProviderType.googleGemini;
+    }
   }
 
   @override
@@ -70,7 +92,42 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
     _nvidiaKeyController.dispose();
     _geminiKeyController.dispose();
     _geminiModelController.dispose();
+    _openAiKeyController.dispose();
+    _openAiModelController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchOpenAiModels() async {
+    final key = _openAiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa primero tu API Key de OpenAI para consultar los modelos.')),
+      );
+      return;
+    }
+    setState(() => _isFetchingOpenAiModels = true);
+    final models = await AiService.fetchAvailableOpenAiModels(apiKey: key);
+    if (mounted) {
+      setState(() {
+        _isFetchingOpenAiModels = false;
+        if (models.isNotEmpty) {
+          _openAiFetchedModels = models;
+          if (!_openAiPresetModels.contains(_openAiModelController.text.trim()) &&
+              !models.contains(_openAiModelController.text.trim())) {
+            _openAiModelController.text = models.first;
+            AiService.setOpenAiModel(models.first);
+            _isCustomOpenAiModel = false;
+          }
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(models.isNotEmpty
+              ? 'Se encontraron ${models.length} modelos de imagen en tu cuenta de OpenAI.'
+              : 'No se encontraron modelos adicionales o la clave no tiene permisos.'),
+        ),
+      );
+    }
   }
 
   Future<void> _fetchGeminiModels() async {
@@ -107,7 +164,10 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
   }
 
   Future<void> _handleGenerate() async {
-    if (_selectedProvider == AiProviderType.googleGemini) {
+    if (_selectedProvider == AiProviderType.openAi) {
+      AiService.setOpenAiApiKey(_openAiKeyController.text.trim());
+      AiService.setOpenAiModel(_openAiModelController.text.trim());
+    } else if (_selectedProvider == AiProviderType.googleGemini) {
       AiService.setGeminiApiKey(_geminiKeyController.text.trim());
       AiService.setGeminiModel(_geminiModelController.text.trim());
     } else if (_selectedProvider == AiProviderType.nvidiaFluxKlein) {
@@ -138,12 +198,21 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
         },
       );
     } else {
+      final isNativeOpenAiTransparent = _selectedProvider == AiProviderType.openAi &&
+          _autoRemoveBg &&
+          _openAiModelController.text.trim().toLowerCase().contains('gpt-image');
+
       result = await _aiService.generateArtwork(
         prompt: _promptController.text.trim(),
         gameName: game,
         provider: _selectedProvider,
         aspectRatio: _selectedGeminiAspectRatio,
         geminiModel: _geminiModelController.text.trim(),
+        openAiModel: _openAiModelController.text.trim(),
+        openAiSize: _selectedOpenAiSize,
+        openAiQuality: _selectedOpenAiQuality,
+        openAiStyle: _selectedOpenAiStyle,
+        openAiTransparentBackground: isNativeOpenAiTransparent,
       );
     }
 
@@ -155,7 +224,11 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
       if (result.success && result.localFilePath != null) {
         String finalPath = result.localFilePath!;
 
-        if (_autoRemoveBg) {
+        final alreadyTransparentNatively = _selectedProvider == AiProviderType.openAi &&
+            _autoRemoveBg &&
+            _openAiModelController.text.trim().toLowerCase().contains('gpt-image');
+
+        if (_autoRemoveBg && !alreadyTransparentNatively) {
           if (mounted) {
             setState(() {
               _statusMessage = 'Quitando fondo con transparencia alfa...';
@@ -199,6 +272,8 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
 
   String _getProviderName(AiProviderType type) {
     switch (type) {
+      case AiProviderType.openAi:
+        return 'OpenAI (GPT Image 1 / DALL·E 3 • OpenAI API)';
       case AiProviderType.googleGemini:
         return 'Google Gemini (Imagen 3 • Google AI Studio)';
       case AiProviderType.nvidiaFluxKlein:
@@ -210,7 +285,7 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
       case AiProviderType.ollamaLocal:
         return 'Local Ollama / LM Studio (127.0.0.1:11434)';
       case AiProviderType.cloudApi:
-        return 'Cloud API (SDXL / Flux)';
+        return 'Cloud API (Personalizada)';
     }
   }
 
@@ -493,6 +568,266 @@ class _AiPromptDialogState extends ConsumerState<AiPromptDialog> {
                         activeWorkflow.description ?? 'Workflow de generación de imagen para ComfyUI',
                         style: const TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_selectedProvider == AiProviderType.openAi) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F2420),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF10A37F).withValues(alpha: 0.65)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10A37F).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF34D399)),
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'OpenAI • Generación de Imágenes (gpt-image-1 / DALL·E 3)',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Tu OpenAI API Key (se guarda localmente):',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6EE7B7)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _openAiKeyController,
+                        obscureText: _obscureOpenAiKey,
+                        style: const TextStyle(fontSize: 11.5, color: Colors.white, fontFamily: 'monospace'),
+                        decoration: InputDecoration(
+                          hintText: 'sk-proj-...',
+                          hintStyle: const TextStyle(color: GrimoireTheme.textMuted),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureOpenAiKey ? Icons.visibility_off : Icons.visibility,
+                              size: 16,
+                              color: GrimoireTheme.textMuted,
+                            ),
+                            onPressed: () => setState(() => _obscureOpenAiKey = !_obscureOpenAiKey),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          AiService.setOpenAiApiKey(val.trim());
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(Icons.tune, size: 13, color: Color(0xFF6EE7B7)),
+                          const SizedBox(width: 5),
+                          const Text(
+                            'Modelo de Imagen (OpenAI):',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF6EE7B7)),
+                          ),
+                          const Spacer(),
+                          InkWell(
+                            onTap: _isFetchingOpenAiModels ? null : _fetchOpenAiModels,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isFetchingOpenAiModels)
+                                    const SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF6EE7B7)),
+                                    )
+                                  else
+                                    const Icon(Icons.sync, size: 12, color: Color(0xFF6EE7B7)),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Consultar Modelos',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFF6EE7B7),
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 34,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1714),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: GrimoireTheme.borderSubtle),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _isCustomOpenAiModel
+                                ? '__custom__'
+                                : ({..._openAiPresetModels, ..._openAiFetchedModels}.contains(_openAiModelController.text.trim())
+                                    ? _openAiModelController.text.trim()
+                                    : '__custom__'),
+                            isExpanded: true,
+                            dropdownColor: const Color(0xFF0F2420),
+                            style: const TextStyle(fontSize: 11, color: Colors.white),
+                            items: [
+                              ...{..._openAiPresetModels, ..._openAiFetchedModels}.map((m) {
+                                String label = m;
+                                if (m == 'gpt-image-1') {
+                                  label = 'gpt-image-1 (Recomendado • Última generación + Fondo Transparente)';
+                                } else if (m == 'dall-e-3') {
+                                  label = 'dall-e-3 (DALL·E 3 • Alta Fidelidad)';
+                                } else if (m == 'dall-e-2') {
+                                  label = 'dall-e-2 (DALL·E 2 • Rápido)';
+                                }
+                                return DropdownMenuItem(value: m, child: Text(label));
+                              }),
+                              const DropdownMenuItem(
+                                value: '__custom__',
+                                child: Text('Personalizado (Escribir ID manualmente)...'),
+                              ),
+                            ],
+                            onChanged: (v) {
+                              if (v == null) return;
+                              if (v == '__custom__') {
+                                setState(() => _isCustomOpenAiModel = true);
+                              } else {
+                                setState(() {
+                                  _isCustomOpenAiModel = false;
+                                  _openAiModelController.text = v;
+                                });
+                                AiService.setOpenAiModel(v);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      if (_isCustomOpenAiModel) ...[
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _openAiModelController,
+                          style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'monospace'),
+                          decoration: const InputDecoration(
+                            hintText: 'Ej: gpt-image-1 o dall-e-3',
+                            hintStyle: TextStyle(color: GrimoireTheme.textMuted),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            prefixIcon: Icon(Icons.edit, size: 14, color: Color(0xFF6EE7B7)),
+                          ),
+                          onChanged: (val) => AiService.setOpenAiModel(val.trim()),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Resolución / Proporción:',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 32,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0A1714),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: GrimoireTheme.borderSubtle),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedOpenAiSize,
+                                      isExpanded: true,
+                                      dropdownColor: const Color(0xFF0F2420),
+                                      style: const TextStyle(fontSize: 10.5, color: Colors.white),
+                                      items: const [
+                                        DropdownMenuItem(value: '1024x1536', child: Text('Vertical TCG (1024×1536 / 1792)')),
+                                        DropdownMenuItem(value: '1024x1024', child: Text('Cuadrado 1:1 (1024×1024)')),
+                                        DropdownMenuItem(value: '1536x1024', child: Text('Horizontal (1536×1024 / 1792)')),
+                                        DropdownMenuItem(value: 'auto', child: Text('Automático (auto)')),
+                                      ],
+                                      onChanged: (v) {
+                                        if (v != null) setState(() => _selectedOpenAiSize = v);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Calidad:',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: GrimoireTheme.textSecondary),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 32,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0A1714),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: GrimoireTheme.borderSubtle),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedOpenAiQuality,
+                                      isExpanded: true,
+                                      dropdownColor: const Color(0xFF0F2420),
+                                      style: const TextStyle(fontSize: 10.5, color: Colors.white),
+                                      items: const [
+                                        DropdownMenuItem(value: 'high', child: Text('Alta (High / HD)')),
+                                        DropdownMenuItem(value: 'medium', child: Text('Media (Estándar)')),
+                                        DropdownMenuItem(value: 'low', child: Text('Rápida (Low)')),
+                                        DropdownMenuItem(value: 'auto', child: Text('Auto')),
+                                      ],
+                                      onChanged: (v) {
+                                        if (v != null) setState(() => _selectedOpenAiQuality = v);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '💡 Soporta gpt-image-1 (con transparencia nativa al activar "Quitar fondo") y DALL·E 3 (platform.openai.com).',
+                        style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
                       ),
                     ],
                   ),

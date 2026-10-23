@@ -10,6 +10,7 @@ import 'package:grimoire_studio/features/editor/services/game_folder_service.dar
 import 'comfy_ui_service.dart';
 
 enum AiProviderType {
+  openAi,
   googleGemini,
   nvidiaFluxKlein,
   comfyUiLocal,
@@ -37,6 +38,153 @@ class AiService {
   String localOllamaUrl = AppConstants.defaultOllamaUrl;
   String cloudApiKey = '';
   String cloudApiEndpoint = 'https://api.openai.com/v1/images/generations';
+
+  // OpenAI (gpt-image-1 / dall-e-3 / dall-e-2)
+  static String _savedOpenAiApiKey = '';
+  static String _savedOpenAiModel = '';
+
+  static File _getOpenAiConfigFile() {
+    final root = GameFolderService.getGamesRootDir();
+    return File('${root.path}/.openai_config.json');
+  }
+
+  static String getOpenAiApiKey() {
+    if (_savedOpenAiApiKey.isNotEmpty) return _savedOpenAiApiKey;
+    try {
+      final f = _getOpenAiConfigFile();
+      if (f.existsSync()) {
+        final data = jsonDecode(f.readAsStringSync());
+        if (data is Map && data['openai_api_key'] != null) {
+          _savedOpenAiApiKey = data['openai_api_key'].toString().trim();
+          return _savedOpenAiApiKey;
+        }
+      }
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      if (fShared.existsSync()) {
+        final data = jsonDecode(fShared.readAsStringSync());
+        if (data is Map && data['openai_api_key'] != null) {
+          _savedOpenAiApiKey = data['openai_api_key'].toString().trim();
+          return _savedOpenAiApiKey;
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  static void setOpenAiApiKey(String key) {
+    _savedOpenAiApiKey = key.trim();
+    try {
+      final f = _getOpenAiConfigFile();
+      Map<String, dynamic> data = {};
+      if (f.existsSync()) {
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(f.readAsStringSync()));
+        } catch (_) {}
+      }
+      data['openai_api_key'] = _savedOpenAiApiKey;
+      f.writeAsStringSync(jsonEncode(data));
+
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      Map<String, dynamic> sharedData = {};
+      if (fShared.existsSync()) {
+        try {
+          sharedData = Map<String, dynamic>.from(jsonDecode(fShared.readAsStringSync()));
+        } catch (_) {}
+      }
+      sharedData['openai_api_key'] = _savedOpenAiApiKey;
+      fShared.writeAsStringSync(jsonEncode(sharedData));
+    } catch (_) {}
+  }
+
+  String get openAiApiKey => getOpenAiApiKey();
+  set openAiApiKey(String val) => setOpenAiApiKey(val);
+
+  static String getOpenAiModel() {
+    if (_savedOpenAiModel.isNotEmpty) return _savedOpenAiModel;
+    try {
+      final f = _getOpenAiConfigFile();
+      if (f.existsSync()) {
+        final data = jsonDecode(f.readAsStringSync());
+        if (data is Map && data['openai_model'] != null && data['openai_model'].toString().trim().isNotEmpty) {
+          _savedOpenAiModel = data['openai_model'].toString().trim();
+          return _savedOpenAiModel;
+        }
+      }
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      if (fShared.existsSync()) {
+        final data = jsonDecode(fShared.readAsStringSync());
+        if (data is Map && data['openai_model'] != null && data['openai_model'].toString().trim().isNotEmpty) {
+          _savedOpenAiModel = data['openai_model'].toString().trim();
+          return _savedOpenAiModel;
+        }
+      }
+    } catch (_) {}
+    return 'gpt-image-1';
+  }
+
+  static void setOpenAiModel(String model) {
+    _savedOpenAiModel = model.trim().isEmpty ? 'gpt-image-1' : model.trim();
+    try {
+      final f = _getOpenAiConfigFile();
+      Map<String, dynamic> data = {};
+      if (f.existsSync()) {
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(f.readAsStringSync()));
+        } catch (_) {}
+      }
+      data['openai_model'] = _savedOpenAiModel;
+      f.writeAsStringSync(jsonEncode(data));
+
+      final root = GameFolderService.getGamesRootDir();
+      final fShared = File('${root.path}/.grimoire_ai_config.json');
+      Map<String, dynamic> sharedData = {};
+      if (fShared.existsSync()) {
+        try {
+          sharedData = Map<String, dynamic>.from(jsonDecode(fShared.readAsStringSync()));
+        } catch (_) {}
+      }
+      sharedData['openai_model'] = _savedOpenAiModel;
+      fShared.writeAsStringSync(jsonEncode(sharedData));
+    } catch (_) {}
+  }
+
+  static Future<List<String>> fetchAvailableOpenAiModels({String? apiKey}) async {
+    final key = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : getOpenAiApiKey();
+    if (key.isEmpty) return [];
+
+    try {
+      final url = Uri.parse('https://api.openai.com/v1/models');
+      final res = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $key'},
+      ).timeout(const Duration(seconds: 12));
+
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['data'] is List) {
+          final list = data['data'] as List;
+          final List<String> imageModels = [];
+          for (final item in list) {
+            if (item is Map && item['id'] != null) {
+              final id = item['id'].toString();
+              final lower = id.toLowerCase();
+              if (lower.contains('dall-e') || lower.contains('image')) {
+                imageModels.add(id);
+              }
+            }
+          }
+          imageModels.sort();
+          if (imageModels.isNotEmpty) return imageModels;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching OpenAI models: $e');
+    }
+    return [];
+  }
 
   // Google Gemini (Imagen 3)
   static String _savedGeminiApiKey = '';
@@ -257,7 +405,18 @@ class AiService {
     int height = 512,
     String? aspectRatio,
     String? geminiModel,
+    String? openAiModel,
+    String? openAiSize,
+    String? openAiQuality,
+    String? openAiStyle,
+    bool openAiTransparentBackground = false,
   }) async {
+    if (provider == AiProviderType.openAi && openAiApiKey.trim().isEmpty) {
+      return const AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de OpenAI. Por favor configúrala en el panel de IA.',
+      );
+    }
     if (provider == AiProviderType.googleGemini && geminiApiKey.trim().isEmpty) {
       return const AiGenerationResult(
         success: false,
@@ -289,7 +448,17 @@ class AiService {
       final file = File('${targetDir.path}/$fileName');
 
       AiGenerationResult? customResult;
-      if (provider == AiProviderType.googleGemini) {
+      if (provider == AiProviderType.openAi) {
+        customResult = await _generateViaOpenAi(
+          prompt,
+          file,
+          model: openAiModel,
+          size: openAiSize,
+          quality: openAiQuality,
+          style: openAiStyle,
+          transparentBackground: openAiTransparentBackground,
+        );
+      } else if (provider == AiProviderType.googleGemini) {
         customResult = await _generateViaGemini(
           prompt,
           file,
@@ -336,6 +505,161 @@ class AiService {
         errorMessage: 'Generation error: $e',
       );
     }
+  }
+
+  /// Generates artwork via OpenAI Images API (gpt-image-1 / dall-e-3 / dall-e-2)
+  Future<AiGenerationResult> _generateViaOpenAi(
+    String prompt,
+    File targetFile, {
+    String? model,
+    String? size,
+    String? quality,
+    String? style,
+    bool transparentBackground = false,
+  }) async {
+    final key = openAiApiKey.trim();
+    if (key.isEmpty) {
+      return const AiGenerationResult(
+        success: false,
+        errorMessage: 'Falta la API Key de OpenAI. Por favor configúrala en el panel de IA.',
+      );
+    }
+
+    final targetModel = (model != null && model.trim().isNotEmpty)
+        ? model.trim()
+        : getOpenAiModel();
+
+    final isGptImage = targetModel.toLowerCase().contains('gpt-image');
+    final isDalle3 = targetModel.toLowerCase().contains('dall-e-3');
+    final isDalle2 = targetModel.toLowerCase().contains('dall-e-2');
+
+    // Resolve valid size for the target model
+    String resolvedSize = size ?? '1024x1024';
+    if (isGptImage) {
+      const validSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+      if (!validSizes.contains(resolvedSize)) {
+        if (resolvedSize == '1024x1792') {
+          resolvedSize = '1024x1536';
+        } else if (resolvedSize == '1792x1024') {
+          resolvedSize = '1536x1024';
+        } else {
+          resolvedSize = '1024x1024';
+        }
+      }
+    } else if (isDalle3) {
+      const validSizes = ['1024x1024', '1024x1792', '1792x1024'];
+      if (!validSizes.contains(resolvedSize)) {
+        if (resolvedSize == '1024x1536') {
+          resolvedSize = '1024x1792';
+        } else if (resolvedSize == '1536x1024') {
+          resolvedSize = '1792x1024';
+        } else {
+          resolvedSize = '1024x1024';
+        }
+      }
+    } else if (isDalle2) {
+      const validSizes = ['256x256', '512x512', '1024x1024'];
+      if (!validSizes.contains(resolvedSize)) {
+        resolvedSize = '1024x1024';
+      }
+    }
+
+    final Map<String, dynamic> payload = {
+      'model': targetModel,
+      'prompt': prompt.trim(),
+      'n': 1,
+      'size': resolvedSize,
+    };
+
+    if (isGptImage) {
+      if (quality != null && ['low', 'medium', 'high', 'auto'].contains(quality)) {
+        payload['quality'] = quality;
+      }
+      if (transparentBackground) {
+        payload['background'] = 'transparent';
+        payload['output_format'] = 'png';
+      }
+    } else if (isDalle3) {
+      payload['response_format'] = 'b64_json';
+      if (quality != null && ['standard', 'hd'].contains(quality)) {
+        payload['quality'] = quality;
+      } else if (quality == 'high') {
+        payload['quality'] = 'hd';
+      } else {
+        payload['quality'] = 'standard';
+      }
+      if (style != null && ['vivid', 'natural'].contains(style)) {
+        payload['style'] = style;
+      }
+    } else {
+      payload['response_format'] = 'b64_json';
+    }
+
+    String? lastError;
+    try {
+      final url = Uri.parse('https://api.openai.com/v1/images/generations');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $key',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 90));
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final dataList = decoded['data'] as List<dynamic>?;
+        if (dataList != null && dataList.isNotEmpty) {
+          final first = dataList.first as Map<String, dynamic>;
+          final b64 = first['b64_json'] as String?;
+          if (b64 != null && b64.isNotEmpty) {
+            final imageBytes = base64Decode(b64);
+            await targetFile.writeAsBytes(imageBytes);
+            return AiGenerationResult(
+              success: true,
+              localFilePath: targetFile.path,
+              imageBytes: imageBytes,
+            );
+          }
+          final imgUrl = first['url'] as String?;
+          if (imgUrl != null && imgUrl.isNotEmpty) {
+            final dlRes = await http.get(Uri.parse(imgUrl)).timeout(const Duration(seconds: 30));
+            if (dlRes.statusCode == 200 && dlRes.bodyBytes.isNotEmpty) {
+              await targetFile.writeAsBytes(dlRes.bodyBytes);
+              return AiGenerationResult(
+                success: true,
+                localFilePath: targetFile.path,
+                imageBytes: dlRes.bodyBytes,
+              );
+            }
+          }
+        }
+      } else {
+        try {
+          final errJson = jsonDecode(response.body);
+          if (errJson is Map && errJson['error'] != null) {
+            final errObj = errJson['error'];
+            final msg = (errObj is Map) ? (errObj['message'] ?? response.body) : errObj.toString();
+            lastError = 'OpenAI ($targetModel error ${response.statusCode}): $msg';
+          } else {
+            lastError = 'OpenAI HTTP ${response.statusCode}: ${response.body}';
+          }
+        } catch (_) {
+          lastError = 'OpenAI HTTP ${response.statusCode}: ${response.body}';
+        }
+        debugPrint('OpenAI generation failed with $targetModel: $lastError');
+      }
+    } catch (e) {
+      lastError = 'Excepción al conectar con OpenAI ($targetModel): $e';
+      debugPrint(lastError);
+    }
+
+    return AiGenerationResult(
+      success: targetFile.existsSync(),
+      localFilePath: targetFile.path,
+      errorMessage: lastError,
+    );
   }
 
   /// Generates artwork via Google Gemini / Imagen API
