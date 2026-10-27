@@ -88,15 +88,15 @@ class GameCategory {
   };
 
   factory GameCategory.fromJson(Map<String, dynamic> json) {
-    final costStr = json['defaultCost']?.toString() ?? '3';
+    final costStr = json['defaultCost']?.toString() ?? '';
     final hasCostVal = json['hasCost'] as bool? ?? (costStr.isNotEmpty && costStr != '-');
-    final atkStr = json['defaultAttack']?.toString() ?? '0';
-    final defStr = json['defaultDefense']?.toString() ?? '0';
-    final hasCombatVal = json['hasCombatStats'] as bool? ?? true;
+    final atkStr = json['defaultAttack']?.toString() ?? '';
+    final defStr = json['defaultDefense']?.toString() ?? '';
+    final hasCombatVal = json['hasCombatStats'] as bool? ?? (atkStr.isNotEmpty || defStr.isNotEmpty);
     final rarityStr = json['defaultRarity']?.toString() ?? 'Común';
-    final hasRarityVal = json['hasRarity'] as bool? ?? true;
+    final hasRarityVal = json['hasRarity'] as bool? ?? false;
     final rulesStr = json['defaultRules']?.toString() ?? '';
-    final hasRulesVal = json['hasRules'] as bool? ?? true;
+    final hasRulesVal = json['hasRules'] as bool? ?? rulesStr.isNotEmpty;
 
     final fields = <String, String>{};
     if (json['customFields'] is Map) {

@@ -1892,6 +1892,21 @@ class EditorNotifier extends StateNotifier<EditorState> {
     if (state.project.activeRowIndex >= 0 && state.project.activeRowIndex < rows.length) {
       final updatedRow = Map<String, dynamic>.from(rows[state.project.activeRowIndex]);
       updatedRow[key] = value;
+      // Mirror title_name and card_name if appropriate
+      if (key == 'title_name' && value.toString().trim().isNotEmpty) {
+        final currentCardName = (updatedRow['card_name'] ?? '').toString().trim();
+        if (currentCardName.isEmpty ||
+            currentCardName.startsWith('Nueva') ||
+            currentCardName.startsWith('Carta') ||
+            currentCardName == '{{title_name}}' ||
+            currentCardName == '{{title}}') {
+          updatedRow['card_name'] = value.toString().trim();
+        }
+      } else if (key == 'card_name' && value.toString().trim().isNotEmpty && value.toString() != '{{title_name}}') {
+        if (updatedRow.containsKey('title_name') && (updatedRow['title_name']?.toString().trim().isEmpty ?? true)) {
+          updatedRow['title_name'] = value.toString().trim();
+        }
+      }
       rows[state.project.activeRowIndex] = updatedRow;
       state = state.copyWith(
         project: state.project.copyWith(rows: rows),
@@ -1909,6 +1924,20 @@ class EditorNotifier extends StateNotifier<EditorState> {
         project: state.project.copyWith(rows: rows),
       );
       final game = (row['game'] ?? '').toString();
+      _persistWorkspace(syncGameName: game);
+    }
+  }
+
+  void updateRowData(int index, String key, dynamic value) {
+    final rows = List<Map<String, dynamic>>.from(state.project.rows);
+    if (index >= 0 && index < rows.length) {
+      final updatedRow = Map<String, dynamic>.from(rows[index]);
+      updatedRow[key] = value;
+      rows[index] = updatedRow;
+      state = state.copyWith(
+        project: state.project.copyWith(rows: rows),
+      );
+      final game = (updatedRow['game'] ?? '').toString();
       _persistWorkspace(syncGameName: game);
     }
   }
@@ -2169,6 +2198,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'card_name': cardName ?? (isCategoryDefault ? '${category.name} (Modelo)' : 'Nueva ${category.name}'),
       'game': gameName,
       'category': category.name,
+      'card_status': isCategoryDefault ? 'Muestra' : 'Definitiva',
       'qty': '1',
       'cost': finalCost,
       'type': finalType,
@@ -2178,7 +2208,24 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'creator': 'Grimoire Studio',
       'icon': category.icon.isNotEmpty ? category.icon : '🃏',
       'art_color': category.defaultColor,
-      'art_url': baseCard?['art_url'] ?? '',
+      'art_url': (baseCard?['art_url']?.toString().trim().isNotEmpty ?? false)
+          ? baseCard!['art_url'].toString().trim()
+          : () {
+              final tplToCheck = state.project.templates.firstWhere(
+                (t) => t.id == assignedTemplateId,
+                orElse: () => state.project.activeTemplate,
+              );
+              final imgL = [...tplToCheck.layers, ...tplToCheck.backLayers].cast<LayerItem>().firstWhere(
+                (l) => (l.type == LayerType.image || l.bindingKey == 'art_url') && (l.imagePath ?? '').trim().isNotEmpty,
+                orElse: () => const LayerItem(id: '', name: '', type: LayerType.image),
+              );
+              if ((imgL.imagePath ?? '').trim().isNotEmpty) {
+                String norm = imgL.imagePath!.trim().replaceAll('\\', '/');
+                final aIdx = norm.indexOf('assets/');
+                return aIdx != -1 ? norm.substring(aIdx) : norm;
+              }
+              return '';
+            }(),
       'prompt': '',
       'rules_text': finalRules,
       'rules': finalRules,
@@ -2190,6 +2237,22 @@ class EditorNotifier extends StateNotifier<EditorState> {
       newCard[k] = v;
     });
 
+    // Initialize any dynamic variables present in the template
+    for (final v in state.project.getAllTemplateVariables()) {
+      if (!GameFolderService.internalKeys.contains(v) && !newCard.containsKey(v)) {
+        if (v == 'title_name' || v == 'title' || v == 'titulo') {
+          newCard[v] = newCard['card_name'];
+        } else {
+          final matchingLayer = state.project.templates
+              .expand((t) => [...t.layers, ...t.backLayers])
+              .firstWhere(
+                (l) => l.bindingKey == v && l.type == LayerType.text && l.text.trim().isNotEmpty && !l.text.contains('{{$v}}'),
+                orElse: () => const LayerItem(id: '', name: '', type: LayerType.text),
+              );
+          newCard[v] = matchingLayer.text.trim().isNotEmpty ? matchingLayer.text : '';
+        }
+      }
+    }
     addRow(newCard);
   }
 
@@ -2819,6 +2882,7 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'card_name': cardName ?? 'Carta Normal ($gameName)',
       'game': gameName,
       'category': finalCatName.isNotEmpty ? finalCatName : 'General',
+      'card_status': 'Definitiva',
       'qty': '1',
       'cost': finalCost,
       'type': finalType.isNotEmpty ? finalType : 'Carta Normal',
@@ -2831,9 +2895,36 @@ class EditorNotifier extends StateNotifier<EditorState> {
       'creator': 'Grimoire Studio',
       'icon': finalIcon.isNotEmpty ? finalIcon : '🃏',
       'art_color': finalColor,
-      'art_url': '',
+      'art_url': (modelCard?['art_url']?.toString().trim().isNotEmpty ?? false)
+          ? modelCard!['art_url'].toString().trim()
+          : () {
+              final imgL = [...sourceTpl.layers, ...sourceTpl.backLayers].cast<LayerItem>().firstWhere(
+                (l) => (l.type == LayerType.image || l.bindingKey == 'art_url') && (l.imagePath ?? '').trim().isNotEmpty,
+                orElse: () => const LayerItem(id: '', name: '', type: LayerType.image),
+              );
+              if ((imgL.imagePath ?? '').trim().isNotEmpty) {
+                String norm = imgL.imagePath!.trim().replaceAll('\\', '/');
+                final aIdx = norm.indexOf('assets/');
+                return aIdx != -1 ? norm.substring(aIdx) : norm;
+              }
+              return '';
+            }(),
       'prompt': '',
     };
+    // Initialize any dynamic variables present in the template
+    for (final v in sourceTpl.getReferencedVariables()) {
+      if (!GameFolderService.internalKeys.contains(v) && !newCard.containsKey(v)) {
+        if (v == 'title_name' || v == 'title' || v == 'titulo') {
+          newCard[v] = newCard['card_name'];
+        } else {
+          final matchingLayer = [...sourceTpl.layers, ...sourceTpl.backLayers].firstWhere(
+            (l) => l.bindingKey == v && l.type == LayerType.text && l.text.trim().isNotEmpty && !l.text.contains('{{$v}}'),
+            orElse: () => const LayerItem(id: '', name: '', type: LayerType.text),
+          );
+          newCard[v] = matchingLayer.text.trim().isNotEmpty ? matchingLayer.text : '';
+        }
+      }
+    }
     addRow(newCard);
   }
 
@@ -3481,9 +3572,34 @@ class EditorNotifier extends StateNotifier<EditorState> {
         ? template.copyWith(layers: updatedLayers)
         : template.copyWith(backLayers: updatedLayers);
 
+    // Also synchronize asset path to active row data if layer has bindingKey or is image
+    final targetLayer = layers.firstWhere(
+      (l) => l.id == layerId,
+      orElse: () => const LayerItem(id: '', name: '', type: LayerType.image),
+    );
+    final bindKey = targetLayer.bindingKey.isNotEmpty
+        ? targetLayer.bindingKey
+        : (targetLayer.type == LayerType.image ? 'art_url' : '');
+
+    List<Map<String, dynamic>> updatedRows = state.project.rows;
+    if (bindKey.isNotEmpty &&
+        state.project.activeRowIndex >= 0 &&
+        state.project.activeRowIndex < state.project.rows.length) {
+      String norm = assetRelativePath.replaceAll('\\', '/');
+      final aIdx = norm.indexOf('assets/');
+      if (aIdx != -1) norm = norm.substring(aIdx);
+
+      final currentRows = List<Map<String, dynamic>>.from(state.project.rows);
+      final r = Map<String, dynamic>.from(currentRows[state.project.activeRowIndex]);
+      r[bindKey] = norm;
+      currentRows[state.project.activeRowIndex] = r;
+      updatedRows = currentRows;
+    }
+
     state = state.copyWith(
       project: state.project.copyWith(
         templates: state.project.templates.map((t) => t.id == updatedTemplate.id ? updatedTemplate : t).toList(),
+        rows: updatedRows,
       ),
     );
     _persistWorkspace();
@@ -3516,9 +3632,29 @@ class EditorNotifier extends StateNotifier<EditorState> {
         ? template.copyWith(layers: updatedLayers)
         : template.copyWith(backLayers: updatedLayers);
 
+    final targetLayer = layers.firstWhere(
+      (l) => l.id == layerId,
+      orElse: () => const LayerItem(id: '', name: '', type: LayerType.image),
+    );
+    final bindKey = targetLayer.bindingKey.isNotEmpty
+        ? targetLayer.bindingKey
+        : (targetLayer.type == LayerType.image ? 'art_url' : '');
+
+    List<Map<String, dynamic>> updatedRows = state.project.rows;
+    if (bindKey.isNotEmpty &&
+        state.project.activeRowIndex >= 0 &&
+        state.project.activeRowIndex < state.project.rows.length) {
+      final currentRows = List<Map<String, dynamic>>.from(state.project.rows);
+      final r = Map<String, dynamic>.from(currentRows[state.project.activeRowIndex]);
+      r[bindKey] = '';
+      currentRows[state.project.activeRowIndex] = r;
+      updatedRows = currentRows;
+    }
+
     state = state.copyWith(
       project: state.project.copyWith(
         templates: state.project.templates.map((t) => t.id == updatedTemplate.id ? updatedTemplate : t).toList(),
+        rows: updatedRows,
       ),
     );
     _persistWorkspace();
@@ -3713,6 +3849,102 @@ class EditorNotifier extends StateNotifier<EditorState> {
     }
 
     return templates.isNotEmpty ? templates.first : state.project.activeTemplate;
+  }
+
+  /// Synchronizes all dynamic template variables (bindingKey and {{variable}}) across rows.
+  /// Ensures that columns defined in layer templates exist in every card's dictionary,
+  /// enabling rapid data manipulation in CSV and data tables.
+  void syncTemplateVariablesToRows() {
+    final vars = state.project.getAllTemplateVariables();
+    if (vars.isEmpty && state.project.rows.isEmpty) return;
+
+    bool changed = false;
+    final updatedRows = state.project.rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      final cardTpl = resolveTemplateForRow(map);
+      final cardLayers = [...cardTpl.layers, ...cardTpl.backLayers];
+
+      for (final v in vars) {
+        if (GameFolderService.internalKeys.contains(v)) continue;
+
+        final currentValue = map[v]?.toString().trim() ?? '';
+        final isMissingOrEmpty = !map.containsKey(v) || currentValue.isEmpty;
+
+        if (isMissingOrEmpty) {
+          // If the variable is a title alias and card_name is populated, mirror it
+          if ((v == 'title_name' || v == 'title' || v == 'titulo') &&
+              (map['card_name']?.toString().trim().isNotEmpty ?? false) &&
+              map['card_name'].toString().trim() != '{{title_name}}') {
+            map[v] = map['card_name'];
+            changed = true;
+          } else {
+            // Look for matching layer in card's own template first, then any template
+            LayerItem? matchingLayer = cardLayers.where((l) => l.bindingKey == v).firstOrNull;
+            matchingLayer ??= state.project.templates
+                .expand((t) => [...t.layers, ...t.backLayers])
+                .firstWhere(
+                  (l) => l.bindingKey == v,
+                  orElse: () => const LayerItem(id: '', name: '', type: LayerType.text),
+                );
+
+            if (matchingLayer.type == LayerType.image) {
+              final rawPath = (matchingLayer.imagePath ?? '').trim();
+              if (rawPath.isNotEmpty) {
+                String norm = rawPath.replaceAll('\\', '/');
+                final aIdx = norm.indexOf('assets/');
+                if (aIdx != -1) norm = norm.substring(aIdx);
+                map[v] = norm;
+                changed = true;
+              } else if (!map.containsKey(v)) {
+                map[v] = '';
+                changed = true;
+              }
+            } else if (matchingLayer.type == LayerType.text &&
+                       matchingLayer.text.trim().isNotEmpty &&
+                       !matchingLayer.text.contains('{{$v}}')) {
+              map[v] = matchingLayer.text.trim();
+              changed = true;
+            } else if (!map.containsKey(v)) {
+              map[v] = '';
+              changed = true;
+            }
+          }
+        }
+      }
+
+      // If art_url exists or is in vars but is empty, try to resolve from template's image layers
+      final artVal = map['art_url']?.toString().trim() ?? '';
+      if (artVal.isEmpty) {
+        final imgL = cardLayers.firstWhere(
+          (l) => (l.type == LayerType.image || l.bindingKey == 'art_url') && (l.imagePath ?? '').trim().isNotEmpty,
+          orElse: () => const LayerItem(id: '', name: '', type: LayerType.image),
+        );
+        if ((imgL.imagePath ?? '').trim().isNotEmpty) {
+          String norm = imgL.imagePath!.trim().replaceAll('\\', '/');
+          final aIdx = norm.indexOf('assets/');
+          if (aIdx != -1) norm = norm.substring(aIdx);
+          map['art_url'] = norm;
+          changed = true;
+        }
+      }
+
+      // If card_name was literally set to {{title_name}}, clean it
+      if (map['card_name'] == '{{title_name}}' || map['card_name'] == '{{title}}') {
+        final fallback = (map['title_name']?.toString().trim().isNotEmpty ?? false)
+            ? map['title_name']
+            : (map['category']?.toString().isNotEmpty == true ? 'Nueva ${map['category']}' : 'Nueva Carta');
+        map['card_name'] = fallback;
+        changed = true;
+      }
+      return map;
+    }).toList();
+
+    if (changed) {
+      state = state.copyWith(
+        project: state.project.copyWith(rows: updatedRows),
+      );
+      _persistWorkspace();
+    }
   }
 
   // --- DATABASE COLUMN MANAGEMENT ---

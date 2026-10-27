@@ -838,16 +838,66 @@ class InspectorPanel extends ConsumerWidget {
         _buildSectionHeader(ref.tr('databinding_token')),
         const SizedBox(height: 8),
         TextFormField(
-          key: ValueKey('binding_${layer.id}'),
+          key: ValueKey('binding_${layer.id}_${layer.bindingKey}'),
           initialValue: layer.bindingKey,
           style: const TextStyle(fontSize: 12, color: Colors.white, fontFamily: 'monospace'),
           decoration: InputDecoration(
             labelText: ref.tr('variable_key'),
             hintText: ref.tr('variable_key_hint'),
             isDense: true,
+            suffixIcon: layer.bindingKey.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 14, color: GrimoireTheme.textMuted),
+                    onPressed: () {
+                      ref.read(editorProvider.notifier).updateLayer(layer.copyWith(bindingKey: ''));
+                    },
+                  )
+                : null,
           ),
           onChanged: (val) {
             ref.read(editorProvider.notifier).updateLayer(layer.copyWith(bindingKey: val.trim()));
+          },
+        ),
+        const SizedBox(height: 6),
+        Builder(
+          builder: (context) {
+            final editorState = ref.watch(editorProvider);
+            final vars = <String>{
+              'card_name',
+              'art_url',
+              'title_name',
+              ...editorState.project.getAllTemplateVariables(),
+              if (editorState.project.rows.isNotEmpty)
+                ...editorState.project.rows.first.keys.where((k) => !GameFolderService.internalKeys.contains(k)),
+            }.where((k) => k != layer.bindingKey && k.isNotEmpty).take(8).toList();
+
+            if (vars.isEmpty) return const SizedBox.shrink();
+
+            return Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final v in vars)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: () {
+                      ref.read(editorProvider.notifier).updateLayer(layer.copyWith(bindingKey: v));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: GrimoireTheme.surfaceElevated,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: GrimoireTheme.borderSubtle),
+                      ),
+                      child: Text(
+                        '{{$v}}',
+                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: GrimoireTheme.accentIndigo),
+                      ),
+                    ),
+                  ),
+              ],
+            );
           },
         ),
 
@@ -1022,6 +1072,10 @@ class InspectorPanel extends ConsumerWidget {
             },
             allowTransparent: false,
           ),
+          const SizedBox(height: 12),
+          _buildTextStrokeSection(context, ref, layer),
+          const SizedBox(height: 12),
+          _buildInlineTokensHelperSection(context, ref, layer),
         ],
 
         // ============================================================
@@ -4280,6 +4334,132 @@ class InspectorPanel extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildTextStrokeSection(BuildContext context, WidgetRef ref, LayerItem layer) {
+    final strokeW = layer.textStrokeWidth;
+    final strokeCol = layer.textStrokeColor;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161928),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.accentPurple.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.border_color_outlined, size: 14, color: GrimoireTheme.accentPurple),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Contorno TCG (Stroke)',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${strokeW.toStringAsFixed(1)} px',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GrimoireTheme.accentPurple),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              trackHeight: 3,
+            ),
+            child: Slider(
+              value: strokeW,
+              min: 0.0,
+              max: 6.0,
+              divisions: 12,
+              activeColor: GrimoireTheme.accentPurple,
+              inactiveColor: const Color(0xFF23283E),
+              onChanged: (val) {
+                ref.read(editorProvider.notifier).updateLayer(layer.copyWith(textStrokeWidth: val));
+              },
+            ),
+          ),
+          if (strokeW > 0.0) ...[
+            const SizedBox(height: 6),
+            _buildColorPickerSection(
+              context,
+              ref,
+              title: 'Color del Contorno',
+              currentColor: strokeCol,
+              onChanged: (col) {
+                ref.read(editorProvider.notifier).updateLayer(layer.copyWith(textStrokeColor: col));
+              },
+              allowTransparent: false,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineTokensHelperSection(BuildContext context, WidgetRef ref, LayerItem layer) {
+    const tokens = ['{T}', '{1}', '{2}', '{fire}', '{water}', '{skull}', '{sword}', '{shield}', '{heart}', '{star}', '{action}'];
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131524),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: GrimoireTheme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 14, color: GrimoireTheme.accentGold),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Incrustar Símbolos TCG',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Haz clic en cualquier token para insertarlo en el texto de esta capa:',
+            style: TextStyle(fontSize: 9.5, color: GrimoireTheme.textMuted),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: tokens.map((tk) {
+              return ActionChip(
+                backgroundColor: const Color(0xFF1E2238),
+                side: const BorderSide(color: Color(0xFF333A58)),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                label: Text(tk, style: const TextStyle(fontSize: 10.5, color: Color(0xFF93C5FD), fontFamily: 'monospace')),
+                onPressed: () {
+                  final newText = '${layer.text} $tk'.trim();
+                  ref.read(editorProvider.notifier).updateLayer(layer.copyWith(text: newText));
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AddEnumOptionWidget extends StatefulWidget {
@@ -5011,4 +5191,3 @@ class _AssetInspectorWidgetState extends ConsumerState<AssetInspectorWidget> {
     );
   }
 }
-

@@ -269,3 +269,88 @@ class BattleLogEntry {
     return '$h:$m:$s';
   }
 }
+
+class CustomPlaymatConfig {
+  final bool isEnabled;
+  final String? imagePath;
+  final BoxFit fit;
+  final double overlayDim; // 0.0 to 0.8
+  final bool showDivisionLines;
+  final double divisionLinesOpacity; // 0.1 to 1.0
+  final Color accentColor;
+  final double tableWidth;
+  final double tableHeight;
+
+  const CustomPlaymatConfig({
+    this.isEnabled = false,
+    this.imagePath,
+    this.fit = BoxFit.cover,
+    this.overlayDim = 0.2,
+    this.showDivisionLines = true,
+    this.divisionLinesOpacity = 0.7,
+    this.accentColor = const Color(0xFF8B5CF6),
+    this.tableWidth = 2200.0,
+    this.tableHeight = 1400.0,
+  });
+
+  CustomPlaymatConfig copyWith({
+    bool? isEnabled,
+    String? imagePath,
+    bool clearImagePath = false,
+    BoxFit? fit,
+    double? overlayDim,
+    bool? showDivisionLines,
+    double? divisionLinesOpacity,
+    Color? accentColor,
+    double? tableWidth,
+    double? tableHeight,
+  }) {
+    return CustomPlaymatConfig(
+      isEnabled: isEnabled ?? this.isEnabled,
+      imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
+      fit: fit ?? this.fit,
+      overlayDim: overlayDim ?? this.overlayDim,
+      showDivisionLines: showDivisionLines ?? this.showDivisionLines,
+      divisionLinesOpacity: divisionLinesOpacity ?? this.divisionLinesOpacity,
+      accentColor: accentColor ?? this.accentColor,
+      tableWidth: tableWidth ?? this.tableWidth,
+      tableHeight: tableHeight ?? this.tableHeight,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'isEnabled': isEnabled,
+    'imagePath': imagePath,
+    'fit': fit.name,
+    'overlayDim': overlayDim,
+    'showDivisionLines': showDivisionLines,
+    'divisionLinesOpacity': divisionLinesOpacity,
+    'accentColor': accentColor.toARGB32(),
+    'tableWidth': tableWidth,
+    'tableHeight': tableHeight,
+  };
+
+  factory CustomPlaymatConfig.fromJson(Map<String, dynamic> json) {
+    BoxFit parsedFit = BoxFit.cover;
+    if (json['fit'] != null) {
+      parsedFit = BoxFit.values.firstWhere(
+        (e) => e.name == json['fit'],
+        orElse: () => BoxFit.cover,
+      );
+    }
+    return CustomPlaymatConfig(
+      isEnabled: json['isEnabled'] as bool? ?? false,
+      imagePath: json['imagePath'] as String?,
+      fit: parsedFit,
+      overlayDim: (json['overlayDim'] as num?)?.toDouble() ?? 0.2,
+      showDivisionLines: json['showDivisionLines'] as bool? ?? true,
+      divisionLinesOpacity: (json['divisionLinesOpacity'] as num?)?.toDouble() ?? 0.7,
+      accentColor: json['accentColor'] != null
+          ? Color(json['accentColor'] as int)
+          : const Color(0xFF8B5CF6),
+      tableWidth: (json['tableWidth'] as num?)?.toDouble() ?? 2200.0,
+      tableHeight: (json['tableHeight'] as num?)?.toDouble() ?? 1400.0,
+    );
+  }
+}
+

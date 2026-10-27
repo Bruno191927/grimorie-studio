@@ -17,6 +17,9 @@ enum ExportFormat {
   tabletopSimulator,
   pngZip,
   grimoirePackage,
+  theGameCrafter,
+  makePlayingCards,
+  screentopGg,
 }
 
 class ExportOptionsDialog extends ConsumerStatefulWidget {
@@ -55,6 +58,7 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
   bool _includeBacks = true;
   bool _useUsLetter = false;
   bool _respectQuantityColumn = true;
+  bool _onlyDefinitiveCards = false;
   bool _isProcessing = false;
   String _statusMessage = '';
   double _progress = 0.0;
@@ -118,14 +122,26 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
       final targetRows = widget.filterGame == null || widget.filterGame == 'All'
           ? allRows
           : allRows.where((r) => (r['game'] ?? '').toString().toLowerCase() == widget.filterGame!.toLowerCase()).toList();
-      final rowsToRender = targetRows.isEmpty ? allRows : targetRows;
+      var rowsToRender = targetRows.isEmpty ? allRows : targetRows;
+      if (_onlyDefinitiveCards) {
+        final defOnly = rowsToRender
+            .where((r) => (r['card_status'] ?? 'Definitiva').toString().toLowerCase() != 'muestra')
+            .toList();
+        if (defOnly.isNotEmpty) {
+          rowsToRender = defOnly;
+        }
+      }
 
       final cardImages = <Uint8List>[];
       final expandedCardNames = <String>[];
       Uint8List? backImageBytes;
 
       // 1. Capture Back Face using the dialog's dedicated RepaintBoundary
-      if (_includeBacks || _selectedFormat == ExportFormat.tabletopSimulator) {
+      if (_includeBacks ||
+          _selectedFormat == ExportFormat.tabletopSimulator ||
+          _selectedFormat == ExportFormat.theGameCrafter ||
+          _selectedFormat == ExportFormat.makePlayingCards ||
+          _selectedFormat == ExportFormat.screentopGg) {
         setState(() {
           _statusMessage = 'Renderizando reverso de carta (300 DPI)...';
           _currentRenderingRow = rowsToRender.isNotEmpty ? rowsToRender.first : {};
@@ -242,6 +258,39 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
             zipName: '${deckName}_PNG_Cards',
           );
           resultPath = zipFile.path;
+          break;
+
+        case ExportFormat.theGameCrafter:
+          final tgcFile = await ExportService.exportTheGameCrafterPackage(
+            cardImages: cardImages,
+            cardNames: expandedCardNames,
+            defaultBackImage: backImageBytes,
+            cardRows: rowsToRender,
+            deckName: deckName,
+          );
+          resultPath = tgcFile.path;
+          break;
+
+        case ExportFormat.makePlayingCards:
+          final mpcFile = await ExportService.exportMakePlayingCardsPackage(
+            cardImages: cardImages,
+            cardNames: expandedCardNames,
+            defaultBackImage: backImageBytes,
+            cardRows: rowsToRender,
+            deckName: deckName,
+          );
+          resultPath = mpcFile.path;
+          break;
+
+        case ExportFormat.screentopGg:
+          final screentopFile = await ExportService.exportScreentopGgPackage(
+            cardImages: cardImages,
+            cardNames: expandedCardNames,
+            backImage: backImageBytes,
+            cardRows: rowsToRender,
+            deckName: deckName,
+          );
+          resultPath = screentopFile.path;
           break;
 
         case ExportFormat.grimoirePackage:
@@ -404,6 +453,27 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       ),
                       const SizedBox(width: 6),
                       _buildFormatTab(
+                        format: ExportFormat.theGameCrafter,
+                        title: 'TGC (825x1125)',
+                        icon: Icons.precision_manufacturing_outlined,
+                        color: const Color(0xFFF97316),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.makePlayingCards,
+                        title: 'MPC (816x1110)',
+                        icon: Icons.print_outlined,
+                        color: const Color(0xFF38BDF8),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
+                        format: ExportFormat.screentopGg,
+                        title: 'Screentop.gg',
+                        icon: Icons.grid_view_rounded,
+                        color: const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildFormatTab(
                         format: ExportFormat.tabletopSimulator,
                         title: ref.tr('format_tts'),
                         icon: Icons.casino,
@@ -472,6 +542,14 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
                     ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets para imprimir solo tu mazo final',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.filter_alt_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
+                    ),
                   ] else if (_selectedFormat == ExportFormat.pdfPrint) ...[
                     _buildSwitchOption(
                       title: ref.tr('option_bleed'),
@@ -495,6 +573,14 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       value: _includeBacks,
                       icon: Icons.flip,
                       onChanged: _isProcessing ? null : (v) => setState(() => _includeBacks = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets para imprimir solo tu mazo final',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.filter_alt_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
                     ),
                     const SizedBox(height: 12),
                     _buildPreflightChecklist(project),
@@ -586,6 +672,140 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
                     ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets para imprimir solo tu mazo final',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.filter_alt_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.theGameCrafter) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A130D),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.precision_manufacturing_outlined, color: Color(0xFFF97316), size: 18),
+                              SizedBox(width: 8),
+                              Text('The Game Crafter (TGC) - Especificación Poker', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Genera imágenes a 825 x 1125 px @ 300 DPI con 36px de sangrado (bleed) exacto para cartas Poker de The Game Crafter, junto con el manifiesto thegamecrafter_manifest.json y guía paso a paso.',
+                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.verified_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.makePlayingCards) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C1929),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.print_outlined, color: Color(0xFF38BDF8), size: 18),
+                              SizedBox(width: 8),
+                              Text('MakePlayingCards (MPC) - Poker 63x88mm', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Exporta las cartas a 816 x 1110 px @ 300 DPI en carpetas frontales y traseras, con archivo mpc_order_guide.txt listo para importar en el creador masivo de MPC.',
+                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.verified_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
+                    ),
+                  ] else if (_selectedFormat == ExportFormat.screentopGg) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF092318),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.grid_view_rounded, color: Color(0xFF10B981), size: 18),
+                              SizedBox(width: 8),
+                              Text('Screentop.gg - Hojas Sprite & Descriptor JSON', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Genera sprite sheets en cuadrícula (grid) optimizadas para el navegador, reversos comunes y screentop_asset.json para crear componentes de carta en Screentop.gg al instante.',
+                            style: TextStyle(fontSize: 12, color: GrimoireTheme.textSecondary, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: ref.tr('multiply_by_qty'),
+                      description: ref.tr('multiply_by_qty_desc'),
+                      value: _respectQuantityColumn,
+                      icon: Icons.copy_all,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.verified_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
+                    ),
                   ] else if (_selectedFormat == ExportFormat.tabletopSimulator) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -649,6 +869,14 @@ class _ExportOptionsDialogState extends ConsumerState<ExportOptionsDialog> {
                       value: _respectQuantityColumn,
                       icon: Icons.copy_all,
                       onChanged: _isProcessing ? null : (v) => setState(() => _respectQuantityColumn = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSwitchOption(
+                      title: 'Solo cartas definitivas',
+                      description: 'Omite cartas de muestra o presets para imprimir solo tu mazo final',
+                      value: _onlyDefinitiveCards,
+                      icon: Icons.filter_alt_outlined,
+                      onChanged: _isProcessing ? null : (v) => setState(() => _onlyDefinitiveCards = v),
                     ),
                   ] else if (_selectedFormat == ExportFormat.grimoirePackage) ...[
                     Container(

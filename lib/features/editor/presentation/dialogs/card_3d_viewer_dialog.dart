@@ -31,6 +31,7 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
   // Effects state
   bool _enableFoil = true;
   double _foilIntensity = 0.65;
+  String _foilStyle = 'rainbow'; // rainbow, gold, cosmic
   bool _enableLinen = true;
   double _linenOpacity = 0.35;
   bool _autoShowcase = false;
@@ -307,15 +308,33 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
                             gradient: LinearGradient(
                               begin: lightAlignment,
                               end: Alignment(-lightAlignment.x, -lightAlignment.y),
-                              colors: [
-                                Colors.transparent,
-                                const Color(0x66FF0055).withValues(alpha: 0.25 * _foilIntensity),
-                                const Color(0x889900FF).withValues(alpha: 0.35 * _foilIntensity),
-                                const Color(0xAA00DDFF).withValues(alpha: 0.45 * _foilIntensity),
-                                const Color(0xAA00FF99).withValues(alpha: 0.35 * _foilIntensity),
-                                const Color(0x88FFAA00).withValues(alpha: 0.30 * _foilIntensity),
-                                Colors.transparent,
-                              ],
+                              colors: _foilStyle == 'gold'
+                                  ? [
+                                      Colors.transparent,
+                                      const Color(0x66B45309).withValues(alpha: 0.30 * _foilIntensity),
+                                      const Color(0xAAFEF08A).withValues(alpha: 0.50 * _foilIntensity),
+                                      const Color(0xEEF59E0B).withValues(alpha: 0.60 * _foilIntensity),
+                                      const Color(0xAAFEF08A).withValues(alpha: 0.45 * _foilIntensity),
+                                      Colors.transparent,
+                                    ]
+                                  : (_foilStyle == 'cosmic'
+                                      ? [
+                                          Colors.transparent,
+                                          const Color(0x668B5CF6).withValues(alpha: 0.35 * _foilIntensity),
+                                          const Color(0xAA06B6D4).withValues(alpha: 0.45 * _foilIntensity),
+                                          const Color(0xAAEC4899).withValues(alpha: 0.45 * _foilIntensity),
+                                          const Color(0x663B82F6).withValues(alpha: 0.30 * _foilIntensity),
+                                          Colors.transparent,
+                                        ]
+                                      : [
+                                          Colors.transparent,
+                                          const Color(0x66FF0055).withValues(alpha: 0.25 * _foilIntensity),
+                                          const Color(0x889900FF).withValues(alpha: 0.35 * _foilIntensity),
+                                          const Color(0xAA00DDFF).withValues(alpha: 0.45 * _foilIntensity),
+                                          const Color(0xAA00FF99).withValues(alpha: 0.35 * _foilIntensity),
+                                          const Color(0x88FFAA00).withValues(alpha: 0.30 * _foilIntensity),
+                                          Colors.transparent,
+                                        ]),
                               stops: const [0.0, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0],
                             ),
                             backgroundBlendMode: BlendMode.colorDodge,
@@ -433,7 +452,7 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
               ),
               if (_enableFoil) ...[
                 SizedBox(
-                  width: 90,
+                  width: 80,
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 2,
@@ -447,6 +466,21 @@ class _Card3DViewerDialogState extends State<Card3DViewerDialog>
                       onChanged: (val) => setState(() => _foilIntensity = val),
                     ),
                   ),
+                ),
+                const SizedBox(width: 4),
+                DropdownButton<String>(
+                  value: _foilStyle,
+                  dropdownColor: const Color(0xFF1E2238),
+                  underline: const SizedBox(),
+                  style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                  items: const [
+                    DropdownMenuItem(value: 'rainbow', child: Text('🌈 Arcoíris')),
+                    DropdownMenuItem(value: 'gold', child: Text('✨ Oro Secreto')),
+                    DropdownMenuItem(value: 'cosmic', child: Text('🔮 Cósmico')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _foilStyle = val);
+                  },
                 ),
               ],
             ],

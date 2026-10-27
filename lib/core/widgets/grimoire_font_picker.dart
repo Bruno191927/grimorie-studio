@@ -108,15 +108,17 @@ class GrimoireFontHelper {
     required double fontSize,
     bool isBold = false,
     bool isItalic = false,
-    Color color = Colors.white,
+    Color? color = Colors.white,
     double letterSpacing = 0.2,
+    Paint? foreground,
   }) {
     final trimmed = fontFamily.trim().isEmpty ? 'Inter' : fontFamily.trim();
     final baseStyle = TextStyle(
       fontSize: fontSize,
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
       fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-      color: color,
+      color: foreground != null ? null : color,
+      foreground: foreground,
       letterSpacing: letterSpacing,
     );
 

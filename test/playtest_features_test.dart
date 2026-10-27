@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grimoire_studio/core/localization/app_strings.dart';
 import 'package:grimoire_studio/features/playtest/models/playtest_models.dart';
+import 'package:grimoire_studio/features/playtest/services/playmat_service.dart';
 import 'package:grimoire_studio/features/playtest/presentation/screens/playtest_screen.dart';
 import 'package:grimoire_studio/features/export/services/export_service.dart';
 
@@ -197,6 +198,64 @@ void main() {
 
       // Verify Center Hub reflects 6 players
       expect(find.text(AppStrings.get(AppLanguage.en, 'common_area')), findsOneWidget);
+    });
+
+    test('9. CustomPlaymatConfig serializes and deserializes properly and PlaymatService handles persistence', () async {
+      const config = CustomPlaymatConfig(
+        isEnabled: true,
+        imagePath: '/path/to/playmat.png',
+        fit: BoxFit.contain,
+        overlayDim: 0.35,
+        showDivisionLines: false,
+        divisionLinesOpacity: 0.5,
+        tableWidth: 2400.0,
+        tableHeight: 1600.0,
+      );
+
+      final json = config.toJson();
+      expect(json['isEnabled'], isTrue);
+      expect(json['imagePath'], '/path/to/playmat.png');
+      expect(json['fit'], 'contain');
+      expect(json['overlayDim'], 0.35);
+      expect(json['showDivisionLines'], isFalse);
+      expect(json['tableWidth'], 2400.0);
+      expect(json['tableHeight'], 1600.0);
+
+      final restored = CustomPlaymatConfig.fromJson(json);
+      expect(restored.isEnabled, isTrue);
+      expect(restored.imagePath, '/path/to/playmat.png');
+      expect(restored.fit, BoxFit.contain);
+      expect(restored.overlayDim, 0.35);
+      expect(restored.showDivisionLines, isFalse);
+      expect(restored.tableWidth, 2400.0);
+      expect(restored.tableHeight, 1600.0);
+
+      // Verify PlaymatService config file generation
+      final file = PlaymatService.getConfigFile('TestGame');
+      expect(file.path.contains('TestGame'), isTrue);
+      expect(file.path.endsWith('playmat_config.json'), isTrue);
+    });
+
+    testWidgets('10. PlaytestScreen renders custom playmat toolbar button', (tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: PlaytestScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Custom Playmat icon button exists in toolbar
+      final playmatButton = find.byTooltip('Subir Mesa de Juego Personalizada (Tapete)');
+      expect(playmatButton, findsOneWidget);
     });
   });
 }

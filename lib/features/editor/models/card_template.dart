@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:grimoire_studio/core/utils/template_parser.dart';
 import 'layer_item.dart';
 
 enum CardSide {
@@ -34,6 +35,21 @@ class CardTemplate {
   Color getBackgroundColor(CardSide side) => side == CardSide.front ? backgroundColor : backBackgroundColor;
 
   String? getBackgroundImage(CardSide side) => side == CardSide.front ? backgroundImage : backBackgroundImage;
+
+  /// Returns all dynamic variable keys referenced across layers in this template
+  Set<String> getReferencedVariables() {
+    final vars = <String>{};
+    for (final layer in [...layers, ...backLayers]) {
+      final b = layer.bindingKey.trim();
+      if (b.isNotEmpty) {
+        vars.add(b);
+      }
+      if (layer.type == LayerType.text && layer.text.isNotEmpty) {
+        vars.addAll(TemplateParser.extractKeys(layer.text));
+      }
+    }
+    return vars;
+  }
 
   CardTemplate copyWith({
     String? id,

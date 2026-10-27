@@ -10,6 +10,9 @@ import 'features/editor/presentation/screens/editor_screen.dart';
 import 'features/gallery/presentation/screens/card_gallery_screen.dart';
 import 'features/database/presentation/widgets/data_table_view.dart';
 import 'features/playtest/presentation/screens/playtest_screen.dart';
+import 'features/analytics/presentation/screens/game_balance_dashboard.dart';
+import 'features/rulebook/presentation/screens/rulebook_editor_screen.dart';
+
 import 'features/editor/presentation/providers/editor_provider.dart';
 import 'core/localization/locale_provider.dart';
 import 'core/localization/language_selector.dart';
@@ -149,6 +152,8 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
         const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => setState(() => _currentTab = 1),
         const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => setState(() => _currentTab = 2),
         const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => setState(() => _currentTab = 3),
+        const SingleActivator(LogicalKeyboardKey.digit5, control: true): () => setState(() => _currentTab = 4),
+        const SingleActivator(LogicalKeyboardKey.digit6, control: true): () => setState(() => _currentTab = 5),
       },
       child: Focus(
         autofocus: true,
@@ -233,6 +238,10 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
                                     _buildNavTab(2, ref.tr('nav_database'), Icons.table_chart_outlined),
                                     const SizedBox(width: 6),
                                     _buildNavTab(3, ref.tr('nav_playtest'), Icons.casino_outlined),
+                                    const SizedBox(width: 6),
+                                    _buildNavTab(4, ref.tr('nav_analytics'), Icons.auto_graph_rounded),
+                                    const SizedBox(width: 6),
+                                    _buildNavTab(5, ref.tr('nav_rulebook'), Icons.menu_book_rounded),
                                   ],
                                 ),
                               ],
@@ -356,6 +365,17 @@ class _GrimoireMainShellState extends ConsumerState<GrimoireMainShell> {
 
                     // 3: Tabletop Playtesting Mat
                     const PlaytestScreen(),
+
+                    // 4: Game Balance & Deck Analytics Dashboard
+                    GameBalanceDashboard(
+                      onOpenEditor: () {
+                        ref.read(editorProvider.notifier).syncActiveTemplateWithActiveRow();
+                        setState(() => _currentTab = 1);
+                      },
+                    ),
+
+                    // 5: Rulebook Builder (Official Game Rules Booklet)
+                    const RulebookEditorScreen(),
                   ],
                 ),
               ),

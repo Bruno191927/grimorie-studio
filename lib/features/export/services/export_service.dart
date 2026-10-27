@@ -428,6 +428,296 @@ class ExportService {
     return byteData!.buffer.asUint8List();
   }
 
+  /// Exports full print-ready package for The Game Crafter (TGC Poker standard 825x1125 px @ 300 DPI)
+  static Future<File> exportTheGameCrafterPackage({
+    required List<Uint8List> cardImages,
+    required List<String> cardNames,
+    List<Uint8List>? backImages,
+    Uint8List? defaultBackImage,
+    required List<Map<String, dynamic>> cardRows,
+    required String deckName,
+    Directory? outputDirectory,
+  }) async {
+    final archive = Archive();
+    final totalCards = cardImages.length;
+    if (totalCards == 0) throw Exception('No cards to export');
+
+    final manifestCards = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < cardImages.length; i++) {
+      final name = i < cardNames.length ? cardNames[i] : 'Card_${i + 1}';
+      final safeCardName = name.replaceAll(RegExp(r'[^\w\s\-]'), '_').trim();
+      final idxStr = (i + 1).toString().padLeft(3, '0');
+      final faceFileName = 'cards/card_${idxStr}_${safeCardName}_face.png';
+
+      archive.addFile(ArchiveFile(faceFileName, cardImages[i].length, cardImages[i]));
+
+      String backFileName = 'cards/deck_back.png';
+      if (backImages != null && i < backImages.length && backImages[i].isNotEmpty) {
+        backFileName = 'cards/card_${idxStr}_${safeCardName}_back.png';
+        archive.addFile(ArchiveFile(backFileName, backImages[i].length, backImages[i]));
+      } else if (defaultBackImage != null && !archive.files.any((f) => f.name == 'cards/deck_back.png')) {
+        archive.addFile(ArchiveFile('cards/deck_back.png', defaultBackImage.length, defaultBackImage));
+      }
+
+      final row = i < cardRows.length ? cardRows[i] : <String, dynamic>{};
+      final qty = int.tryParse(row['qty']?.toString() ?? '1') ?? 1;
+
+      manifestCards.add({
+        'index': i + 1,
+        'name': name,
+        'quantity': qty,
+        'category': row['category'] ?? 'General',
+        'type': row['type'] ?? '',
+        'cost': row['cost'] ?? '',
+        'front_file': faceFileName,
+        'back_file': backFileName,
+      });
+    }
+
+    // Add TGC Manifest JSON
+    final manifest = {
+      'game': deckName,
+      'platform': 'The Game Crafter (TGC)',
+      'component_type': 'Poker Deck',
+      'specifications': {
+        'card_size': 'Poker (2.5 x 3.5 inches)',
+        'target_resolution_px': '825 x 1125',
+        'dpi': 300,
+        'bleed_px': 36,
+        'safe_zone_px': '750 x 1050',
+      },
+      'total_cards': totalCards,
+      'cards': manifestCards,
+    };
+
+    final manifestJson = const JsonEncoder.withIndent('  ').convert(manifest);
+    final manifestBytes = utf8.encode(manifestJson);
+    archive.addFile(ArchiveFile('thegamecrafter_manifest.json', manifestBytes.length, manifestBytes));
+
+    // Add Instructions
+    final instructions = StringBuffer()
+      ..writeln('====================================================')
+      ..writeln(' The Game Crafter (TGC) - Especificaciones de Baraja')
+      ..writeln('====================================================')
+      ..writeln('Juego: $deckName')
+      ..writeln('Total de Cartas Únicas: $totalCards')
+      ..writeln('')
+      ..writeln('ESPECIFICACIONES DE IMPRESIÓN TGC:')
+      ..writeln('• Tipo de Componente: Poker Deck (2.5" x 3.5")')
+      ..writeln('• Tamaño de Archivo: 825 x 1125 px a 300 DPI')
+      ..writeln('• Margen de Sangrado (Bleed): 36 px (1/8 pulgada) por cada lado')
+      ..writeln('• Zona Segura (Safe Area): 750 x 1050 px centrado')
+      ..writeln('')
+      ..writeln('PASOS PARA SUBIR A THE GAME CRAFTER:')
+      ..writeln('1. Inicia sesión en https://www.thegamecrafter.com y entra en tu juego.')
+      ..writeln('2. Haz clic en "Add Component" -> "Deck" -> "Poker Deck".')
+      ..writeln('3. Sube las imágenes de la carpeta "cards/" asignando cada cara y reverso.')
+      ..writeln('4. Consulta thegamecrafter_manifest.json para verificar las cantidades (qty).')
+      ..writeln('5. ¡Listo para pedir pruebas físicas o publicar en la tienda!');
+
+    final instBytes = utf8.encode(instructions.toString());
+    archive.addFile(ArchiveFile('tgc_instrucciones.txt', instBytes.length, instBytes));
+
+    final zipBytes = ZipEncoder().encode(archive);
+    final outputDir = await getExportDirectory(overrideDir: outputDirectory);
+    final safeName = deckName.replaceAll(RegExp(r'[^\w\s\-]'), '_').trim();
+    final file = File('${outputDir.path}/${safeName}_TheGameCrafter.zip');
+    await file.writeAsBytes(zipBytes);
+    return file;
+  }
+
+  /// Exports print-ready package for MakePlayingCards (MPC Poker 816x1110 px @ 300 DPI)
+  static Future<File> exportMakePlayingCardsPackage({
+    required List<Uint8List> cardImages,
+    required List<String> cardNames,
+    List<Uint8List>? backImages,
+    Uint8List? defaultBackImage,
+    required List<Map<String, dynamic>> cardRows,
+    required String deckName,
+    Directory? outputDirectory,
+  }) async {
+    final archive = Archive();
+    final totalCards = cardImages.length;
+    if (totalCards == 0) throw Exception('No cards to export');
+
+    final guideBuffer = StringBuffer()
+      ..writeln('========================================================')
+      ..writeln(' MakePlayingCards (MPC) - Guía de Pedido y Especificación')
+      ..writeln('========================================================')
+      ..writeln('Juego: $deckName')
+      ..writeln('Fecha: ${DateTime.now().toIso8601String().split('T').first}')
+      ..writeln('Total de Cartas Exportadas: $totalCards')
+      ..writeln('')
+      ..writeln('ESPECIFICACIONES RECOMENDADAS EN MPC:')
+      ..writeln('• Tipo de Carta: Custom Game Cards (63 x 88 mm / 2.48" x 3.46")')
+      ..writeln('• Tamaño de Archivo: 816 x 1110 px a 300 DPI')
+      ..writeln('• Cartulina sugerida: S30 (Standard Smooth) o S33 (Superior Smooth / Linen)')
+      ..writeln('• Acabado: MPC Game Card Finish o Linen Air-Cushion')
+      ..writeln('')
+      ..writeln('LISTA DE CARTAS Y CANTIDADES REQUERIDAS:')
+      ..writeln('--------------------------------------------------------');
+
+    for (int i = 0; i < cardImages.length; i++) {
+      final name = i < cardNames.length ? cardNames[i] : 'Card_${i + 1}';
+      final safeCardName = name.replaceAll(RegExp(r'[^\w\s\-]'), '_').trim();
+      final idxStr = (i + 1).toString().padLeft(3, '0');
+      final faceFileName = 'mpc_fronts/card_${idxStr}_$safeCardName.png';
+
+      archive.addFile(ArchiveFile(faceFileName, cardImages[i].length, cardImages[i]));
+
+      if (backImages != null && i < backImages.length && backImages[i].isNotEmpty) {
+        final backFileName = 'mpc_backs/card_${idxStr}_$safeCardName.png';
+        archive.addFile(ArchiveFile(backFileName, backImages[i].length, backImages[i]));
+      }
+
+      final row = i < cardRows.length ? cardRows[i] : <String, dynamic>{};
+      final qty = int.tryParse(row['qty']?.toString() ?? '1') ?? 1;
+      final cat = row['category'] ?? 'General';
+      guideBuffer.writeln('[$idxStr] $name - $qty unidad(es) - [$cat]');
+    }
+
+    if (defaultBackImage != null) {
+      archive.addFile(ArchiveFile('mpc_backs/common_deck_back.png', defaultBackImage.length, defaultBackImage));
+    }
+
+    guideBuffer
+      ..writeln('--------------------------------------------------------')
+      ..writeln('')
+      ..writeln('INSTRUCCIONES PARA PEDIR EN MAKEPLAYINGCARDS:')
+      ..writeln('1. Entra a https://www.makeplayingcards.com/design/custom-blank-card.html')
+      ..writeln('2. Elige "Custom Game Cards (63 x 88mm)" y el número de cartas.')
+      ..writeln('3. Haz clic en "Upload Images" y sube los archivos de la carpeta mpc_fronts/.')
+      ..writeln('4. En el paso de reverso, sube mpc_backs/common_deck_back.png o los reversos personalizados.')
+      ..writeln('5. Revisa la vista previa de corte (cut line) y confirma tu pedido.');
+
+    final guideBytes = utf8.encode(guideBuffer.toString());
+    archive.addFile(ArchiveFile('mpc_order_guide.txt', guideBytes.length, guideBytes));
+
+    final zipBytes = ZipEncoder().encode(archive);
+    final outputDir = await getExportDirectory(overrideDir: outputDirectory);
+    final safeName = deckName.replaceAll(RegExp(r'[^\w\s\-]'), '_').trim();
+    final file = File('${outputDir.path}/${safeName}_MakePlayingCards.zip');
+    await file.writeAsBytes(zipBytes);
+    return file;
+  }
+
+  /// Exports digital tabletop sprite sheet package for Screentop.gg
+  static Future<File> exportScreentopGgPackage({
+    required List<Uint8List> cardImages,
+    required List<String> cardNames,
+    Uint8List? backImage,
+    required List<Map<String, dynamic>> cardRows,
+    required String deckName,
+    int maxCols = 10,
+    int maxRows = 7,
+    Directory? outputDirectory,
+  }) async {
+    final archive = Archive();
+    final totalCards = cardImages.length;
+    if (totalCards == 0) throw Exception('No cards to export');
+
+    final int cols = totalCards <= maxCols ? totalCards : maxCols;
+    final int rows = ((totalCards + cols - 1) ~/ cols).clamp(1, maxRows);
+
+    const int cellW = 400;
+    const int cellH = 560;
+    final sheetW = cols * cellW;
+    final sheetH = rows * cellH;
+
+    // 1. Render front sprite sheet
+    final frontSheetBytes = await _renderSpriteSheet(
+      images: cardImages,
+      cols: cols,
+      rows: rows,
+      cellW: cellW,
+      cellH: cellH,
+      sheetW: sheetW,
+      sheetH: sheetH,
+    );
+    archive.addFile(ArchiveFile('screentop_cards_sheet.png', frontSheetBytes.length, frontSheetBytes));
+
+    // 2. Render back sprite sheet or single back
+    if (backImage != null) {
+      archive.addFile(ArchiveFile('screentop_card_back.png', backImage.length, backImage));
+      final backList = List.generate(cols * rows, (_) => backImage);
+      final backSheetBytes = await _renderSpriteSheet(
+        images: backList,
+        cols: cols,
+        rows: rows,
+        cellW: cellW,
+        cellH: cellH,
+        sheetW: sheetW,
+        sheetH: sheetH,
+      );
+      archive.addFile(ArchiveFile('screentop_backs_sheet.png', backSheetBytes.length, backSheetBytes));
+    }
+
+    // 3. Screentop Asset JSON
+    final screentopCards = <Map<String, dynamic>>[];
+    for (int i = 0; i < cardImages.length; i++) {
+      final name = i < cardNames.length ? cardNames[i] : 'Card_${i + 1}';
+      final row = i < cardRows.length ? cardRows[i] : <String, dynamic>{};
+      screentopCards.add({
+        'index': i,
+        'col': i % cols,
+        'row': i ~/ cols,
+        'name': name,
+        'category': row['category'] ?? 'General',
+        'cost': row['cost'] ?? '',
+        'type': row['type'] ?? '',
+        'qty': row['qty'] ?? 1,
+      });
+    }
+
+    final screentopAsset = {
+      'name': deckName,
+      'platform': 'Screentop.gg',
+      'type': 'asset',
+      'kind': 'grid',
+      'columns': cols,
+      'rows': rows,
+      'cell_width': cellW,
+      'cell_height': cellH,
+      'total_cards': totalCards,
+      'front_sheet': 'screentop_cards_sheet.png',
+      'back_sheet': backImage != null ? 'screentop_backs_sheet.png' : null,
+      'cards': screentopCards,
+    };
+
+    final assetJson = const JsonEncoder.withIndent('  ').convert(screentopAsset);
+    final assetBytes = utf8.encode(assetJson);
+    archive.addFile(ArchiveFile('screentop_asset.json', assetBytes.length, assetBytes));
+
+    // Instructions
+    final instructions = StringBuffer()
+      ..writeln('====================================================')
+      ..writeln(' Screentop.gg Digital Tabletop Integration Guide')
+      ..writeln('====================================================')
+      ..writeln('Deck Name: $deckName')
+      ..writeln('Grid Dimensions: ${cols}x$rows (Total Slots: ${cols * rows})')
+      ..writeln('Resolution: ${sheetW}x$sheetH px')
+      ..writeln('')
+      ..writeln('HOW TO IMPORT INTO SCREENTOP.GG:')
+      ..writeln('1. Open your project on https://screentop.gg.')
+      ..writeln('2. Go to Assets -> Create Asset -> Type: "Grid Image".')
+      ..writeln('3. Upload "screentop_cards_sheet.png".')
+      ..writeln('4. Set Columns = $cols, Rows = $rows.')
+      ..writeln('5. Go to Components -> Create Component -> Type: "Card".')
+      ..writeln('6. Assign the front asset and back asset.')
+      ..writeln('7. Enjoy browser-based multiplayer playtesting on Screentop.gg!');
+
+    final instBytes = utf8.encode(instructions.toString());
+    archive.addFile(ArchiveFile('screentop_instructions.txt', instBytes.length, instBytes));
+
+    final zipBytes = ZipEncoder().encode(archive);
+    final outputDir = await getExportDirectory(overrideDir: outputDirectory);
+    final safeName = deckName.replaceAll(RegExp(r'[^\w\s\-]'), '_').trim();
+    final file = File('${outputDir.path}/${safeName}_ScreentopGg.zip');
+    await file.writeAsBytes(zipBytes);
+    return file;
+  }
+
   /// Exports card image byte buffers into a ZIP file with high-res PNGs
   static Future<File> exportCardsToZip({
     required List<Uint8List> cardImages,

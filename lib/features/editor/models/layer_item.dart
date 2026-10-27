@@ -70,6 +70,9 @@ class LayerItem {
   final double letterSpacing;
   final Color fontColor;
   final TextAlign textAlign;
+  final double textStrokeWidth;
+  final Color textStrokeColor;
+  final String foilFinish;
 
   // Text Data Type & Schema Options
   final TextDataType textDataType;
@@ -121,6 +124,9 @@ class LayerItem {
     this.letterSpacing = 0.2,
     this.fontColor = Colors.white,
     this.textAlign = TextAlign.left,
+    this.textStrokeWidth = 0.0,
+    this.textStrokeColor = Colors.black,
+    this.foilFinish = 'none',
     this.textDataType = TextDataType.text,
     this.numberPrefix = '',
     this.numberSuffix = '',
@@ -167,6 +173,9 @@ class LayerItem {
     double? letterSpacing,
     Color? fontColor,
     TextAlign? textAlign,
+    double? textStrokeWidth,
+    Color? textStrokeColor,
+    String? foilFinish,
     TextDataType? textDataType,
     String? numberPrefix,
     String? numberSuffix,
@@ -215,6 +224,9 @@ class LayerItem {
       letterSpacing: letterSpacing ?? this.letterSpacing,
       fontColor: fontColor ?? this.fontColor,
       textAlign: textAlign ?? this.textAlign,
+      textStrokeWidth: textStrokeWidth ?? this.textStrokeWidth,
+      textStrokeColor: textStrokeColor ?? this.textStrokeColor,
+      foilFinish: foilFinish ?? this.foilFinish,
       textDataType: textDataType ?? this.textDataType,
       numberPrefix: numberPrefix ?? this.numberPrefix,
       numberSuffix: numberSuffix ?? this.numberSuffix,
@@ -275,6 +287,9 @@ class LayerItem {
       'letterSpacing': letterSpacing,
       'fontColor': fontColor.toARGB32(),
       'textAlign': textAlign.name,
+      'textStrokeWidth': textStrokeWidth,
+      'textStrokeColor': textStrokeColor.toARGB32(),
+      'foilFinish': foilFinish,
       'textDataType': textDataType.name,
       'numberPrefix': numberPrefix,
       'numberSuffix': numberSuffix,
@@ -340,6 +355,11 @@ class LayerItem {
         (a) => a.name == json['textAlign'],
         orElse: () => TextAlign.left,
       ),
+      textStrokeWidth: (json['textStrokeWidth'] as num?)?.toDouble() ?? 0.0,
+      textStrokeColor: json['textStrokeColor'] != null
+          ? Color(json['textStrokeColor'] as int)
+          : Colors.black,
+      foilFinish: json['foilFinish'] as String? ?? 'none',
       textDataType: TextDataType.values.firstWhere(
         (t) => t.name == json['textDataType'],
         orElse: () => TextDataType.text,

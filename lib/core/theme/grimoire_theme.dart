@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 class GrimoireTheme {
   // Brand Backgrounds & Surfaces (Faithful to the Reference Image)
   static const Color bgCanvas = Color(0xFF0B0E14);
+  static const Color bgDark = Color(0xFF0B0E14);
   static const Color surfacePanel = Color(0xFF101420);
   static const Color surfaceCard = Color(0xFF131622);
   static const Color surfaceCardHover = Color(0xFF1A1F33);
@@ -19,6 +20,7 @@ class GrimoireTheme {
   static const Color accentIndigo = Color(0xFF6366F1);
   static const Color accentPink = Color(0xFFEC4899);
   static const Color accentAmber = Color(0xFFF59E0B);
+  static const Color accentGold = Color(0xFFF59E0B);
   static const Color accentEmerald = Color(0xFF10B981);
   static const Color accentCyan = Color(0xFF06B6D4);
 

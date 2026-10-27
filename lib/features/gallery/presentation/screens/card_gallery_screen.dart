@@ -2239,20 +2239,32 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
       }
     }
 
-    final bool showCost = cost.isNotEmpty && (matchedCat == null || matchedCat.hasCost);
+    final tpl = ref.read(editorProvider.notifier).resolveTemplateForRow(row);
+    final bool templateUsesCost = tpl.layers.any((l) =>
+        l.bindingKey.toLowerCase() == 'cost' ||
+        l.text.toLowerCase().contains('{{cost}}'));
+    final bool templateUsesCombat = tpl.layers.any((l) =>
+        l.bindingKey.toLowerCase() == 'attack' ||
+        l.bindingKey.toLowerCase() == 'atk' ||
+        l.bindingKey.toLowerCase() == 'defense' ||
+        l.bindingKey.toLowerCase() == 'def' ||
+        l.text.toLowerCase().contains('{{attack}}') ||
+        l.text.toLowerCase().contains('{{defense}}'));
+
+    final bool showCost = cost.isNotEmpty &&
+        templateUsesCost &&
+        (matchedCat == null || matchedCat.hasCost);
     final bool showRarity = rarity.isNotEmpty && (matchedCat == null || matchedCat.hasRarity);
 
-    final bool showAttack = matchedCat != null
-        ? (matchedCat.hasCombatStats &&
-            attack.isNotEmpty &&
-            attack != '0')
-        : (attack.isNotEmpty && attack != '0');
+    final bool showAttack = attack.isNotEmpty &&
+        attack != '0' &&
+        templateUsesCombat &&
+        (matchedCat == null || matchedCat.hasCombatStats);
 
-    final bool showDefense = matchedCat != null
-        ? (matchedCat.hasCombatStats &&
-            defense.isNotEmpty &&
-            defense != '0')
-        : (defense.isNotEmpty && defense != '0');
+    final bool showDefense = defense.isNotEmpty &&
+        defense != '0' &&
+        templateUsesCombat &&
+        (matchedCat == null || matchedCat.hasCombatStats);
 
     final hasCombatStats = showAttack || showDefense;
     final rarityColor = _getRarityColor(rarity);
@@ -2519,20 +2531,15 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
                 ),
-                child: Builder(
-                  builder: (context) {
-                    final tpl = ref.read(editorProvider.notifier).resolveTemplateForRow(row);
-                    return Center(
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                        child: CardRendererWidget(
-                          template: tpl,
-                          cardData: row,
-                        ),
-                      ),
-                    );
-                  },
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    child: CardRendererWidget(
+                      template: tpl,
+                      cardData: row,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -3032,7 +3039,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         Text(
-                          '${row['game'] ?? ''} • ${row['cost'] ?? '0'} ${ref.tr('mana')}',
+                          [
+                            if ((row['game']?.toString() ?? '').isNotEmpty) row['game'].toString(),
+                            if ((row['category']?.toString() ?? '').isNotEmpty) row['category'].toString(),
+                          ].join(' • '),
                           style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
                         ),
                       ],
@@ -3373,7 +3383,13 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Tipo: ${cat.defaultType} • Coste: ${cat.defaultCost} • Stats: ${cat.defaultAttack}/${cat.defaultDefense} • ${cat.defaultRarity}',
+                                      [
+                                        'Tipo: ${cat.defaultType}',
+                                        if (cat.hasCost && cat.defaultCost.isNotEmpty) 'Coste: ${cat.defaultCost}',
+                                        if (cat.hasCombatStats && (cat.defaultAttack.isNotEmpty || cat.defaultDefense.isNotEmpty))
+                                          'Stats: ${cat.defaultAttack}/${cat.defaultDefense}',
+                                        if (cat.hasRarity && cat.defaultRarity.isNotEmpty) cat.defaultRarity,
+                                      ].join(' • '),
                                       style: const TextStyle(fontSize: 10, color: Color(0xFFC7D2FE)),
                                     ),
                                     if (cat.defaultRules.isNotEmpty) ...[
@@ -3495,15 +3511,11 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
     final rarityController = TextEditingController(text: existingCategory?.defaultRarity ?? 'Común');
     final rulesController = TextEditingController(text: existingCategory?.defaultRules ?? '');
 
-    final customKeyCtrl = TextEditingController();
-    final customValCtrl = TextEditingController();
-
     bool hasCost = existingCategory?.hasCost ?? false;
     bool hasCombatStats = existingCategory?.hasCombatStats ?? false;
     bool hasRarity = existingCategory?.hasRarity ?? false;
     bool hasRules = existingCategory?.hasRules ?? false;
     Map<String, String> customFields = Map<String, String>.from(existingCategory?.customFields ?? {});
-    bool showAddCustom = false;
     bool createPresetCard = !isEditing;
     Map<String, dynamic>? selectedBaseCard;
     int? selectedBaseCardIndex;
@@ -3793,11 +3805,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                                     } else {
                                       selectedBaseCard = null;
                                       selectedBaseCardIndex = null;
-                                      final isUnicorn = chosenGame.toLowerCase().contains('unicorn');
-                                      hasCost = !isUnicorn;
-                                      hasCombatStats = !isUnicorn;
-                                      hasRarity = true;
-                                      hasRules = true;
+                                      hasCost = false;
+                                      hasCombatStats = false;
+                                      hasRarity = false;
+                                      hasRules = false;
                                     }
                                   });
                                 },
@@ -4258,6 +4269,7 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
 
     final customKeyCtrl = TextEditingController();
     final customValCtrl = TextEditingController();
+    final archetypeScrollCtrl = ScrollController();
 
     bool hasCost = isFromCard ? (costController.text.isNotEmpty) : (initialArchetype?.hasCost ?? true);
     bool hasCombatStats = isFromCard
@@ -4356,8 +4368,10 @@ class _CardGalleryScreenState extends ConsumerState<CardGalleryScreen> {
                     ),
                     const SizedBox(height: 8),
                     Scrollbar(
+                      controller: archetypeScrollCtrl,
                       thumbVisibility: true,
                       child: SingleChildScrollView(
+                        controller: archetypeScrollCtrl,
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Row(

@@ -1,3 +1,4 @@
+import 'package:grimoire_studio/features/editor/models/card_template.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -24,8 +25,19 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchFilter = '';
   String _selectedGame = 'all';
+  String _selectedStatus = 'all'; // 'all', 'Definitiva', 'Muestra'
   String? _sortColumn;
   bool _sortAscending = true;
+  final Set<String> _hiddenColumns = {};
+  final Set<String> _explicitlyShownColumns = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(editorProvider.notifier).syncTemplateVariablesToRows();
+    });
+  }
 
   @override
   void dispose() {
@@ -38,8 +50,9 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
   @override
   Widget build(BuildContext context) {
     final editorState = ref.watch(editorProvider);
-    final rows = editorState.project.rows;
-    final activeRowIndex = editorState.project.activeRowIndex;
+    final project = editorState.project;
+    final rows = project.rows;
+    final activeRowIndex = project.activeRowIndex;
 
     // Collect available games for game filtering
     final availableGames = <String>{};
@@ -49,30 +62,96 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
     }
     final sortedGames = availableGames.toList()..sort();
 
-    // Collect all unique keys from all rows, ensuring card_name, game, category, qty come first
-    const internalKeys = {'template_id', 'is_category_default', 'is_game_default', 'rules'};
-    final List<String> primaryKeys = [
-      'card_name',
-      'game',
-      'category',
-      'qty',
-      'cost',
+    // 1. Core permanent columns (always shown first, cannot be hidden)
+    const coreKeys = ['card_name', 'game', 'category', 'card_status', 'qty'];
+    const internalKeys = GameFolderService.internalKeys;
+
+    // 2. Relevant rows based on game filter
+    final currentTargetRows = _selectedGame == 'all'
+        ? rows
+        : rows.where((r) => (r['game'] ?? '').toString().toLowerCase() == _selectedGame.toLowerCase()).toList();
+    final rowsToCheck = currentTargetRows.isNotEmpty ? currentTargetRows : rows;
+
+    // 3. Dynamic template variables extracted from templates of cards being displayed
+    final templateVars = <String>{};
+    final displayedTemplates = <CardTemplate>{};
+    for (final r in rowsToCheck) {
+      displayedTemplates.add(ref.read(editorProvider.notifier).resolveTemplateForRow(r));
+    }
+    if (project.templates.isNotEmpty) {
+      displayedTemplates.add(project.activeTemplate);
+    }
+    for (final t in displayedTemplates) {
+      templateVars.addAll(t.getReferencedVariables());
+    }
+    final templateKeys = <String>[];
+    for (final v in templateVars) {
+      if (!internalKeys.contains(v) && !coreKeys.contains(v) && !templateKeys.contains(v)) {
+        templateKeys.add(v);
+      }
+    }
+
+    // 4. Standard genre columns
+    const standardGenreKeys = [
       'type',
       'rarity',
+      'cost',
       'attack',
       'defense',
       'rules_text',
       'art_url',
+      'prompt',
+      'icon',
+      'art_color',
+      'creator',
     ];
-    final Set<String> extraKeys = {};
-    for (final r in rows) {
+
+    // 5. Extra data columns from row data
+    final extraDataKeys = <String>[];
+    for (final r in rowsToCheck) {
       for (final k in r.keys) {
-        if (!primaryKeys.contains(k) && !internalKeys.contains(k)) {
-          extraKeys.add(k);
+        if (!coreKeys.contains(k) &&
+            !templateKeys.contains(k) &&
+            !standardGenreKeys.contains(k) &&
+            !internalKeys.contains(k) &&
+            !extraDataKeys.contains(k)) {
+          extraDataKeys.add(k);
         }
       }
     }
-    final columns = [...primaryKeys, ...extraKeys];
+
+    // 6. Active genre keys:
+    // Only include if in template, or explicitly shown, or has non-empty/non-default data
+    final activeGenreKeys = <String>[];
+    for (final genre in standardGenreKeys) {
+      if (templateKeys.contains(genre)) continue;
+      if (_hiddenColumns.contains(genre)) continue;
+      if (_explicitlyShownColumns.contains(genre)) {
+        activeGenreKeys.add(genre);
+        continue;
+      }
+      final hasData = rowsToCheck.any((r) {
+        final val = (r[genre]?.toString() ?? '').trim();
+        if (genre == 'creator' && val == 'Grimoire Studio') return false;
+        if (genre == 'icon' && val == '🃏') return false;
+        return val.isNotEmpty;
+      });
+      if (hasData) {
+        activeGenreKeys.add(genre);
+      }
+    }
+
+    final allCandidateColumns = [
+      ...coreKeys,
+      ...templateKeys,
+      ...extraDataKeys,
+      ...activeGenreKeys,
+    ];
+
+    final columns = allCandidateColumns.where((col) {
+      if (coreKeys.contains(col)) return true;
+      return !_hiddenColumns.contains(col);
+    }).toList();
 
     final filteredIndices = <int>[];
     for (int i = 0; i < rows.length; i++) {
@@ -80,6 +159,12 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       if (_selectedGame != 'all') {
         final rowGame = (row['game'] ?? '').toString().trim();
         if (rowGame.toLowerCase() != _selectedGame.toLowerCase()) {
+          continue;
+        }
+      }
+      if (_selectedStatus != 'all') {
+        final rowStatus = (row['card_status'] ?? 'Definitiva').toString().trim();
+        if (rowStatus.toLowerCase() != _selectedStatus.toLowerCase()) {
           continue;
         }
       }
@@ -113,14 +198,17 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       appBar: AppBar(
         backgroundColor: GrimoireTheme.surfacePanel,
         elevation: 0,
-        title: Row(
-          children: [
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             const Icon(Icons.table_chart_outlined, color: GrimoireTheme.accentPurple, size: 20),
             const SizedBox(width: 8),
             Text(ref.tr('db_title'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(width: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: GrimoireTheme.accentPurple.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
@@ -183,6 +271,69 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
               ),
               const SizedBox(width: 12),
             ],
+            // Status filter selector (Definitivas vs Muestras / Presets)
+            Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: GrimoireTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _selectedStatus == 'Definitiva'
+                      ? GrimoireTheme.accentEmerald.withValues(alpha: 0.5)
+                      : (_selectedStatus == 'Muestra'
+                          ? GrimoireTheme.accentAmber.withValues(alpha: 0.5)
+                          : GrimoireTheme.borderSubtle),
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedStatus,
+                  dropdownColor: GrimoireTheme.surfaceElevated,
+                  style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+                  icon: const Icon(Icons.arrow_drop_down, size: 16, color: GrimoireTheme.textMuted),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.layers_outlined, size: 13, color: GrimoireTheme.accentIndigo),
+                          SizedBox(width: 6),
+                          Text('Todas las cartas'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Definitiva',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_outline, size: 13, color: GrimoireTheme.accentEmerald),
+                          SizedBox(width: 6),
+                          Text('Solo Definitivas'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Muestra',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.bookmark_border, size: 13, color: GrimoireTheme.accentAmber),
+                          SizedBox(width: 6),
+                          Text('Solo Muestras / Presets'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedStatus = val);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
             // Quick search in table
             SizedBox(
               width: 180,
@@ -221,15 +372,27 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
             ),
           ],
         ),
-        actions: [
-          // Manage custom columns button
-          if (extraKeys.isNotEmpty)
-            TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: GrimoireTheme.accentIndigo),
-              icon: const Icon(Icons.tune, size: 15),
-              label: Text('${ref.tr('columns')} (${extraKeys.length})', style: const TextStyle(fontSize: 12)),
-              onPressed: () => _showManageColumnsDialog(context, ref, extraKeys.toList()),
+      ),
+      actions: [
+          // Manage custom & template columns button (always available)
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: GrimoireTheme.accentIndigo),
+            icon: const Icon(Icons.tune, size: 15),
+            label: Text('${ref.tr('columns')} (${columns.length})', style: const TextStyle(fontSize: 12)),
+            onPressed: () => _showManageColumnsDialog(
+              context,
+              ref,
+              allAvailableColumns: [
+                ...coreKeys,
+                ...templateKeys,
+                ...extraDataKeys,
+                ...standardGenreKeys.where((k) => !templateKeys.contains(k) && !coreKeys.contains(k)),
+              ],
+              templateKeys: templateKeys,
+              customKeys: extraDataKeys,
+              visibleColumns: columns.toSet(),
             ),
+          ),
           // Add custom column button
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: GrimoireTheme.accentAmber),
@@ -238,11 +401,20 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
             onPressed: () => _showAddColumnDialog(context, ref),
           ),
           const SizedBox(width: 4),
+          // Sync with template variables button
+          IconButton(
+            icon: const Icon(Icons.sync, color: GrimoireTheme.accentCyan, size: 20),
+            tooltip: 'Sincronizar variables con plantilla',
+            onPressed: () {
+              ref.read(editorProvider.notifier).syncTemplateVariablesToRows();
+              GrimoireToast.success(context, 'Variables sincronizadas con las capas de la plantilla.', title: 'Sincronización completada');
+            },
+          ),
           // Export CSV button
           IconButton(
             icon: const Icon(Icons.file_download_outlined, color: GrimoireTheme.accentEmerald),
             tooltip: _selectedGame == 'all' ? ref.tr('export_current_csv') : '${ref.tr('export_csv')} ($_selectedGame)',
-            onPressed: () => _exportCsvFile(context, ref),
+            onPressed: () => _exportCsvFile(context, ref, columns, filteredIndices),
           ),
           // Import CSV/JSON
           IconButton(
@@ -329,15 +501,30 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                             });
                           },
                           label: Expanded(
-                            child: Text(
-                              col == 'qty' ? 'QTY (Copias)' : col,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: col == 'qty' ? GrimoireTheme.accentPink : GrimoireTheme.accentPurple,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (templateKeys.contains(col)) ...[
+                                  const Icon(Icons.link, size: 11, color: GrimoireTheme.accentIndigo),
+                                  const SizedBox(width: 3),
+                                ],
+                                Flexible(
+                                  child: Text(
+                                    col == 'qty' ? 'QTY (Copias)' : (col == 'card_status' ? 'Estado (Definitiva / Muestra)' : col),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: col == 'qty'
+                                          ? GrimoireTheme.accentPink
+                                          : (templateKeys.contains(col)
+                                              ? GrimoireTheme.accentIndigo
+                                              : GrimoireTheme.accentPurple),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           columnWidth: FixedColumnWidth(_getColumnWidth(col)),
@@ -367,24 +554,79 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
                           },
                           cells: [
                             DataCell(
-                              Text('', style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
+                              Text('${i + 1}', style: const TextStyle(fontSize: 11, color: GrimoireTheme.textMuted)),
                             ),
                             for (final col in columns)
-                              DataCell(
-                                Text(
-                                  rows[i][col]?.toString() ?? (col == 'qty' ? '1' : ''),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: col == 'qty' ? FontWeight.bold : FontWeight.normal,
-                                    color: col == 'qty'
-                                        ? GrimoireTheme.accentPink
-                                        : (i == activeRowIndex ? Colors.white : GrimoireTheme.textSecondary),
+                              if (col == 'card_status')
+                                DataCell(
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: () {
+                                      final current = (rows[i]['card_status'] ?? 'Definitiva').toString().trim();
+                                      final next = current.toLowerCase() == 'muestra' ? 'Definitiva' : 'Muestra';
+                                      ref.read(editorProvider.notifier).updateRowData(i, 'card_status', next);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (rows[i]['card_status']?.toString().toLowerCase() == 'muestra')
+                                            ? GrimoireTheme.accentAmber.withValues(alpha: 0.18)
+                                            : GrimoireTheme.accentEmerald.withValues(alpha: 0.18),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: (rows[i]['card_status']?.toString().toLowerCase() == 'muestra')
+                                              ? GrimoireTheme.accentAmber.withValues(alpha: 0.6)
+                                              : GrimoireTheme.accentEmerald.withValues(alpha: 0.6),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            (rows[i]['card_status']?.toString().toLowerCase() == 'muestra')
+                                                ? Icons.bookmark_border
+                                                : Icons.check_circle_outline,
+                                            size: 11,
+                                            color: (rows[i]['card_status']?.toString().toLowerCase() == 'muestra')
+                                                ? GrimoireTheme.accentAmber
+                                                : GrimoireTheme.accentEmerald,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              (rows[i]['card_status']?.toString().toLowerCase() == 'muestra') ? 'Muestra' : 'Definitiva',
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: (rows[i]['card_status']?.toString().toLowerCase() == 'muestra')
+                                                    ? GrimoireTheme.accentAmber
+                                                    : GrimoireTheme.accentEmerald,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
+                                )
+                              else
+                                DataCell(
+                                  Text(
+                                    rows[i][col]?.toString() ?? (col == 'qty' ? '1' : ''),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: col == 'qty' ? FontWeight.bold : FontWeight.normal,
+                                      color: col == 'qty'
+                                          ? GrimoireTheme.accentPink
+                                          : (i == activeRowIndex ? Colors.white : GrimoireTheme.textSecondary),
+                                    ),
+                                  ),
+                                  onTap: () => _editCellDialog(context, ref, i, col, rows[i][col]?.toString() ?? (col == 'qty' ? '1' : '')),
                                 ),
-                                onTap: () => _editCellDialog(context, ref, i, col, rows[i][col]?.toString() ?? (col == 'qty' ? '1' : '')),
-                              ),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -433,6 +675,8 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
     switch (col) {
       case 'qty':
         return 110.0;
+      case 'card_status':
+        return 160.0;
       case 'card_name':
         return 180.0;
       case 'game':
@@ -452,7 +696,9 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
       case 'rules_text':
         return 260.0;
       case 'art_url':
-        return 160.0;
+      case 'card_url':
+      case 'category_url':
+        return 180.0;
       default:
         return 140.0;
     }
@@ -491,45 +737,25 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
     );
   }
 
-  Future<void> _exportCsvFile(BuildContext context, WidgetRef ref) async {
+  Future<void> _exportCsvFile(BuildContext context, WidgetRef ref, List<String> currentColumns, List<int> filteredIndices) async {
     final allRows = ref.read(editorProvider).project.rows;
     if (allRows.isEmpty) return;
 
-    final targetRows = _selectedGame == 'all'
-        ? allRows
-        : allRows.where((r) => (r['game'] ?? '').toString().toLowerCase() == _selectedGame.toLowerCase()).toList();
-
-    if (targetRows.isEmpty) return;
-
-    const internalKeys = {'template_id', 'is_category_default', 'is_game_default', 'rules'};
-    final List<String> standardHeaders = [
-      'card_name',
-      'game',
-      'category',
-      'qty',
-      'cost',
-      'type',
-      'rarity',
-      'attack',
-      'defense',
-      'rules_text',
-      'prompt',
-      'art_url',
-      'icon',
-      'art_color',
-      'creator',
-    ];
-
-    final Set<String> extraHeaders = {};
-    for (final r in targetRows) {
-      for (final k in r.keys) {
-        if (!standardHeaders.contains(k) && !internalKeys.contains(k)) {
-          extraHeaders.add(k);
-        }
+    final targetRows = <Map<String, dynamic>>[];
+    for (final i in filteredIndices) {
+      if (i >= 0 && i < allRows.length) {
+        targetRows.add(allRows[i]);
       }
     }
 
-    final headers = [...standardHeaders, ...extraHeaders];
+    if (targetRows.isEmpty) {
+      if (context.mounted) {
+        GrimoireToast.info(context, 'No hay cartas para exportar con los filtros seleccionados.');
+      }
+      return;
+    }
+
+    final headers = currentColumns;
     final csvRows = <List<dynamic>>[headers];
     for (final raw in targetRows) {
       final r = GameFolderService.normalizeCardRow(raw, defaultGame: raw['game']?.toString());
@@ -538,9 +764,12 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
 
     final csvContent = csv.encode(csvRows);
     final outputDir = await ExportService.getExportDirectory();
+    final statusSuffix = _selectedStatus == 'Definitiva'
+        ? '_Definitivas'
+        : (_selectedStatus == 'Muestra' ? '_Muestras' : '');
     final fileName = _selectedGame == 'all'
-        ? 'Grimoire_Database_Export.csv'
-        : 'Grimoire_${GameFolderService.sanitizeFolderName(_selectedGame)}_data.csv';
+        ? 'Grimoire_Database_Export$statusSuffix.csv'
+        : 'Grimoire_${GameFolderService.sanitizeFolderName(_selectedGame)}$statusSuffix.csv';
     final file = File('${outputDir.path}/$fileName');
     await file.writeAsString('\uFEFF$csvContent', encoding: utf8);
 
@@ -555,18 +784,49 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
 
   void _editCellDialog(BuildContext context, WidgetRef ref, int rowIndex, String key, String currentValue) {
     final controller = TextEditingController(text: currentValue);
+    final isImageField = key.contains('url') || key.contains('art') || key.contains('image');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GrimoireTheme.surfaceElevated,
         title: Text('${ref.tr('edit_cell')} ($key) - #${rowIndex + 1}', style: const TextStyle(fontSize: 14)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(fontSize: 12, color: Colors.white),
-          decoration: InputDecoration(labelText: key),
-          maxLines: key == 'rules_text' ? 4 : 1,
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: key,
+                  suffixIcon: isImageField
+                      ? IconButton(
+                          icon: const Icon(Icons.image_search, color: GrimoireTheme.accentPurple, size: 20),
+                          tooltip: 'Seleccionar archivo de imagen',
+                          onPressed: () async {
+                            final res = await FilePicker.pickFiles(type: FileType.image);
+                            if (res.isNotEmpty && res.first.path != null) {
+                              controller.text = res.first.path!;
+                            }
+                          },
+                        )
+                      : null,
+                ),
+                maxLines: key == 'rules_text' ? 4 : 1,
+              ),
+              if (isImageField) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  '💡 Puedes ingresar la ruta relativa dentro de assets/ o seleccionar un archivo.',
+                  style: TextStyle(fontSize: 10, color: GrimoireTheme.textMuted),
+                ),
+              ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -630,6 +890,8 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
           }
         }
 
+        ref.read(editorProvider.notifier).syncTemplateVariablesToRows();
+
         if (context.mounted) {
           GrimoireToast.success(
             context,
@@ -649,66 +911,190 @@ class _DataTableViewState extends ConsumerState<DataTableView> {
     }
   }
 
-  void _showManageColumnsDialog(BuildContext context, WidgetRef ref, List<String> customCols) {
+  void _showManageColumnsDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required List<String> allAvailableColumns,
+    required List<String> templateKeys,
+    required List<String> customKeys,
+    required Set<String> visibleColumns,
+  }) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: GrimoireTheme.surfaceElevated,
-        title: const Row(
-          children: [
-            Icon(Icons.tune, color: GrimoireTheme.accentIndigo, size: 20),
-            SizedBox(width: 8),
-            Text('Gestionar Columnas Personalizadas', style: TextStyle(fontSize: 14, color: Colors.white)),
-          ],
-        ),
-        content: SizedBox(
-          width: 380,
-          child: customCols.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Text('No hay columnas personalizadas creadas.', style: TextStyle(color: GrimoireTheme.textMuted, fontSize: 12)),
-                )
-              : ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: customCols.length,
-                  separatorBuilder: (_, _) => const Divider(color: GrimoireTheme.borderSubtle, height: 1),
-                  itemBuilder: (context, idx) {
-                    final col = customCols[idx];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(col, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: GrimoireTheme.accentAmber),
-                            tooltip: ref.tr('rename_column'),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _showRenameColumnDialog(context, ref, col);
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 16, color: GrimoireTheme.accentPink),
-                            tooltip: ref.tr('delete_column'),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _confirmDeleteColumn(context, ref, col);
-                            },
-                          ),
-                        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: GrimoireTheme.surfaceElevated,
+            title: const Row(
+              children: [
+                Icon(Icons.tune, color: GrimoireTheme.accentIndigo, size: 20),
+                SizedBox(width: 8),
+                Text('Columnas y Variables de Base de Datos', style: TextStyle(fontSize: 14, color: Colors.white)),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              height: 400,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Las variables usadas en tus capas se sincronizan automáticamente. Activa o desactiva columnas a conveniencia.',
+                    style: TextStyle(fontSize: 11, color: GrimoireTheme.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.sync, size: 14, color: GrimoireTheme.accentCyan),
+                        label: const Text('Detectar de Plantilla', style: TextStyle(fontSize: 11)),
+                        onPressed: () {
+                          ref.read(editorProvider.notifier).syncTemplateVariablesToRows();
+                          setDialogState(() {
+                            _hiddenColumns.clear();
+                            _explicitlyShownColumns.clear();
+                          });
+                          setState(() {});
+                        },
                       ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(ref.tr('close')),
-          ),
-        ],
+                      TextButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            _hiddenColumns.clear();
+                            for (final c in allAvailableColumns) {
+                              _explicitlyShownColumns.add(c);
+                            }
+                          });
+                          setState(() {});
+                        },
+                        child: const Text('Mostrar Todas', style: TextStyle(fontSize: 11, color: GrimoireTheme.accentIndigo)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            _hiddenColumns.clear();
+                            _explicitlyShownColumns.clear();
+                          });
+                          setState(() {});
+                        },
+                        child: const Text('Solo Relevantes', style: TextStyle(fontSize: 11, color: GrimoireTheme.accentAmber)),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: GrimoireTheme.borderSubtle, height: 16),
+                  Expanded(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: allAvailableColumns.length,
+                      separatorBuilder: (_, _) => const Divider(color: GrimoireTheme.borderSubtle, height: 1),
+                      itemBuilder: (context, idx) {
+                        final col = allAvailableColumns[idx];
+                        const coreKeys = ['card_name', 'game', 'category', 'card_status', 'qty'];
+                        final isCore = coreKeys.contains(col);
+                        final isTemplate = templateKeys.contains(col);
+                        final isCustom = customKeys.contains(col);
+                        final isVisible = isCore || (!_hiddenColumns.contains(col) && (visibleColumns.contains(col) || _explicitlyShownColumns.contains(col)));
+
+                        return SwitchListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                          title: Row(
+                            children: [
+                              Text(
+                                col == 'qty' ? 'QTY (Copias)' : (col == 'card_status' ? 'Estado (Definitiva / Muestra)' : col),
+                                style: TextStyle(
+                                  color: isCore
+                                      ? Colors.white
+                                      : (isTemplate ? GrimoireTheme.accentIndigo : Colors.white),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isCore)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text('Núcleo', style: TextStyle(fontSize: 9, color: GrimoireTheme.textMuted)),
+                                )
+                              else if (isTemplate)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: GrimoireTheme.accentIndigo.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: GrimoireTheme.accentIndigo.withValues(alpha: 0.5)),
+                                  ),
+                                  child: const Text('Plantilla', style: TextStyle(fontSize: 9, color: GrimoireTheme.accentIndigo, fontWeight: FontWeight.bold)),
+                                )
+                              else if (isCustom)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: GrimoireTheme.accentAmber.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text('Personalizada', style: TextStyle(fontSize: 9, color: GrimoireTheme.accentAmber)),
+                                ),
+                            ],
+                          ),
+                          value: isVisible,
+                          onChanged: isCore
+                              ? null
+                              : (val) {
+                                  setDialogState(() {
+                                    if (val) {
+                                      _hiddenColumns.remove(col);
+                                      _explicitlyShownColumns.add(col);
+                                    } else {
+                                      _explicitlyShownColumns.remove(col);
+                                      _hiddenColumns.add(col);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                          secondary: isCustom
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 16, color: GrimoireTheme.accentAmber),
+                                      tooltip: ref.tr('rename_column'),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _showRenameColumnDialog(context, ref, col);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 16, color: GrimoireTheme.accentPink),
+                                      tooltip: ref.tr('delete_column'),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _confirmDeleteColumn(context, ref, col);
+                                      },
+                                    ),
+                                  ],
+                                )
+                              : null,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(ref.tr('close')),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

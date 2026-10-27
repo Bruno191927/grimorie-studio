@@ -42,6 +42,15 @@ class CardProject {
     return rows.first;
   }
 
+  /// Returns all dynamic variable keys referenced across templates in this project
+  Set<String> getAllTemplateVariables() {
+    final vars = <String>{};
+    for (final t in templates) {
+      vars.addAll(t.getReferencedVariables());
+    }
+    return vars;
+  }
+
   CardProject copyWith({
     String? id,
     String? name,

@@ -123,13 +123,16 @@ class CardRendererWidget extends StatelessWidget {
       case LayerType.background:
         File? bgImgFile;
         if (layer.fillMode == LayerFillMode.image) {
-          if (layer.imagePath != null && File(layer.imagePath!).existsSync()) {
-            bgImgFile = File(layer.imagePath!);
-          } else {
-            final game = (activeRow['game'] ?? '').toString();
-            final key = layer.bindingKey.isNotEmpty ? layer.bindingKey : 'art_url';
-            final bindingVal = activeRow[key]?.toString();
-            bgImgFile = GameFolderService.resolveCardImageFile(game, bindingVal);
+          final game = (activeRow['game'] ?? '').toString();
+          final key = layer.bindingKey.isNotEmpty ? layer.bindingKey : 'art_url';
+          final bindingVal = activeRow[key]?.toString();
+          if (bindingVal != null && bindingVal.trim().isNotEmpty) {
+            bgImgFile = GameFolderService.resolveCardImageFile(game, bindingVal.trim());
+          }
+          if (bgImgFile == null || !bgImgFile.existsSync()) {
+            if (layer.imagePath != null && File(layer.imagePath!).existsSync()) {
+              bgImgFile = File(layer.imagePath!);
+            }
           }
         }
 
@@ -188,15 +191,35 @@ class CardRendererWidget extends StatelessWidget {
           return const SizedBox.expand();
         }
 
-        String rawText = layer.bindingKey.isNotEmpty && activeRow.containsKey(layer.bindingKey)
-            ? activeRow[layer.bindingKey].toString()
+        final boundVal = layer.bindingKey.isNotEmpty && activeRow.containsKey(layer.bindingKey)
+            ? activeRow[layer.bindingKey]?.toString()
+            : null;
+        String rawText = (boundVal != null && boundVal.trim().isNotEmpty)
+            ? boundVal
             : layer.text;
 
         final layerNameLower = layer.name.toLowerCase().trim();
         final rawTextLower = rawText.toLowerCase().trim();
 
-        // Auto-detect title layers if bindingKey was omitted or placeholder was used
-        if (layer.bindingKey.isEmpty || layer.bindingKey == 'card_name') {
+        // Auto-detect title layers if bindingKey was omitted, title_name was used, or placeholder was used
+        if (layer.bindingKey.isEmpty ||
+            layer.bindingKey == 'card_name' ||
+            layer.bindingKey == 'title_name' ||
+            layer.bindingKey == 'title' ||
+            layer.bindingKey == 'titulo') {
+          // If rawText is empty or matches token placeholder, fallback to card_name or title_name
+          if (rawText.trim().isEmpty ||
+              rawText.trim() == '{{${layer.bindingKey}}}' ||
+              rawText.trim() == '{{title_name}}' ||
+              rawText.trim() == '{{card_name}}') {
+            final boundTitle = (activeRow['title_name'] ?? '').toString().trim();
+            final cardName = (activeRow['card_name'] ?? '').toString().trim();
+            if (boundTitle.isNotEmpty && boundTitle != '{{title_name}}') {
+              rawText = boundTitle;
+            } else if (cardName.isNotEmpty && cardName != '{{title_name}}') {
+              rawText = cardName;
+            }
+          }
           if (layerNameLower == 'titulo' ||
               layerNameLower == 'título' ||
               layerNameLower == 'title' ||
@@ -206,7 +229,10 @@ class CardRendererWidget extends StatelessWidget {
               rawTextLower == 'titulo' ||
               rawTextLower == 'title') {
             final cardName = (activeRow['card_name'] ?? '').toString().trim();
-            if (cardName.isNotEmpty) {
+            final boundTitle = (activeRow['title_name'] ?? '').toString().trim();
+            if (boundTitle.isNotEmpty && boundTitle != '{{title_name}}') {
+              rawText = boundTitle;
+            } else if (cardName.isNotEmpty && cardName != '{{title_name}}') {
               rawText = cardName;
             }
           }
@@ -248,6 +274,8 @@ class CardRendererWidget extends StatelessWidget {
               textAlign: layer.textAlign,
               enableAutoFit: true,
               enableInlineSymbols: true,
+              textStrokeWidth: layer.textStrokeWidth,
+              textStrokeColor: layer.textStrokeColor,
             ),
           ),
         );
@@ -293,13 +321,16 @@ class CardRendererWidget extends StatelessWidget {
 
       case LayerType.image:
         File? imgFile;
-        if (layer.imagePath != null && File(layer.imagePath!).existsSync()) {
-          imgFile = File(layer.imagePath!);
-        } else {
-          final game = (activeRow['game'] ?? '').toString();
-          final key = layer.bindingKey.isNotEmpty ? layer.bindingKey : 'art_url';
-          final bindingVal = activeRow[key]?.toString();
-          imgFile = GameFolderService.resolveCardImageFile(game, bindingVal);
+        final game = (activeRow['game'] ?? '').toString();
+        final key = layer.bindingKey.isNotEmpty ? layer.bindingKey : 'art_url';
+        final bindingVal = activeRow[key]?.toString();
+        if (bindingVal != null && bindingVal.trim().isNotEmpty) {
+          imgFile = GameFolderService.resolveCardImageFile(game, bindingVal.trim());
+        }
+        if (imgFile == null || !imgFile.existsSync()) {
+          if (layer.imagePath != null && File(layer.imagePath!).existsSync()) {
+            imgFile = File(layer.imagePath!);
+          }
         }
 
         if (imgFile != null && imgFile.existsSync()) {

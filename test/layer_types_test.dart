@@ -282,8 +282,11 @@ void main() {
     expect(find.text(AppStrings.get(AppLanguage.en, 'generate_ai_for_layer')), findsNothing);
 
     // Verify Typography selector and open full Font Catalog dialog
-    expect(find.text(AppStrings.get(AppLanguage.en, 'full_catalog')), findsOneWidget);
-    await tester.tap(find.text(AppStrings.get(AppLanguage.en, 'full_catalog')));
+    final catalogFinder = find.text(AppStrings.get(AppLanguage.en, 'full_catalog'));
+    expect(catalogFinder, findsOneWidget);
+    await tester.ensureVisible(catalogFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(catalogFinder);
     await tester.pumpAndSettle();
     expect(find.byType(GrimoireFontPickerDialog), findsOneWidget);
     expect(find.textContaining('Apply "'), findsOneWidget);

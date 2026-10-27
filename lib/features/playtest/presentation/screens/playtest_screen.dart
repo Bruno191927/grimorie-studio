@@ -9,7 +9,10 @@ import 'package:grimoire_studio/core/localization/locale_provider.dart';
 import 'package:grimoire_studio/features/export/services/export_service.dart';
 import '../../models/playtest_models.dart';
 import '../dialogs/token_spawner_dialog.dart';
+import 'dart:io';
 import '../dialogs/playtest_analytics_dialog.dart';
+import '../dialogs/custom_playmat_dialog.dart';
+import '../../services/playmat_service.dart';
 import '../widgets/battle_log_panel.dart';
 import 'package:grimoire_studio/features/editor/presentation/dialogs/card_3d_viewer_dialog.dart';
 
@@ -65,6 +68,14 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
 
   // Theme & Battle Log
   PlaymatTheme _currentTheme = PlaymatTheme.presets.first;
+  CustomPlaymatConfig _customPlaymatConfig = const CustomPlaymatConfig();
+
+  double get _effectiveTableWidth => (_customPlaymatConfig.isEnabled && _customPlaymatConfig.imagePath != null)
+      ? _customPlaymatConfig.tableWidth
+      : 2200.0;
+  double get _effectiveTableHeight => (_customPlaymatConfig.isEnabled && _customPlaymatConfig.imagePath != null)
+      ? _customPlaymatConfig.tableHeight
+      : 1400.0;
   final List<BattleLogEntry> _battleLogs = [];
   bool _showBattleLog = false;
   bool? _userShowCombatStats; // null = auto-detect based on cards in game
@@ -162,8 +173,8 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
       return;
     }
 
-    const double tableWidth = 2200.0;
-    const double tableHeight = 1400.0;
+    final double tableWidth = _effectiveTableWidth;
+    final double tableHeight = _effectiveTableHeight;
 
     final scaleX = vpSize.width / tableWidth;
     final scaleY = vpSize.height / tableHeight;
@@ -519,7 +530,33 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initDeckAndHand();
+      _loadPlaymatConfig();
     });
+  }
+
+  Future<void> _loadPlaymatConfig() async {
+    final loaded = await PlaymatService.loadConfig(_selectedGame);
+    if (loaded != null && mounted) {
+      setState(() {
+        _customPlaymatConfig = loaded;
+      });
+    }
+  }
+
+  void _openCustomPlaymatDialog() {
+    CustomPlaymatDialog.show(
+      context,
+      gameName: _selectedGame,
+      initialConfig: _customPlaymatConfig,
+      onApply: (CustomPlaymatConfig newConfig) {
+        setState(() {
+          _customPlaymatConfig = newConfig;
+        });
+        _addLog(newConfig.isEnabled
+            ? 'Mesa de juego personalizada aplicada.'
+            : 'Mesa personalizada desactivada (usando tema predeterminado).');
+      },
+    );
   }
 
   void _onTransformationChanged() {
@@ -1145,7 +1182,10 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
       _lastActiveGame = activeGame;
       _selectedGame = activeGame;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _initDeckAndHand();
+        if (mounted) {
+          _initDeckAndHand();
+          _loadPlaymatConfig();
+        }
       });
     }
 
@@ -1207,6 +1247,7 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                           if (val != null) {
                             setState(() => _selectedGame = val);
                             _initDeckAndHand();
+                            _loadPlaymatConfig();
                           }
                         },
                       ),
@@ -1438,16 +1479,61 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                     ),
                     const SizedBox(width: 6),
 
+                    // Custom Playmat Direct Action Button
+                    IconButton(
+                      tooltip: (_customPlaymatConfig.isEnabled && _customPlaymatConfig.imagePath != null)
+                          ? 'Mesa Personalizada Activa • Clic para configurar o cambiar'
+                          : 'Subir Mesa de Juego Personalizada (Tapete)',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(
+                            Icons.table_bar,
+                            size: 18,
+                            color: (_customPlaymatConfig.isEnabled && _customPlaymatConfig.imagePath != null)
+                                ? GrimoireTheme.accentPurple
+                                : GrimoireTheme.textMuted,
+                          ),
+                          if (_customPlaymatConfig.isEnabled && _customPlaymatConfig.imagePath != null)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: GrimoireTheme.accentPurple,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: _openCustomPlaymatDialog,
+                    ),
+                    const SizedBox(width: 4),
+
                     // Playmat Theme Selector Popup
-                    PopupMenuButton<PlaymatTheme>(
+                    PopupMenuButton<dynamic>(
                       tooltip: 'Cambiar Tapete de Juego',
                       color: GrimoireTheme.surfaceElevated,
                       icon: Text(_currentTheme.icon, style: const TextStyle(fontSize: 16)),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onSelected: (theme) {
-                        setState(() => _currentTheme = theme);
-                        _addLog('Tapete cambiado a "${theme.name}"');
+                      onSelected: (val) {
+                        if (val is PlaymatTheme) {
+                          setState(() {
+                            _currentTheme = val;
+                            if (_customPlaymatConfig.isEnabled) {
+                              _customPlaymatConfig = _customPlaymatConfig.copyWith(isEnabled: false);
+                            }
+                          });
+                          _addLog('Tapete cambiado a "${val.name}"');
+                        } else if (val == 'custom_playmat') {
+                          _openCustomPlaymatDialog();
+                        }
                       },
                       itemBuilder: (ctx) => [
                         for (final theme in PlaymatTheme.presets)
@@ -1461,6 +1547,17 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                               ],
                             ),
                           ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'custom_playmat',
+                          child: Row(
+                            children: [
+                              Icon(Icons.table_bar, size: 16, color: GrimoireTheme.accentPurple),
+                              SizedBox(width: 8),
+                              Text('Personalizar Mesa (Subir Imagen)...', style: TextStyle(fontSize: 12, color: Colors.white)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(width: 6),
@@ -1590,8 +1687,8 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                             });
                           }
 
-                          const double tableWidth = 2200.0;
-                          const double tableHeight = 1400.0;
+                          final double tableWidth = _effectiveTableWidth;
+                          final double tableHeight = _effectiveTableHeight;
 
                           return Stack(
                             children: [
@@ -1620,6 +1717,10 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                                     }
                                   },
                                   builder: (context, candidateData, rejectedData) {
+                                    final hasCustomImage = _customPlaymatConfig.isEnabled &&
+                                        _customPlaymatConfig.imagePath != null &&
+                                        File(_customPlaymatConfig.imagePath!).existsSync();
+
                                     return InteractiveViewer(
                                       transformationController: _transformationController,
                                       minScale: 0.25,
@@ -1629,23 +1730,43 @@ class _PlaytestScreenState extends ConsumerState<PlaytestScreen> {
                                       child: Container(
                                         width: tableWidth,
                                         height: tableHeight,
-                                        decoration: _currentTheme.decoration,
+                                        decoration: hasCustomImage
+                                            ? BoxDecoration(
+                                                color: const Color(0xFF0F111D),
+                                                image: DecorationImage(
+                                                  image: FileImage(File(_customPlaymatConfig.imagePath!)),
+                                                  fit: _customPlaymatConfig.fit,
+                                                ),
+                                              )
+                                            : _currentTheme.decoration,
                                         child: Stack(
                                           children: [
-                                            // Table Division Lines Painter
-                                            Positioned.fill(
-                                              child: CustomPaint(
-                                                painter: TableDivisionPainter(
-                                                  mode: _divisionMode,
-                                                  theme: _currentTheme,
-                                                  activePlayer: _activePlayer,
+                                            // Dimming Overlay for custom playmat
+                                            if (hasCustomImage && _customPlaymatConfig.overlayDim > 0)
+                                              Positioned.fill(
+                                                child: Container(
+                                                  color: Colors.black.withValues(alpha: _customPlaymatConfig.overlayDim),
                                                 ),
                                               ),
-                                            ),
+
+                                            // Table Division Lines Painter
+                                            if (!hasCustomImage || _customPlaymatConfig.showDivisionLines)
+                                              Positioned.fill(
+                                                child: Opacity(
+                                                  opacity: hasCustomImage ? _customPlaymatConfig.divisionLinesOpacity : 1.0,
+                                                  child: CustomPaint(
+                                                    painter: TableDivisionPainter(
+                                                      mode: _divisionMode,
+                                                      theme: _currentTheme,
+                                                      activePlayer: _activePlayer,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
 
                                             // Center Hub Badge / Info
                                             if (_divisionMode != TableDivisionMode.none)
-                                              _buildCenterHub(const Offset(tableWidth / 2, tableHeight / 2)),
+                                              _buildCenterHub(Offset(tableWidth / 2, tableHeight / 2)),
 
                                             // Center Watermark when single player
                                             if (_divisionMode == TableDivisionMode.none)

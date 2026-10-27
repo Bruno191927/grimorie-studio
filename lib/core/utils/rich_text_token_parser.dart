@@ -27,6 +27,7 @@ class RichTextTokenParser {
     switch (code) {
       case 'T':
       case 'TAP':
+      case 'GIRAR':
         return const InlineBadgeSpec(
           label: '⟳',
           bgColor: Color(0xFF334155),
@@ -35,6 +36,7 @@ class RichTextTokenParser {
         );
       case 'Q':
       case 'UNTAP':
+      case 'DESGIRAR':
         return const InlineBadgeSpec(
           label: '⟲',
           bgColor: Color(0xFF1E293B),
@@ -43,6 +45,7 @@ class RichTextTokenParser {
         );
       case 'R':
       case 'FIRE':
+      case 'FUEGO':
         return const InlineBadgeSpec(
           label: '🔥',
           bgColor: Color(0xFF991B1B),
@@ -50,6 +53,7 @@ class RichTextTokenParser {
         );
       case 'U':
       case 'WATER':
+      case 'AGUA':
         return const InlineBadgeSpec(
           label: '💧',
           bgColor: Color(0xFF1E40AF),
@@ -57,6 +61,9 @@ class RichTextTokenParser {
         );
       case 'G':
       case 'NATURE':
+      case 'PLANTA':
+      case 'TIERRA':
+      case 'EARTH':
         return const InlineBadgeSpec(
           label: '🌿',
           bgColor: Color(0xFF065F46),
@@ -64,6 +71,10 @@ class RichTextTokenParser {
         );
       case 'B':
       case 'DARK':
+      case 'OSCURIDAD':
+      case 'SKULL':
+      case 'CALAVERA':
+      case 'MUERTE':
         return const InlineBadgeSpec(
           label: '💀',
           bgColor: Color(0xFF18181B),
@@ -71,6 +82,9 @@ class RichTextTokenParser {
         );
       case 'W':
       case 'LIGHT':
+      case 'LUZ':
+      case 'SOL':
+      case 'SUN':
         return const InlineBadgeSpec(
           label: '☀️',
           bgColor: Color(0xFFFEF3C7),
@@ -79,34 +93,63 @@ class RichTextTokenParser {
         );
       case 'C':
       case 'VOID':
+      case 'INCOLORO':
         return const InlineBadgeSpec(
           label: '◇',
           bgColor: Color(0xFF334155),
           borderColor: Color(0xFFCBD5E1),
         );
       case 'ATK':
+      case 'ATTACK':
       case 'SWORD':
+      case 'ESPADA':
         return const InlineBadgeSpec(
           label: '⚔️',
           bgColor: Color(0xFF7C2D12),
           borderColor: Color(0xFFFB923C),
         );
       case 'DEF':
+      case 'DEFENSE':
       case 'SHIELD':
+      case 'ESCUDO':
         return const InlineBadgeSpec(
           label: '🛡️',
           bgColor: Color(0xFF1E3A8A),
           borderColor: Color(0xFF93C5FD),
         );
+      case 'HP':
+      case 'LIFE':
+      case 'HEART':
+      case 'CORAZON':
+      case 'VIDA':
+        return const InlineBadgeSpec(
+          label: '❤️',
+          bgColor: Color(0xFF881337),
+          borderColor: Color(0xFFFB7185),
+        );
       case 'STAR':
       case 'MAGIC':
+      case 'MAGIA':
+      case 'ESTRELLA':
         return const InlineBadgeSpec(
           label: '✨',
           bgColor: Color(0xFF581C87),
           borderColor: Color(0xFFE879F9),
         );
+      case 'ACT':
+      case 'ACTION':
+      case 'ACCION':
+      case 'ENERGY':
+      case 'ENERGIA':
+      case 'MANA':
+        return const InlineBadgeSpec(
+          label: '⚡',
+          bgColor: Color(0xFF78350F),
+          borderColor: Color(0xFFFBBF24),
+          textColor: Color(0xFFFEF3C7),
+        );
       default:
-        // Numeric or X/Y mana cost badges: {0}..{20}, {X}, {+1}
+        // Numeric or X/Y mana cost badges: {0}..{99}, {X}, {+1}, {-1}
         if (RegExp(r'^[0-9XY\+\-]+$').hasMatch(code)) {
           return InlineBadgeSpec(
             label: code,
@@ -131,7 +174,8 @@ class RichTextTokenParser {
     return false;
   }
 
-  /// Builds an auto-fitting text or rich-text widget that shrinks fontSize to fit within [maxWidth] x [maxHeight]
+  /// Builds an auto-fitting text or rich-text widget that shrinks fontSize to fit within [maxWidth] x [maxHeight].
+  /// Optionally supports [textStrokeWidth] and [textStrokeColor] for high-contrast TCG styling.
   static Widget buildAutoFitCardText({
     required String text,
     required double maxWidth,
@@ -145,6 +189,8 @@ class RichTextTokenParser {
     required TextAlign textAlign,
     bool enableAutoFit = true,
     bool enableInlineSymbols = true,
+    double textStrokeWidth = 0.0,
+    Color textStrokeColor = Colors.black,
   }) {
     if (text.isEmpty) return const SizedBox.shrink();
 
@@ -161,7 +207,7 @@ class RichTextTokenParser {
           )
         : baseFontSize;
 
-    final baseStyle = GrimoireFontHelper.resolveTextStyle(
+    final fillStyle = GrimoireFontHelper.resolveTextStyle(
       fontFamily: fontFamily,
       fontSize: effectiveFontSize,
       isBold: isBold,
@@ -170,84 +216,117 @@ class RichTextTokenParser {
       letterSpacing: letterSpacing,
     );
 
-    if (!enableInlineSymbols || !hasInlineTokens(text)) {
-      return Text(
-        text,
+    Widget buildTextWithStyle(TextStyle style, {bool isStrokePass = false}) {
+      if (!enableInlineSymbols || !hasInlineTokens(text)) {
+        return Text(
+          text,
+          textAlign: textAlign,
+          style: style,
+        );
+      }
+
+      final spans = <InlineSpan>[];
+      int lastEnd = 0;
+
+      for (final match in _tokenRegex.allMatches(text)) {
+        if (match.start > lastEnd) {
+          spans.add(TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: style,
+          ));
+        }
+
+        final rawCode = match.group(1) ?? '';
+        final badge = resolveToken(rawCode);
+
+        if (badge != null) {
+          final badgeSize = (effectiveFontSize * 1.32).clamp(11.0, 32.0);
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: isStrokePass
+                  ? SizedBox(width: badgeSize + 3.0, height: badgeSize)
+                  : Container(
+                      width: badgeSize,
+                      height: badgeSize,
+                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                      decoration: BoxDecoration(
+                        color: badge.bgColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: badge.borderColor, width: 1.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          badge.label,
+                          style: TextStyle(
+                            fontSize: badgeSize * 0.58,
+                            fontWeight: FontWeight.bold,
+                            color: badge.textColor,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          );
+        } else {
+          spans.add(TextSpan(
+            text: match.group(0),
+            style: style,
+          ));
+        }
+
+        lastEnd = match.end;
+      }
+
+      if (lastEnd < text.length) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd),
+          style: style,
+        ));
+      }
+
+      return Text.rich(
+        TextSpan(children: spans),
         textAlign: textAlign,
-        style: baseStyle,
       );
     }
 
-    final spans = <InlineSpan>[];
-    int lastEnd = 0;
+    if (textStrokeWidth > 0.0) {
+      final strokePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = textStrokeWidth * 2.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = textStrokeColor;
 
-    for (final match in _tokenRegex.allMatches(text)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(
-          text: text.substring(lastEnd, match.start),
-          style: baseStyle,
-        ));
-      }
+      final strokeStyle = GrimoireFontHelper.resolveTextStyle(
+        fontFamily: fontFamily,
+        fontSize: effectiveFontSize,
+        isBold: isBold,
+        isItalic: isItalic,
+        color: null,
+        foreground: strokePaint,
+        letterSpacing: letterSpacing,
+      );
 
-      final rawCode = match.group(1) ?? '';
-      final badge = resolveToken(rawCode);
-
-      if (badge != null) {
-        final badgeSize = (effectiveFontSize * 1.32).clamp(11.0, 32.0);
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              width: badgeSize,
-              height: badgeSize,
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              decoration: BoxDecoration(
-                color: badge.bgColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: badge.borderColor, width: 1.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 2,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  badge.label,
-                  style: TextStyle(
-                    fontSize: badgeSize * 0.58,
-                    fontWeight: FontWeight.bold,
-                    color: badge.textColor,
-                    height: 1.0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      } else {
-        spans.add(TextSpan(
-          text: match.group(0),
-          style: baseStyle,
-        ));
-      }
-
-      lastEnd = match.end;
+      return Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          buildTextWithStyle(strokeStyle, isStrokePass: true),
+          buildTextWithStyle(fillStyle, isStrokePass: false),
+        ],
+      );
     }
 
-    if (lastEnd < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastEnd),
-        style: baseStyle,
-      ));
-    }
-
-    return Text.rich(
-      TextSpan(children: spans),
-      textAlign: textAlign,
-    );
+    return buildTextWithStyle(fillStyle, isStrokePass: false);
   }
 
   static double _computeOptimalFontSize({

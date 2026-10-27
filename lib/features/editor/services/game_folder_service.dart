@@ -117,6 +117,9 @@ class GameFolderService {
     return saveGameDataCsvSync(gameName, cards, customRootDir: customRootDir);
   }
 
+  /// Internal keys that are used for engine/storage metadata and should not appear as CSV data columns
+  static const Set<String> internalKeys = {'template_id', 'is_category_default', 'is_game_default', 'rules'};
+
   /// Normalizes a card row dictionary ensuring standard fields are populated and aligned.
   static Map<String, dynamic> normalizeCardRow(Map<String, dynamic> raw, {String? defaultGame}) {
     final card = Map<String, dynamic>.from(raw);
@@ -131,11 +134,30 @@ class GameFolderService {
     final qty = card['qty']?.toString().trim();
     card['qty'] = (qty != null && qty.isNotEmpty) ? qty : '1';
 
-    if (!card.containsKey('cost')) card['cost'] = '';
-    if (!card.containsKey('type') || card['type']?.toString().trim().isEmpty == true) card['type'] = 'Carta Normal';
-    if (!card.containsKey('rarity')) card['rarity'] = 'Común';
-    if (!card.containsKey('attack')) card['attack'] = '';
-    if (!card.containsKey('defense')) card['defense'] = '';
+    // Card Status: 'Definitiva' vs 'Muestra' (Preset)
+    final rawStatus = (card['card_status'] ?? card['preset'] ?? card['is_preset'] ?? card['estado'])?.toString().trim();
+    if (rawStatus != null && rawStatus.isNotEmpty) {
+      final s = rawStatus.toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes' || s == 'si' || s == 'sí' || s == 'muestra' || s == 'preset' || s == 'preestablecida') {
+        card['card_status'] = 'Muestra';
+      } else {
+        card['card_status'] = 'Definitiva';
+      }
+    } else {
+      final isCatDef = (card['is_category_default'] ?? '').toString().toLowerCase().trim();
+      final isGameDef = (card['is_game_default'] ?? '').toString().toLowerCase().trim();
+      final creator = (card['creator'] ?? '').toString().trim();
+      if (isCatDef == 'true' || isGameDef == 'true' || creator == 'TeeTurtle / Grimoire') {
+        card['card_status'] = 'Muestra';
+      } else {
+        card['card_status'] = 'Definitiva';
+      }
+    }
+
+    // Combat stats and cost: only preserve if already present in card, don't force on non-combat games
+    if (card.containsKey('cost') && card['cost'] == null) card['cost'] = '';
+    if (card.containsKey('attack') && card['attack'] == null) card['attack'] = '';
+    if (card.containsKey('defense') && card['defense'] == null) card['defense'] = '';
 
     final rulesText = card['rules_text']?.toString().trim() ?? '';
     final rules = card['rules']?.toString().trim() ?? '';
@@ -145,15 +167,7 @@ class GameFolderService {
     } else if (rules.isNotEmpty) {
       card['rules_text'] = rules;
       card['rules'] = rules;
-    } else {
-      card['rules_text'] = card.containsKey('rules_text') ? '' : 'Habilidad especial para el juego $game.';
-      card['rules'] = card['rules_text'];
     }
-
-    if (!card.containsKey('art_url')) card['art_url'] = '';
-    if (!card.containsKey('prompt')) card['prompt'] = '';
-    if (!card.containsKey('icon') || card['icon'].toString().trim().isEmpty) card['icon'] = '🃏';
-    if (!card.containsKey('creator') || card['creator'].toString().trim().isEmpty) card['creator'] = 'Grimoire Studio';
 
     return card;
   }
@@ -163,62 +177,69 @@ class GameFolderService {
     ensureGameFolderExistsSync(gameName, customRootDir: customRootDir);
 
     final csvFile = getGameDataCsvFile(gameName, customRootDir: customRootDir);
-    final standardHeaders = [
-      'card_name',
-      'game',
-      'category',
-      'qty',
-      'cost',
+    final coreHeaders = ['card_name', 'game', 'category', 'card_status', 'qty'];
+    final standardCandidates = [
       'type',
       'rarity',
+      'cost',
       'attack',
       'defense',
       'rules_text',
-      'prompt',
       'art_url',
+      'prompt',
       'icon',
       'art_color',
       'creator',
     ];
 
-    const internalKeys = {'template_id', 'is_category_default', 'is_game_default', 'rules'};
-    final extraHeaders = <String>{};
-    for (final card in cards) {
-      for (final k in card.keys) {
-        if (!standardHeaders.contains(k) && !internalKeys.contains(k)) {
-          extraHeaders.add(k);
-        }
+    // Collect all unique keys present across the cards
+    final allCardKeys = <String>{};
+    for (final c in cards) {
+      allCardKeys.addAll(c.keys);
+    }
+
+    // Custom or template headers (e.g. title_name, card_url, action_text, frase, category_url)
+    final customOrTemplateHeaders = <String>[];
+    for (final k in allCardKeys) {
+      if (!coreHeaders.contains(k) &&
+          !standardCandidates.contains(k) &&
+          !internalKeys.contains(k)) {
+        customOrTemplateHeaders.add(k);
       }
     }
-    final headers = [...standardHeaders, ...extraHeaders];
+
+    // Include standard candidates only if at least one card has a non-empty/non-default value
+    final activeStandardHeaders = <String>[];
+    for (final std in standardCandidates) {
+      final hasData = cards.any((c) {
+        final val = c[std]?.toString().trim() ?? '';
+        if (std == 'creator' && val == 'Grimoire Studio') return false;
+        if (std == 'icon' && val == '🃏') return false;
+        return val.isNotEmpty;
+      });
+      if (hasData) {
+        activeStandardHeaders.add(std);
+      }
+    }
+
+    final headers = [
+      ...coreHeaders,
+      ...customOrTemplateHeaders,
+      ...activeStandardHeaders,
+    ];
 
     final rows = <List<dynamic>>[headers];
 
     for (final rawCard in cards) {
       final card = normalizeCardRow(rawCard, defaultGame: gameName);
 
-      final row = <dynamic>[
-        card['card_name']?.toString() ?? '',
-        card['game']?.toString() ?? gameName,
-        card['category']?.toString() ?? 'General',
-        card['qty']?.toString() ?? '1',
-        card['cost']?.toString() ?? '',
-        card['type']?.toString() ?? 'Carta Normal',
-        card['rarity']?.toString() ?? 'Común',
-        card['attack']?.toString() ?? '',
-        card['defense']?.toString() ?? '',
-        card['rules_text']?.toString() ?? '',
-        card['prompt']?.toString() ?? '',
-        card['art_url']?.toString() ?? '',
-        card['icon']?.toString() ?? '🃏',
-        card['art_color'] is int
-            ? '0x${(card['art_color'] as int).toRadixString(16).padLeft(8, '0').toUpperCase()}'
-            : (card['art_color']?.toString() ?? '0xFF7C3AED'),
-        card['creator']?.toString() ?? 'Grimoire Studio',
-      ];
-      for (final extra in extraHeaders) {
-        row.add(card[extra]?.toString() ?? '');
-      }
+      final row = headers.map((h) {
+        final val = card[h];
+        if (h == 'art_color' && val is int) {
+          return '0x${val.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+        }
+        return val?.toString() ?? '';
+      }).toList();
       rows.add(row);
     }
 
